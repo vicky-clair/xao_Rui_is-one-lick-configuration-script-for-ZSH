@@ -18,11 +18,11 @@ jobs:
         shell: bash
         run: |
           if command -v apt-get >/dev/null; then
-            apt-get update && apt-get install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates
+            apt-get update && apt-get install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux bsdutils
           elif command -v dnf >/dev/null; then
-            dnf install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates
+            dnf install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux
           else
-            pacman -Syu --noconfirm bash zsh git coreutils diffutils findutils grep sed ca-certificates
+            pacman -Syu --noconfirm bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux
           fi
       - uses: actions/checkout@v4
       - name: Installer regression (mocked downloads and system changes)

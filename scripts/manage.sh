@@ -249,7 +249,19 @@ case "$ACTION" in
     timer=$(command -v timeout || command -v gtimeout || true)
     [[ -n "$timer" ]] || fail '缺少 timeout/gtimeout，拒绝运行可能阻塞的初始化'
     confirm '将真实执行一次当前 .zshrc 和目录钩子，可能触发工具正常缓存写入；最多约 32 秒。继续？' || exit 0
-    ZSH_PROJECT_PROFILING=1 ZSH_PROJECT_AUTO_CHECK_UPDATE=0 "$timer" -k 2s 30s zsh -fic 'zmodload zsh/zprof; source "$HOME/.zshrc" || exit $?; print -r -- "--- chpwd hooks ---"; typeset -p chpwd_functions precmd_functions 2>/dev/null; builtin cd -- "$HOME" || exit $?; print -r -- "--- zprof ---"; zprof'
+    # timeout 创建独立进程组；禁用 Zsh 作业控制，避免子 Shell 在执行配置前争抢前台 TTY。
+    # 保留 -i 以加载交互配置，空输入避免诊断读取按键；仍由 timeout 清理整个进程组。
+    if ZSH_PROJECT_PROFILING=1 ZSH_PROJECT_AUTO_CHECK_UPDATE=0 "$timer" -k 2s 30s zsh -f +m -i -c 'zmodload zsh/zprof; source "$HOME/.zshrc" || exit $?; print -r -- "--- chpwd hooks ---"; typeset -p chpwd_functions precmd_functions 2>/dev/null; builtin cd -- "$HOME" || exit $?; print -r -- "--- zprof ---"; zprof' </dev/null; then
+      :
+    else
+      status=$?
+      if [[ "$status" == 124 || "$status" == 137 ]]; then
+        printf '启动诊断超时（退出码 %s），请检查最后一个已输出的阶段或用户初始化脚本。\n' "$status" >&2
+      else
+        printf '启动诊断失败（退出码 %s），请查看以上输出。\n' "$status" >&2
+      fi
+      exit "$status"
+    fi
     ;;
   --retry-failed)
     args=(); [[ -z "$ARG" ]] || args+=("$ARG")

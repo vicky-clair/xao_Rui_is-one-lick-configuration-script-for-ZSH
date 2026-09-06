@@ -130,9 +130,28 @@ if command -v zsh >/dev/null 2>&1; then
   [[ ! -e "$TOOL_MARKER" ]] || fail 'Fastfetch ran while disabled'
   grep -qx MANUAL_MESSAGE "$STAGE/flags.log" || fail 'banner flag hid manual messages'
   if grep -Eq 'ms|PROFILE|Loading tools|环境加载完成' "$STAGE/flags.log"; then fail 'disabled banner/timer or default profiling emitted output'; fi
-  manage --profile-startup --yes > "$STAGE/profile.log" 2> "$STAGE/profile.stderr" || fail 'startup profiling failed'
+  if manage --profile-startup --yes > "$STAGE/profile.log" 2> "$STAGE/profile.stderr"; then :
+  else
+    profile_status=$?
+    cat "$STAGE/profile.stderr" "$STAGE/profile.log" >&2
+    fail "startup profiling failed (exit $profile_status)"
+  fi
   [[ ! -s "$STAGE/profile.stderr" ]] || { cat "$STAGE/profile.stderr"; fail 'profile startup errors'; }
   grep -q '\[PROFILE\].*Fastfetch' "$STAGE/profile.log" || fail 'profile stage missing'
+  # CI 默认没有控制终端；另造 PTY，覆盖用户从 SSH/终端启动诊断的路径。
+  if [[ ${OSTYPE:-} == linux* ]] && command -v script >/dev/null; then
+    export PROFILE_MANAGER="$ROOT/scripts/manage.sh"
+    if script -q -e -c 'bash "$PROFILE_MANAGER" --profile-startup --yes' "$STAGE/profile.tty.log" </dev/null > "$STAGE/profile.tty.stdout" 2> "$STAGE/profile.tty.stderr"; then :
+    else
+      profile_status=$?
+      cat "$STAGE/profile.tty.stderr" "$STAGE/profile.tty.stdout" >&2
+      fail "startup profiling under PTY failed (exit $profile_status)"
+    fi
+    grep -q -- '--- zprof ---' "$STAGE/profile.tty.stdout" || fail 'PTY profiling did not reach zprof'
+    pass 'startup profiling with a controlling terminal'
+  else
+    echo 'SKIP: Linux util-linux script unavailable; PTY profiling test not run'
+  fi
   pass 'Zsh switches, local extension ordering and opt-in profiling'
 else
   echo 'SKIP: Zsh runtime unavailable; Linux CI runs flag/local/profile tests'

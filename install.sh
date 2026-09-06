@@ -34,6 +34,15 @@ cleanup_terminal() {
 trap 'cleanup_terminal' INT TERM EXIT
 
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+# 独立管理命令不进入安装流程，也不要求重新安装组件。
+for _management_arg in "$@"; do
+  case "$_management_arg" in
+    --disable|--enable|--doctor|--configure|--set|--profile-startup|--retry-failed|--list-backups|--diff-backup|--restore-backup)
+      [[ -r "$SCRIPT_DIR/scripts/manage.sh" ]] || { printf '缺少 scripts/manage.sh，请获取完整项目。\n' >&2; exit 1; }
+      exec bash "$SCRIPT_DIR/scripts/manage.sh" "$@" ;;
+  esac
+done
+unset _management_arg
 DRY_RUN=0
 PROFILE=basic
 PROFILE_SET=0
@@ -74,6 +83,15 @@ $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --update              $(msg "交互式升级已安装的 Zsh/Tmux 插件、主题与包管理器工具" "Interactively update installed plugins, themes, and CLI tools")
   --lang zh|en          $(msg "界面语言（zh 为中文，en 为英文）" "UI language (zh for Chinese, en for English)")
   --rollback DIR        $(msg "恢复某次安装备份，只恢复配置文件" "Rollback configurations from a specific backup directory")
+  --disable / --enable  停用/恢复 Zsh 配置，保留应用与 tmux
+  --doctor              只读配置体检
+  --configure           交互式开关菜单（新会话生效）
+  --set KEY=0|1         设置一个功能开关；管理命令支持 --yes
+  --profile-startup     手动测量初始化阶段与钩子耗时
+  --retry-failed [TOOL] 重试失败组件，不重新部署配置
+  --list-backups        列出安装与配置管理备份
+  --diff-backup DIR     比较备份与当前配置
+  --restore-backup DIR  按 --scope zsh|tmux|all 恢复（默认 zsh）
   --help|-h             $(msg "显示帮助" "Show help")
 $(msg "实际安装必须在交互终端确认，不提供无人值守默认授权。" "Actual installation must be confirmed interactively.")
 EOF
@@ -221,6 +239,8 @@ if ((DRY_RUN)); then
   fi
   exit 0
 fi
+
+[[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/disabled" || $CHECK_UPDATES == 1 || $DO_UPDATE == 1 ]] || die '项目配置已停用；请先 --enable，再重新安装或回退。'
 
 # 交互式语言选择菜单（若未通过命令行显式指定 --lang，按键即响应）
 if ((!DRY_RUN)) && [[ -t 0 ]] && ((!LANG_SET)) && [[ -z "$ROLLBACK" ]]; then
@@ -1016,6 +1036,10 @@ if [[ -f "$SCRIPT_DIR/scripts/check_updates.sh" ]]; then
   chmod 755 "$STATE_ROOT/scripts/check_updates.sh"
 fi
 
+for helper in manage.sh retry_tools.sh; do
+  [[ ! -f "$SCRIPT_DIR/scripts/$helper" ]] || install -m 700 "$SCRIPT_DIR/scripts/$helper" "$STATE_ROOT/scripts/$helper"
+done
+
 # 10. 部署配置文件
 cp "$SCRIPT_DIR/templates/zshrc.zsh" "$BACKUP/new.zshrc"
 
@@ -1029,6 +1053,9 @@ ZSH_PROJECT_DIR="$SCRIPT_DIR"
 ZSH_PROJECT_LANG="$LANG_CHOICE"
 ZSH_PROJECT_AUTO_CHECK_UPDATE=1
 ZSH_PROJECT_CHECK_INTERVAL_DAYS=7
+ZSH_PROJECT_BANNER=1
+ZSH_PROJECT_FASTFETCH=1
+ZSH_PROJECT_TIMER=1
 EOF
 
 zsh -n "$BACKUP/new.zshrc"
@@ -1061,6 +1088,10 @@ fi
 printf '\n\033[1;32m🎉 %s\033[0m\n' "$(msg 'Zsh 配置安装完成！' 'Zsh configuration installed successfully!')"
 printf '%s: %s\n' "$(msg '备份目录与安装日志' 'Backup directory and install log')" "$BACKUP"
 printf '%s: %s\n' "$(msg '跳过的未安装包' 'Skipped packages')" "${SKIPPED[*]:-none}"
+# 独立重试读取结构化组件名称，不解析翻译后的日志。
+failed_tmp=$(mktemp "$STATE_ROOT/failed-components.XXXXXXXX")
+if ((${#SKIPPED[@]})); then printf '%s\n' "${SKIPPED[@]}" | sort -u > "$failed_tmp"; fi
+mv "$failed_tmp" "$STATE_ROOT/failed-components"
 if ((${#SKIPPED[@]} > 0)); then
   info "$(msg "提示：若因网络原因某些独立二进制或包未能自动下载，可参考文档手动安装或重试安装器。" "Tip: If some standalone binaries or packages failed to download due to network, please refer to the documentation or retry.")"
 fi

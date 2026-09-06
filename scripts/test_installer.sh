@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # 隔离回归：不安装软件、不联网、不修改真实 HOME。保留临时目录便于排查。
 set -Eeuo pipefail
+case ${OSTYPE:-} in msys*|cygwin*) export PATH="/usr/bin:$PATH" ;; esac
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 STAGE=$(mktemp -d "${TMPDIR:-/tmp}/zsh-installer-tests.XXXXXXXX")
 export HOME="$STAGE/home" XDG_STATE_HOME="$STAGE/state" XDG_CONFIG_HOME="$STAGE/config"

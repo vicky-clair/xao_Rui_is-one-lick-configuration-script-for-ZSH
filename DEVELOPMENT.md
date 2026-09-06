@@ -1,5 +1,7 @@
 # Zsh 跨平台一键配置项目开发与架构设计文档
 
+配置管理扩展：`install.sh` 将独立管理参数转发到 `scripts/manage.sh`，失败组件重试由 `scripts/retry_tools.sh` 执行。安装时复制两个脚本到状态目录供 `zsh-config` 调用。用户操作、状态文件语义和限制见 [配置管理指南](CONFIGURATION_MANAGEMENT.md)；修改管理行为时运行 `scripts/test_management.sh`，修改模板时同时运行 `scripts/test_installer.sh`。Linux 容器测试矩阵位于 `.github/workflows/tests.yml`。
+
 更新日期：2026-09-06  
 适用范围：Linux（Debian / Ubuntu / Fedora / Arch / openSUSE）与 macOS（Darwin / Apple Silicon & Intel Mac）
 

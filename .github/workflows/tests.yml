@@ -1,0 +1,33 @@
+name: Shell regression
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ["debian:12", "debian:13", "ubuntu:24.04", "fedora:latest", "archlinux:latest"]
+    container: ${{ matrix.image }}
+    steps:
+      - name: Install test prerequisites in disposable container
+        shell: bash
+        run: |
+          if command -v apt-get >/dev/null; then
+            apt-get update && apt-get install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates
+          elif command -v dnf >/dev/null; then
+            dnf install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates
+          else
+            pacman -Syu --noconfirm bash zsh git coreutils diffutils findutils grep sed ca-certificates
+          fi
+      - uses: actions/checkout@v4
+      - name: Installer regression (mocked downloads and system changes)
+        shell: bash
+        run: bash scripts/test_installer.sh
+      - name: Configuration management regression
+        shell: bash
+        run: bash scripts/test_management.sh

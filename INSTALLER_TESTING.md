@@ -1,5 +1,13 @@
 # 安装器审计修复与 Linux 测试
 
+## 配置管理扩展（2026-09-07）
+
+新增功能见 [配置管理指南](CONFIGURATION_MANAGEMENT.md)。除原安装器回归外，现在还需执行 `bash scripts/test_management.sh`。
+
+本轮在 Windows 的 Bash 环境通过两套脚本中可运行的隔离用例：管理预演、停用与重复停用、恢复修改保护、停用状态回退拦截、选项编辑不执行代码、范围恢复、缺失原文件恢复与字节码退出、备份差异与列表、指定组件重试和非法参数拒绝。测试在 MSYS/Cygwin 优先使用 Unix 工具路径，避免误调用 Windows `find.exe`。
+
+当前机器没有 Zsh，也没有可用 WSL 发行版。Zsh 运行用例（新开关、用户扩展加载顺序、性能阶段统计）与 Neovim 原生链接切换明确标记 SKIP，尚未验证。已添加 Debian 12/13、Ubuntu 24.04、Fedora、Arch 的 GitHub Actions 测试矩阵，尚未触发远端 CI。没有执行真实安装、部署到用户 Linux、运行 macOS 测试或推送代码。
+
 本次修复仅修改项目文件，没有在用户 Debian 上执行安装或部署。
 
 ## 已修复问题

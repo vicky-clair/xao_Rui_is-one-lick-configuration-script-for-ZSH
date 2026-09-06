@@ -1,0 +1,5 @@
+# 保存为 ~/.zshrc.local；此文件由用户维护，安装器不会覆盖。
+# 此处在主配置之后、语法高亮之前加载，可设置个人别名和按键。
+# alias c='clear'
+# bindkey '^[[A' history-substring-search-up
+# bindkey '^[[B' history-substring-search-down

@@ -525,6 +525,7 @@ case "$FAMILY" in
     ;;
   apt)
     sudo apt-get update
+    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term x11-utils 2>/dev/null || \
     sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term
     ;;
   dnf)

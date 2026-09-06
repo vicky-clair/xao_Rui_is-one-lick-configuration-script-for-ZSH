@@ -53,9 +53,23 @@ path=(
 )
 export PATH
 
+# 终端窗口尺寸监听：确保 SSH / 窗格缩放时行高列宽与物理屏幕保持同步
+if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
+  TRAPWINCH() {
+    zle && zle reset-prompt 2>/dev/null || true
+  }
+fi
+
 if command -v nvim >/dev/null 2>&1; then
   export EDITOR=nvim
   export VISUAL=nvim
+  nvim() {
+    # 启动前自适应同步物理窗口尺寸，彻底杜绝部分终端/SSH 默认锁定 80x24 导致无法全屏
+    if command -v resize >/dev/null 2>&1; then
+      eval "$(resize 2>/dev/null)" || true
+    fi
+    command nvim "$@"
+  }
   alias vim=nvim
   alias vi=nvim
   alias v=nvim

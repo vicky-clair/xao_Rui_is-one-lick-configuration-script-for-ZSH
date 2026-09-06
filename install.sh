@@ -398,7 +398,7 @@ optional_package() {
       fi
       ;;
     apt)
-      if apt-cache policy "$pkg" 2>/dev/null | grep -Eq 'Candidate: [^ (]'; then
+      if apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1; then
         sudo apt-get install -y "$pkg" && return 0
       fi
       ;;
@@ -437,8 +437,46 @@ if [[ "$PROFILE" == full ]]; then
   optional_package nvim neovim
 fi
 
-((WITH_VFOX)) && optional_package vfox vfox
-((WITH_LAZYDOCKER)) && optional_package lazydocker lazydocker
+# vfox 可选版本管理安装（优先包管理器，缺失时尝试官方用户态脚本）
+if ((WITH_VFOX)) && ! command -v vfox >/dev/null 2>&1; then
+  optional_package vfox vfox
+  if ! command -v vfox >/dev/null 2>&1; then
+    info "$(msg "系统仓库无 vfox，正在尝试通过官方脚本安装至用户目录..." "vfox not in repo; attempting official install script...")"
+    vfox_stage=$(mktemp -d "$HOME/.vfox-tmp-XXXXXX")
+    if curl -fsSL "https://raw.githubusercontent.com/version-fox/vfox/main/install.sh" -o "$vfox_stage/install.sh" 2>/dev/null; then
+      if bash "$vfox_stage/install.sh" --user >/dev/null 2>&1; then
+        success "$(msg "vfox 官方脚本安装成功" "vfox installed successfully via official script")"
+        new_skipped=()
+        for s in "${SKIPPED[@]}"; do [[ "$s" != vfox ]] && new_skipped+=("$s"); done
+        SKIPPED=("${new_skipped[@]}")
+      fi
+    fi
+    rm -rf "$vfox_stage"
+  fi
+fi
+
+# lazydocker 容器管理面板安装（优先包管理器，缺失时尝试官方独立预编译二进制）
+if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
+  optional_package lazydocker lazydocker
+  if ! command -v lazydocker >/dev/null 2>&1; then
+    info "$(msg "系统仓库无 lazydocker，正在尝试下载官方独立二进制至 ~/.local/bin..." "lazydocker not in repo; downloading official binary...")"
+    lzd_arch="x86_64"
+    [[ "$ARCH" == arm64 || "$ARCH" == aarch64 ]] && lzd_arch="arm64"
+    lzd_stage=$(mktemp -d "$HOME/.lzd-tmp-XXXXXX")
+    lzd_url="https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_Linux_${lzd_arch}.tar.gz"
+    if curl -fsSL "$lzd_url" -o "$lzd_stage/lzd.tar.gz" 2>/dev/null; then
+      if tar -xzf "$lzd_stage/lzd.tar.gz" -C "$lzd_stage" lazydocker 2>/dev/null && [[ -x "$lzd_stage/lazydocker" ]]; then
+        mkdir -p "$HOME/.local/bin"
+        install -m 755 "$lzd_stage/lazydocker" "$HOME/.local/bin/lazydocker"
+        success "$(msg "lazydocker 安装成功（位于 ~/.local/bin/lazydocker）" "lazydocker installed successfully (in ~/.local/bin/lazydocker)")"
+        new_skipped=()
+        for s in "${SKIPPED[@]}"; do [[ "$s" != lazydocker ]] && new_skipped+=("$s"); done
+        SKIPPED=("${new_skipped[@]}")
+      fi
+    fi
+    rm -rf "$lzd_stage"
+  fi
+fi
 
 if ((WITH_TMUX)); then
   info "$(msg "正在安装 tmux 及终端剪贴板依赖..." "Installing tmux and clipboard dependencies...")"
@@ -543,6 +581,9 @@ fi
 printf '\n\033[1;32m🎉 %s\033[0m\n' "$(msg 'Zsh 配置安装完成！' 'Zsh configuration installed successfully!')"
 printf '%s: %s\n' "$(msg '备份目录与安装日志' 'Backup directory and install log')" "$BACKUP"
 printf '%s: %s\n' "$(msg '跳过的未安装包' 'Skipped packages')" "${SKIPPED[*]:-none}"
+if [[ "$FAMILY" == apt ]] && [[ " ${SKIPPED[*]} " =~ " eza " || " ${SKIPPED[*]} " =~ " fastfetch " || " ${SKIPPED[*]} " =~ " yazi " ]]; then
+  info "$(msg "说明：Debian 12 官方仓库未包含 eza/fastfetch/yazi（Debian 13 已原生收录），跳过属正常现象，不影响核心体验；如需使用可参考文档手动下载。" "Note: Debian 12 repos do not include eza/fastfetch/yazi; core features remain fully functional.")"
+fi
 printf '%s\n' "$(msg '提示：请运行 zsh 验证交互环境；首次可用 p10k configure 配置外观。' 'Tip: Run zsh to verify. Configure prompt with p10k configure.')"
 
 # 11. 切换默认 Shell（Linux 与 macOS 分别适配）
@@ -561,6 +602,7 @@ if ask "$(msg '是否将 Zsh 设为当前用户的默认登录 Shell？' 'Set Zs
     fi
 
     if grep -Fxq "$zsh_bin" /etc/shells && command -v chsh >/dev/null 2>&1; then
+      info "$(msg "正在调用 chsh（若提示 Password 请输入当前用户密码）..." "Calling chsh (please enter user password if prompted)...")"
       chsh -s "$zsh_bin" || warn "$(msg "默认 Shell 修改失败，请稍后手动运行: chsh -s $zsh_bin" "chsh failed; please run manually: chsh -s $zsh_bin")"
     else
       warn "$(msg "未修改默认 Shell：缺少 chsh 或权限不足。" "Default shell not modified: missing chsh or insufficient permissions.")"

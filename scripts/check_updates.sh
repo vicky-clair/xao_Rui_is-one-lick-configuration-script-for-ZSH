@@ -6,6 +6,7 @@ export LC_ALL=C
 
 TIMEOUT_SEC=5
 QUIET=0
+CHECK_FAILED=0
 LANG_CHOICE="${ZSH_PROJECT_LANG:-zh}"
 STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
 OUTPUT_FILE="$STATE_ROOT/available_updates"
@@ -46,9 +47,6 @@ done
 command mkdir -p "$(dirname "$OUTPUT_FILE")"
 command mkdir -p "$STATE_ROOT"
 
-# 记录本次检查时间戳
-command date +%s > "$TIMESTAMP_FILE" 2>/dev/null || true
-
 # 超时命令封装（兼容 Linux timeout 与 macOS gtimeout / 降级）
 run_with_timeout() {
   local sec=$1; shift
@@ -64,7 +62,7 @@ run_with_timeout() {
 # 快速网络连通性测试（若离线则直接退出，不阻塞）
 if ! run_with_timeout 2 curl -fsI --connect-timeout 2 https://github.com >/dev/null 2>&1; then
   ((QUIET)) || echo "$(msg "网络不可用或连接 GitHub 超时，跳过更新检测。" "Network unavailable or GitHub connection timed out, skipping update check.")"
-  exit 0
+  exit 2
 fi
 
 UPDATES=()
@@ -102,6 +100,7 @@ check_git_repo() {
     fi
     ALL_CHECKED+=("$name: $(msg "已是最新" "up to date")")
   else
+    CHECK_FAILED=1
     ALL_CHECKED+=("$name: $(msg "检测超时" "check timed out")")
   fi
 }
@@ -150,7 +149,7 @@ check_apps() {
   if [[ "$os" == Darwin ]] && command -v brew >/dev/null 2>&1; then
     # macOS Homebrew 检测
     local outdated
-    outdated=$(run_with_timeout "$TIMEOUT_SEC" brew outdated --formula --quiet 2>/dev/null || true)
+    outdated=$(run_with_timeout "$TIMEOUT_SEC" brew outdated --formula --quiet 2>/dev/null) || { CHECK_FAILED=1; return 0; }
     if [[ -n "$outdated" ]]; then
       local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git tmux)
       for t in "${tools[@]}"; do
@@ -163,7 +162,7 @@ check_apps() {
   elif [[ "$os" == Linux ]]; then
     if command -v apt-get >/dev/null 2>&1 && command -v apt >/dev/null 2>&1; then
       local upgradable
-      upgradable=$(apt list --upgradable 2>/dev/null || true)
+      upgradable=$(run_with_timeout "$TIMEOUT_SEC" apt list --upgradable 2>/dev/null) || { CHECK_FAILED=1; return 0; }
       local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t/"; then
@@ -173,7 +172,9 @@ check_apps() {
       done
     elif command -v dnf >/dev/null 2>&1; then
       local upgradable
-      upgradable=$(dnf check-update --quiet 2>/dev/null || true)
+      local status=0
+      upgradable=$(run_with_timeout "$TIMEOUT_SEC" dnf check-update --quiet 2>/dev/null) || status=$?
+      if [[ "$status" != 0 && "$status" != 100 ]]; then CHECK_FAILED=1; return 0; fi
       local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t\."; then
@@ -184,7 +185,9 @@ check_apps() {
     elif command -v checkupdates >/dev/null 2>&1; then
       # Arch Linux
       local upgradable
-      upgradable=$(checkupdates 2>/dev/null || true)
+      local status=0
+      upgradable=$(run_with_timeout "$TIMEOUT_SEC" checkupdates 2>/dev/null) || status=$?
+      if [[ "$status" != 0 && "$status" != 2 ]]; then CHECK_FAILED=1; return 0; fi
       local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t "; then
@@ -198,6 +201,12 @@ check_apps() {
 
 check_apps
 
+# 不用不完整的检查覆盖上次结果，防止网络错误被当成“没有更新”。
+if ((CHECK_FAILED)); then
+  ((QUIET)) || echo "$(msg '部分检测失败，保留原缓存，请稍后重试。' 'Some checks failed; previous cache preserved. Retry later.')"
+  exit 2
+fi
+
 # 写入缓存文件
 temp_out=$(mktemp "$OUTPUT_FILE.tmp.XXXXXX")
 if ((${#UPDATES[@]} > 0)); then
@@ -206,6 +215,7 @@ else
   : > "$temp_out"
 fi
 mv "$temp_out" "$OUTPUT_FILE"
+command date +%s > "$TIMESTAMP_FILE" 2>/dev/null || true
 
 # 若非静默模式，直接输出清晰汇总
 if ((!QUIET)); then

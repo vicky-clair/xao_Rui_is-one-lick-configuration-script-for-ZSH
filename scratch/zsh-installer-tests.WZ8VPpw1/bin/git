@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+echo "$0" >> "$AUDIT_MARKER"
+exit 1

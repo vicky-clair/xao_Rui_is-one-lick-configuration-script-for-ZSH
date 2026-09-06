@@ -60,7 +60,7 @@ if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
   }
 fi
 
-if command -v nvim >/dev/null 2>&1; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v nvim >/dev/null 2>&1; then
   export EDITOR=nvim
   export VISUAL=nvim
   nvim() {
@@ -77,7 +77,7 @@ else
   export EDITOR=vi
 fi
 
-if command -v bat >/dev/null 2>&1 && bat --list-themes 2>/dev/null | grep -q "tokyonight_night"; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v bat >/dev/null 2>&1 && bat --list-themes 2>/dev/null | grep -q "tokyonight_night"; then
   export BAT_THEME="tokyonight_night"
 fi
 
@@ -112,7 +112,7 @@ fi
 # ========================================
 # vfox 版本管理初始化
 # ========================================
-if command -v vfox &>/dev/null; then
+if [[ ${ZSH_PROJECT_VFOX:-0} == 1 ]] && command -v vfox &>/dev/null; then
   local _vfox_cmd=""
   if command -v timeout >/dev/null 2>&1; then
     _vfox_cmd="timeout -k 1s 5s vfox activate zsh"
@@ -139,7 +139,7 @@ fi
 # ========================================
 # Yazi 退出后同步终端目录
 # ========================================
-if command -v yazi &>/dev/null; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v yazi &>/dev/null; then
   function y() {
     local tmp="$(mktemp -t "yazi-cwd.XXXXXX")" cwd
     yazi "$@" --cwd-file="$tmp"
@@ -154,7 +154,7 @@ fi
 # ========================================
 # FZF 搜索、预览与快捷键
 # ========================================
-if command -v fzf &>/dev/null; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v fzf &>/dev/null; then
   if command -v fd &>/dev/null; then
     export FZF_DEFAULT_COMMAND='fd --hidden --strip-cwd-prefix --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
@@ -221,6 +221,7 @@ fi
 # 命令别名与工具集成
 # ========================================
 # 全平台剪贴板互通别名（兼容 macOS pbcopy / Linux X11 xclip / Wayland wl-copy / WSL clip.exe）
+if [[ ${ZSH_PROJECT_TMUX:-0} == 1 ]]; then
 if command -v pbcopy &>/dev/null; then
   alias clipcopy="pbcopy"
   alias clippaste="pbpaste"
@@ -233,33 +234,34 @@ elif command -v xclip &>/dev/null; then
 elif command -v clip.exe &>/dev/null; then
   alias clipcopy="clip.exe"
 fi
+fi
 
-if command -v eza &>/dev/null; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v eza &>/dev/null; then
   alias ls="eza --icons=always"
   alias ll="eza -lh --icons=always"
   alias la="eza -lah --icons=always"
   _zsh_msg "%F{green}✓%f %F{cyan}eza%f 现代化 ls 已启用 (别名: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)" "%F{green}✓%f %F{cyan}eza%f modern ls enabled (aliases: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)"
 fi
 
-if command -v lazydocker &>/dev/null; then
+if [[ ${ZSH_PROJECT_LAZYDOCKER:-0} == 1 ]] && command -v lazydocker &>/dev/null; then
   alias lzd="lazydocker"
   _zsh_msg "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)" "%F{green}✓%f %F{cyan}lazydocker%f tool enabled (cmd: %F{yellow}lzd%f)"
 fi
 
-if command -v tmux &>/dev/null; then
+if [[ ${ZSH_PROJECT_TMUX:-0} == 1 ]] && command -v tmux &>/dev/null; then
   alias t="tmux"
   alias ta="tmux attach -t"
   alias tls="tmux ls"
   alias tn="tmux new -s"
 fi
 
-if command -v nvim &>/dev/null; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v nvim &>/dev/null; then
   _zsh_msg "%F{green}✓%f %F{cyan}neovim%f 已设置为默认编辑器" "%F{green}✓%f %F{cyan}neovim%f set as default editor"
 fi
 
 alias grep="grep --color=auto"
 
-if command -v zoxide &>/dev/null; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v zoxide &>/dev/null; then
   eval "$(zoxide init zsh)"
   _zsh_msg "%F{green}✓%f %F{cyan}zoxide%f 智能跳转已启用 (命令: %F{yellow}z%f)" "%F{green}✓%f %F{cyan}zoxide%f smart cd enabled (cmd: %F{yellow}z%f)"
 fi
@@ -267,7 +269,7 @@ fi
 # ========================================
 # 自动显示系统信息
 # ========================================
-if command -v fastfetch &>/dev/null; then
+if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v fastfetch &>/dev/null; then
   _zsh_msg "%F{green}✓%f %F{cyan}fastfetch%f 系统信息工具已启动\n" "%F{green}✓%f %F{cyan}fastfetch%f system info tool started\n"
   if [[ -r "$HOME/.config/fastfetch/config.jsonc" ]]; then
     fastfetch -c "$HOME/.config/fastfetch/config.jsonc"
@@ -320,8 +322,20 @@ if [[ ${ZSH_PROJECT_AUTO_CHECK_UPDATE:-1} == 1 && -f "$_zsh_check_script" ]]; th
 fi
 
 # 提供更新与检测命令
+function _zsh_project_check_script() {
+  local script="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/scripts/check_updates.sh"
+  if [[ -f "$script" ]]; then
+    print -r -- "$script"
+  elif [[ -n ${ZSH_PROJECT_DIR:-} && -f "$ZSH_PROJECT_DIR/scripts/check_updates.sh" ]]; then
+    print -r -- "$ZSH_PROJECT_DIR/scripts/check_updates.sh"
+  else
+    return 1
+  fi
+}
+
 function zsh-update() {
   local installer=""
+  local check_script=""
   if [[ -n "${ZSH_PROJECT_DIR:-}" && -f "$ZSH_PROJECT_DIR/install.sh" ]]; then
     installer="$ZSH_PROJECT_DIR/install.sh"
   elif [[ -f "$HOME/.zsh-project/install.sh" ]]; then
@@ -329,16 +343,17 @@ function zsh-update() {
   fi
   if [[ -n "$installer" ]]; then
     bash "$installer" --update --lang "${ZSH_PROJECT_LANG:-zh}"
-  elif [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
+  elif check_script=$(_zsh_project_check_script); then
+    bash "$check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
     _zsh_msg "%F{red}未找到安装器或更新脚本。%f" "%F{red}Installer or update script not found.%f"
   fi
 }
 
 function zsh-check-updates() {
-  if [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
+  local check_script=""
+  if check_script=$(_zsh_project_check_script); then
+    bash "$check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
     _zsh_msg "%F{red}未找到更新检测脚本。%f" "%F{red}Update check script not found.%f"
   fi

@@ -1,0 +1,3 @@
+[DRY RUN] OS=MSYS_NT-10.0-26200 ARCH=x86_64 profile=basic theme=rainbow
+[DRY RUN] vfox=0 lazydocker=0 tmux=0 latest-nvim=0
+[DRY RUN] 将检查更新；更新模式会另行确认。此次不联网、不写缓存、不执行更新。

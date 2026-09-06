@@ -1,5 +1,7 @@
 # Linux 与 macOS Zsh 跨平台一键配置与更新管理器
 
+安装前先阅读 [安装器修复与 Linux 测试步骤](INSTALLER_TESTING.md)，运行 `bash scripts/test_installer.sh`。支持范围是适配目标，不代表所有平台均完成实机验证。
+
 本项目提供面向 **Linux**（Debian / Ubuntu / Fedora / Arch / openSUSE）与 **macOS**（Apple Silicon / Intel Mac）的现代化 Zsh 交互环境一键安装、自动配置及插件/应用版本更新管理工具。
 
 - 🍏 **全平台兼容**：原生支持 Linux 各主流发行版（APT、DNF/YUM、Pacman、Zypper、国产 UOS/Kylin/Deepin）及 macOS（Homebrew），自动识别 `x86_64`、`aarch64` 与 `arm64` 架构。

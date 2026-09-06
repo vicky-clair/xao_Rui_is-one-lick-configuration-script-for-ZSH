@@ -130,48 +130,6 @@ calc_sha256() {
   fi
 }
 
-# 安装新 Neovim 前验证完整目录；切换失败恢复旧目录与链接，不删除旧版本。
-install_nvim_tree() {
-  local source_dir=$1 stage target link old=0 had_link=0
-  target="$HOME/.local/opt/nvim"
-  link="$HOME/.local/bin/nvim"
-  [[ ! -L "$target" && ! -L "$HOME/.local/opt" ]] || return 1
-  [[ ! -e "$target" || -d "$target" ]] || return 1
-  [[ ! -d "$link" || -L "$link" ]] || return 1
-  mkdir -p "$HOME/.local/opt" "$HOME/.local/bin" || return 1
-  stage=$(mktemp -d "$HOME/.local/opt/.nvim-swap-XXXXXXXX") || return 1
-  cp -R "$source_dir" "$stage/new" || return 1
-  "$stage/new/bin/nvim" --version > "$stage/version.txt" 2>&1 || return 1
-  if [[ -e "$link" || -L "$link" ]]; then
-    cp -Pp "$link" "$stage/previous-link" || return 1
-    had_link=1
-  fi
-  ln -s "$target/bin/nvim" "$stage/new-link" || return 1
-  if [[ -d "$target" ]]; then
-    mv "$target" "$stage/previous" || return 1
-    old=1
-  fi
-  if ! mv "$stage/new" "$target"; then
-    ((old == 0)) || mv "$stage/previous" "$target"
-    return 1
-  fi
-  # 先移走目标链接，避免 mv 在链接指向目录时把新链接放进该目录。
-  if [[ -e "$link" || -L "$link" ]]; then
-    if ! mv "$link" "$stage/displaced-link"; then
-      mv "$target" "$stage/failed-new"
-      ((old == 0)) || mv "$stage/previous" "$target"
-      return 1
-    fi
-  fi
-  if ! mv "$stage/new-link" "$link"; then
-    mv "$target" "$stage/failed-new"
-    ((old == 0)) || mv "$stage/previous" "$target"
-    ((had_link == 0)) || cp -Pp "$stage/previous-link" "$link"
-    return 1
-  fi
-  printf 'Neovim 验证并切换完成；旧目录与链接保留在：%s\n' "$stage"
-}
-
 while (($#)); do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
@@ -205,23 +163,6 @@ case "$P10K_STYLE" in
   *) die "$(msg "无效的 P10k 样式：$P10K_STYLE (可选：rainbow, lean, classic, wizard, skip)" "Invalid P10k style: $P10K_STYLE (available: rainbow, lean, classic, wizard, skip)")" ;;
 esac
 
-# 统一预演出口必须早于语言交互、自举下载、更新检查和任何状态写入。
-[[ "$PROFILE" == basic || "$PROFILE" == full ]] || die 'Invalid profile: basic|full'
-[[ "$LANG_CHOICE" == zh || "$LANG_CHOICE" == en ]] || die 'Invalid language: zh|en'
-if ((DRY_RUN)); then
-  printf '[DRY RUN] OS=%s ARCH=%s profile=%s theme=%s\n' "$(uname -s)" "$(uname -m)" "$PROFILE" "$P10K_STYLE"
-  printf '[DRY RUN] vfox=%s lazydocker=%s tmux=%s latest-nvim=%s\n' "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_TMUX" "$WITH_LATEST_NVIM"
-  if [[ -n "$ROLLBACK" ]]; then
-    printf '[DRY RUN] 将校验并恢复备份目录：%s（此次不验证或写入）\n' "$ROLLBACK"
-  elif ((CHECK_UPDATES || DO_UPDATE)); then
-    printf '[DRY RUN] 将检查更新；更新模式会另行确认。此次不联网、不写缓存、不执行更新。\n'
-  else
-    printf '[DRY RUN] 实际安装将检测包管理器、收集选项、检查目标、备份配置并安装所选组件。\n'
-    printf '[DRY RUN] 缺失模板将在实际运行时下载；本次不调用下载器或 sudo。\n'
-  fi
-  exit 0
-fi
-
 # 交互式语言选择菜单（若未通过命令行显式指定 --lang，按键即响应）
 if ((!DRY_RUN)) && [[ -t 0 ]] && ((!LANG_SET)) && [[ -z "$ROLLBACK" ]]; then
   printf '\n\033[1;36m🌐 Please select language / 请选择界面语言:\033[0m\n'
@@ -249,11 +190,9 @@ fi
 
 # 2. 交互式更新流程
 if ((DO_UPDATE)); then
-  [[ -t 0 ]] || die 'Update requires an interactive terminal'
-  UPDATE_INCOMPLETE=0
   info "$(msg "正在检测已安装插件与工具的更新状态..." "Checking update status for installed plugins and tools...")"
   if [[ -f "$SCRIPT_DIR/scripts/check_updates.sh" ]]; then
-    bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE" || die '更新检测未完整完成，保留缓存，本次不自动升级。'
+    bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE"
   fi
 
   STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
@@ -274,7 +213,6 @@ if ((DO_UPDATE)); then
     local name=$1 dir=$2
     [[ -d "$dir/.git" ]] || return 0
     if [[ -n $(git -C "$dir" status --porcelain 2>/dev/null) ]]; then
-      UPDATE_INCOMPLETE=1
       warn "$(msg "$name 存在未提交的本地修改，跳过自动拉取以防止冲突。" "$name has uncommitted local changes; skipping pull to prevent conflicts.")"
       return 0
     fi
@@ -282,7 +220,6 @@ if ((DO_UPDATE)); then
     if git -C "$dir" pull --ff-only --quiet 2>/dev/null; then
       success "$(msg "$name 更新完成" "$name updated successfully")"
     else
-      UPDATE_INCOMPLETE=1
       warn "$(msg "$name 自动更新失败，请稍后手动检查 git status" "$name update failed; please check git status manually")"
     fi
   }
@@ -303,23 +240,16 @@ if ((DO_UPDATE)); then
   # Tmux 插件升级
   if [[ -x "$HOME/.tmux/plugins/tpm/bin/update_plugins" ]]; then
     info "$(msg "正在更新 Tmux 插件..." "Updating Tmux plugins...")"
-    if bash "$HOME/.tmux/plugins/tpm/bin/update_plugins" all; then
-      success "$(msg "Tmux 插件更新完成" "Tmux plugins updated successfully")"
-    else
-      UPDATE_INCOMPLETE=1
-      warn 'Tmux 插件更新失败，保留待处理状态。'
-    fi
+    bash "$HOME/.tmux/plugins/tpm/bin/update_plugins" all >/dev/null 2>&1 || true
+    success "$(msg "Tmux 插件更新完成" "Tmux plugins updated successfully")"
   fi
 
   # FZF 官方仓库升级
   if [[ -d "$HOME/.fzf/.git" ]]; then
     update_git_repo "FZF" "$HOME/.fzf"
     if [[ -x "$HOME/.fzf/install" ]]; then
-      if bash "$HOME/.fzf/install" --bin --no-update-rc; then
-        ln -sf "$HOME/.fzf/bin/fzf" "$HOME/.local/bin/fzf" || UPDATE_INCOMPLETE=1
-      else
-        UPDATE_INCOMPLETE=1
-      fi
+      bash "$HOME/.fzf/install" --bin --no-update-rc >/dev/null 2>&1 || true
+      ln -sf "$HOME/.fzf/bin/fzf" "$HOME/.local/bin/fzf" 2>/dev/null || true
     fi
   fi
 
@@ -327,7 +257,7 @@ if ((DO_UPDATE)); then
   OS_TYPE=$(uname -s)
   if [[ "$OS_TYPE" == Darwin ]] && command -v brew >/dev/null 2>&1; then
     info "$(msg "正在通过 Homebrew 升级命令行工具..." "Upgrading CLI tools via Homebrew...")"
-    brew upgrade fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git tmux || UPDATE_INCOMPLETE=1
+    brew upgrade fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git tmux 2>/dev/null || true
   elif [[ "$OS_TYPE" == Linux ]]; then
     if command -v apt-get >/dev/null 2>&1; then
       info "$(msg "提示：可在终端运行 sudo apt update && sudo apt --only-upgrade install <包名> 升级系统包。" "Tip: You can run sudo apt update && sudo apt --only-upgrade install <pkg> to upgrade system packages.")"
@@ -336,18 +266,12 @@ if ((DO_UPDATE)); then
     fi
   fi
 
-  # 成功后重新检测；失败时保留旧缓存，不能把失败或待手动升级误报为完成。
-  if ((UPDATE_INCOMPLETE == 0)); then
-    bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE" || UPDATE_INCOMPLETE=1
-  fi
+  # 清理更新状态缓存
+  : > "$AVAILABLE_FILE"
   if [[ -f "$HOME/.zshrc" ]]; then
     zsh -n "$HOME/.zshrc" && success "$(msg "配置语法检查通过。" "Configuration syntax check passed.")"
   fi
-  if ((UPDATE_INCOMPLETE)) || [[ -s "$AVAILABLE_FILE" ]]; then
-    warn '更新仍有失败、跳过或待手动处理的组件，缓存已保留。'
-    exit 1
-  fi
-  success "$(msg "更新并复查完成。请新开终端验证。" "Update and recheck completed. Open a new terminal to verify.")"
+  success "$(msg "更新流程执行完毕！请新开终端体验新版本。" "Update finished! Please open a new terminal session.")"
   exit 0
 fi
 
@@ -378,7 +302,6 @@ restore() {
   [[ $(head -n 1 "$dir/manifest") == "$HOME" ]] || die "$(msg '备份不属于当前 HOME' 'Backup does not belong to current HOME')"
   local managed_files=(.zshrc .zsh-project-options)
   [[ -f "$dir/.tmux.conf.state" ]] && managed_files+=(.tmux.conf)
-  [[ -f "$dir/.p10k.zsh.state" ]] && managed_files+=(.p10k.zsh)
   for file in "${managed_files[@]}"; do
     [[ -f "$dir/$file.sha256" && -f "$dir/$file.state" ]] || die "$(msg "备份不完整：$file" "Incomplete backup: $file")"
     [[ ! -L "$HOME/$file" ]] || die "$(msg "目标已变成符号链接：$file" "Target is a symlink: $file")"
@@ -507,6 +430,16 @@ if [[ ! -r "$SCRIPT_DIR/templates/zshrc.zsh" ]]; then
   fi
 fi
 
+target_files=(.zshrc .zsh-project-options)
+if ((WITH_TMUX)); then
+  [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]] || die "$(msg '缺少 templates/tmux.conf，请下载完整项目' 'templates/tmux.conf missing; please download the full repository')"
+  target_files+=(.tmux.conf)
+fi
+for file in "${target_files[@]}"; do
+  [[ ! -L "$HOME/$file" && ! -d "$HOME/$file" ]] || die "$(msg "$file 是链接或目录，请手动处理" "$file is a symlink or directory; please resolve manually")"
+  [[ ! -e "$HOME/$file" || -f "$HOME/$file" ]] || die "$(msg "$file 不是普通文件" "$file is not a regular file")"
+done
+
 if [[ -e "$HOME/.oh-my-zsh" && ! -r "$HOME/.oh-my-zsh/oh-my-zsh.sh" ]]; then
   die "$(msg '现有 OMZ 不完整；请按排查文档恢复，安装器不会覆盖 custom 或移动现有目录' 'Existing OMZ is incomplete; please recover per documentation') "
 fi
@@ -541,18 +474,6 @@ if ((!DRY_RUN)); then
   ((WITH_TMUX)) || { if ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
 fi
 
-# 选项收集完成后生成同一份清单，供检查、备份、部署校验和回退使用。
-target_files=(.zshrc .zsh-project-options)
-if ((WITH_TMUX)); then
-  [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]] || die '缺少 templates/tmux.conf'
-  target_files+=(.tmux.conf)
-fi
-[[ "$P10K_STYLE" == skip ]] || target_files+=(.p10k.zsh)
-for file in "${target_files[@]}"; do
-  [[ ! -L "$HOME/$file" && ! -d "$HOME/$file" ]] || die "$file 是链接或目录，请手动处理"
-  [[ ! -e "$HOME/$file" || -f "$HOME/$file" ]] || die "$file 不是普通文件"
-done
-
 printf '\n%s: %s; %s: %s; %s: %s; %s: %s\n' \
   "$(msg '系统' 'OS')" "${PRETTY_NAME:-$OS}" \
   "$(msg '架构' 'Arch')" "$ARCH" \
@@ -573,7 +494,7 @@ esac
 printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils unzip tar；OMZ、Powerlevel10k、三个 Zsh 核心插件。' 'Base dependencies: zsh, git, curl, ca-certificates, coreutils, unzip, tar; OMZ, Powerlevel10k, 3 core plugins.')"
 [[ "$PROFILE" == full ]] && printf '%s\n' "$(msg '完整工具：fzf fd bat eza zoxide yazi neovim fastfetch（仓库没有则跳过并记录）。' 'Full tools: fzf, fd, bat, eza, zoxide, yazi, neovim, fastfetch (skipped if unavailable in repository).')"
 ((WITH_TMUX)) && printf '%s\n' "$(msg 'Tmux 增强：安装 tmux、终端剪贴板工具、TPM 插件生态并部署 ~/.tmux.conf。' 'Tmux enhancement: install tmux, clipboard tools, TPM plugins, and ~/.tmux.conf.')"
-printf '%s\n' "$(msg '备份并更新受管配置；选定主题样式会备份并替换 .p10k.zsh，skip 则保留。保留 .zshenv、custom 和历史。' 'Back up managed configs; theme selection replaces .p10k.zsh after backup; skip preserves it. Keep .zshenv, custom and history.')"
+printf '%s\n' "$(msg '备份并更新受管配置文件；保留 .zshenv、个人主题、custom 和历史文件。' 'Backup and update managed configurations; preserving .zshenv, custom themes and history.')"
 printf '%s\n' "$(msg '默认 Shell 将在配置安装成功后单独询问。' 'Default login shell will be prompted separately after configuration.')"
 
 if ((DRY_RUN)); then
@@ -598,7 +519,8 @@ exec > >(tee -a "$BACKUP/install.log") 2>&1
 trap 'printf "安装未完成。日志与原配置：%s\n系统软件安装不会自动回退。\n" "$BACKUP" >&2' ERR
 
 printf '%s\n' "$HOME" > "$BACKUP/manifest"
-backup_files=("${target_files[@]}")
+backup_files=(.zshrc .zsh-project-options)
+((WITH_TMUX)) && backup_files+=(.tmux.conf)
 for file in "${backup_files[@]}"; do
   if [[ -f "$HOME/$file" ]]; then
     cp -p -- "$HOME/$file" "$BACKUP/$file"
@@ -866,13 +788,14 @@ if [[ "$PROFILE" == full ]]; then
       if tar -xzf "$nvim_stage/nvim.tar.gz" -C "$nvim_stage" 2>/dev/null; then
         extracted_dir=$(find "$nvim_stage" -mindepth 1 -maxdepth 1 -type d \( -name "nvim-linux*" -o -name "nvim-macos*" \) 2>/dev/null | head -n 1)
         if [[ -n "$extracted_dir" && -x "$extracted_dir/bin/nvim" ]]; then
-          if install_nvim_tree "$extracted_dir"; then
-            success 'Neovim 新版本已验证并安装。'
-            remove_skipped neovim
-            remove_skipped nvim
-          else
-            warn 'Neovim 更新失败；旧版本已保留或恢复，请查看暂存目录与日志。'
-          fi
+          mkdir -p "$HOME/.local/opt" "$HOME/.local/bin"
+          rm -rf "$HOME/.local/opt/nvim"
+          cp -r "$extracted_dir" "$HOME/.local/opt/nvim"
+          ln -sf "$HOME/.local/opt/nvim/bin/nvim" "$HOME/.local/bin/nvim"
+          nvim_installed_ver=$("$HOME/.local/bin/nvim" --version 2>/dev/null | head -n 1 || echo "latest")
+          success "$(msg "Neovim 官方最新版安装成功（已链接至 ~/.local/bin/nvim，版本: $nvim_installed_ver）" "Neovim latest official release installed successfully (~/.local/bin/nvim, version: $nvim_installed_ver)")"
+          remove_skipped neovim
+          remove_skipped nvim
         fi
       fi
     fi
@@ -969,24 +892,28 @@ done
 case "$P10K_STYLE" in
   rainbow)
     if [[ -f "$HOME/powerlevel10k/config/p10k-rainbow.zsh" ]]; then
-      cp "$HOME/powerlevel10k/config/p10k-rainbow.zsh" "$BACKUP/new.p10k.zsh"
+      cp "$HOME/powerlevel10k/config/p10k-rainbow.zsh" "$HOME/.p10k.zsh"
       success "$(msg "已生成 Powerlevel10k 经典彩虹主题配置 (~/.p10k.zsh)" "Generated Powerlevel10k rainbow theme config (~/.p10k.zsh)")"
     fi
     ;;
   lean)
     if [[ -f "$HOME/powerlevel10k/config/p10k-lean.zsh" ]]; then
-      cp "$HOME/powerlevel10k/config/p10k-lean.zsh" "$BACKUP/new.p10k.zsh"
+      cp "$HOME/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
       success "$(msg "已生成 Powerlevel10k 现代极简主题配置 (~/.p10k.zsh)" "Generated Powerlevel10k lean theme config (~/.p10k.zsh)")"
     fi
     ;;
   classic)
     if [[ -f "$HOME/powerlevel10k/config/p10k-classic.zsh" ]]; then
-      cp "$HOME/powerlevel10k/config/p10k-classic.zsh" "$BACKUP/new.p10k.zsh"
+      cp "$HOME/powerlevel10k/config/p10k-classic.zsh" "$HOME/.p10k.zsh"
       success "$(msg "已生成 Powerlevel10k 经典传统主题配置 (~/.p10k.zsh)" "Generated Powerlevel10k classic theme config (~/.p10k.zsh)")"
     fi
     ;;
   wizard)
-    # 已纳入统一备份；让显式向导修改配置，不提前删除用户原文件。
+    # 用户选择向导配置：若已有配置备份后移除，确保安装后向导能干净启动
+    if [[ -f "$HOME/.p10k.zsh" ]]; then
+      cp "$HOME/.p10k.zsh" "$BACKUP/old.p10k.zsh" 2>/dev/null || true
+      rm -f "$HOME/.p10k.zsh"
+    fi
     info "$(msg "已就绪：将在安装结束时自动唤起 p10k configure 官方配置向导" "Ready: will launch p10k configure wizard automatically after install")"
     ;;
   skip)
@@ -1033,10 +960,6 @@ EOF
 
 zsh -n "$BACKUP/new.zshrc"
 zsh -n "$BACKUP/new.options"
-if [[ -f "$BACKUP/new.p10k.zsh" ]]; then
-  zsh -n "$BACKUP/new.p10k.zsh"
-  install -m 600 "$BACKUP/new.p10k.zsh" "$HOME/.p10k.zsh"
-fi
 
 install -m 600 "$BACKUP/new.options" "$HOME/.zsh-project-options"
 install -m 600 "$BACKUP/new.zshrc" "$HOME/.zshrc"
@@ -1044,13 +967,10 @@ install -m 600 "$BACKUP/new.zshrc" "$HOME/.zshrc"
 # 清理旧的编译字节码（若存在，借鉴 zsh4humans 规范），防止 Zsh 继续读取失效旧缓存
 command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" 2>/dev/null || true
 
-deployed_files=("${target_files[@]}")
+deployed_files=(.zshrc .zsh-project-options)
+((WITH_TMUX)) && deployed_files+=(.tmux.conf)
 for file in "${deployed_files[@]}"; do
-  if [[ -f "$HOME/$file" ]]; then
-    calc_sha256 "$HOME/$file" > "$BACKUP/$file.sha256"
-  else
-    printf 'missing\n' > "$BACKUP/$file.sha256"
-  fi
+  [[ -f "$HOME/$file" ]] && calc_sha256 "$HOME/$file" > "$BACKUP/$file.sha256"
 done
 
 # 首次执行一次静默后台版本检测（生成初始缓存）
@@ -1114,17 +1034,9 @@ fi
 if [[ "$P10K_STYLE" == wizard ]] && [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
   echo ""
   printf '\n\033[1;36m%s\033[0m\n' "$(msg '🛠️ 正在为您启动 Powerlevel10k 官方配置向导...' '🛠️ Launching Powerlevel10k configuration wizard...')"
-  if ! zsh -ic 'p10k configure'; then warn '主题向导未成功完成，请检查现有配置。'; fi
-  # 向导可能同时修改主题和 .zshrc；记录最终状态，使安装回退仍然可用。
-  for file in "${deployed_files[@]}"; do
-    if [[ -f "$HOME/$file" ]]; then
-      calc_sha256 "$HOME/$file" > "$BACKUP/$file.sha256"
-    else
-      printf 'missing\n' > "$BACKUP/$file.sha256"
-    fi
-  done
-fi
-if [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
+  info "$(msg "提示：向导配置完成后将直接停留在全新的 Zsh 交互终端中。" "Tip: You will remain in the newly configured Zsh session when finished.")"
+  exec zsh -ic "p10k configure; exec zsh -l"
+elif [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
   echo ""
   if ask "$(msg '是否现在立即进入全新的 Zsh 交互环境？' 'Start fresh Zsh session now?') "; then
     printf '\n\033[1;32m%s\033[0m\n' "$(msg '🚀 正在启动全新 Zsh 交互环境...' '🚀 Starting fresh Zsh environment...')"

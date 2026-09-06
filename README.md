@@ -134,6 +134,7 @@ bash install.sh [选项]
 | `--profile basic\|full` | 指定基础模式（核心插件）或完整工具集模式（现代 CLI 全套） |
 | `--p10k-style STYLE` | 指定 P10k 提示符风格：`rainbow`（经典彩虹，默认）、`lean`（极简纯净）、`classic`（传统流线）、`wizard`（向导配置）、`skip`（跳过/保持现有） |
 | `--p10k-wizard` | 快捷参数，等同于 `--p10k-style wizard`，安装后立即拉起官方配置向导 |
+| `--with-latest-nvim` | 从 GitHub Release 直接拉取并安装最新官方稳定版 Neovim（>= 0.10.x） |
 | `--with-vfox` | 请求安装 vfox（若仓库或脚本可用） |
 | `--with-lazydocker` | 请求安装 lazydocker 容器终端管理 |
 | `--with-tmux` | 请求安装并配置 tmux（含终端剪贴板互通与美化主题） |

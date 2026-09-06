@@ -39,6 +39,7 @@ PROFILE_SET=0
 WITH_VFOX=0
 WITH_LAZYDOCKER=0
 WITH_TMUX=0
+WITH_LATEST_NVIM=0
 P10K_STYLE=rainbow
 P10K_STYLE_SET=0
 CHECK_UPDATES=0
@@ -64,6 +65,7 @@ $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --profile basic|full  $(msg "基础安装（OMZ+主题+3核心插件）或完整安装（+全套CLI工具）" "Basic install (OMZ+theme+3 plugins) or full install (+all modern CLI tools)")
   --p10k-style STYLE    $(msg "P10k 主题风格：rainbow(经典彩虹,默认), lean(极简), classic(传统), wizard(向导), skip(跳过)" "P10k prompt style: rainbow(default), lean, classic, wizard, skip")
   --p10k-wizard         $(msg "安装完成后立即启动 p10k configure 官方交互式配置向导" "Launch p10k configure interactive wizard after installation")
+  --with-latest-nvim    $(msg "从 GitHub Release 下载安装最新官方 Neovim (>= 0.10.x)" "Install latest official Neovim from GitHub release (>= 0.10.x)")
   --with-vfox           $(msg "请求安装 vfox 多版本管理工具，不自动安装 SDK" "Install vfox version manager (does not install SDKs automatically)")
   --with-lazydocker     $(msg "请求安装 lazydocker，不配置 Docker 服务或权限" "Install lazydocker (does not configure Docker daemon or permissions)")
   --with-tmux           $(msg "请求安装并配置 tmux 终端复用器（含剪贴板互通与美化主题）" "Install and configure tmux terminal multiplexer (with clipboard & themes)")
@@ -146,6 +148,7 @@ while (($#)); do
     --p10k-lean) P10K_STYLE="lean"; P10K_STYLE_SET=1 ;;
     --p10k-classic) P10K_STYLE="classic"; P10K_STYLE_SET=1 ;;
     --p10k-skip) P10K_STYLE="skip"; P10K_STYLE_SET=1 ;;
+    --with-latest-nvim) WITH_LATEST_NVIM=1 ;;
     --with-vfox) WITH_VFOX=1 ;;
     --with-lazydocker) WITH_LAZYDOCKER=1 ;;
     --with-tmux) WITH_TMUX=1 ;;
@@ -607,16 +610,19 @@ if [[ "$PROFILE" == full ]]; then
   EZA_ARCH=""
   FF_ARCH=""
   YAZI_ARCH=""
+  NVIM_ARCH=""
   case "$ARCH_UNAME" in
     x86_64|amd64)
       EZA_ARCH="x86_64"
       FF_ARCH="amd64"
       YAZI_ARCH="x86_64"
+      NVIM_ARCH="x86_64"
       ;;
     aarch64|arm64)
       EZA_ARCH="aarch64"
       FF_ARCH="aarch64"
       YAZI_ARCH="aarch64"
+      NVIM_ARCH="arm64"
       ;;
   esac
 
@@ -707,6 +713,46 @@ if [[ "$PROFILE" == full ]]; then
       fi
     fi
     rm -rf "$yazi_stage"
+  fi
+
+  # --- NEOVIM 现代版本保障与官方预编译包自动拉取（解决 Debian 12 等官方仓库版本过旧仅为 0.7 的问题）---
+  need_nvim_download=0
+  if ((WITH_LATEST_NVIM)); then
+    need_nvim_download=1
+  elif ! command -v nvim >/dev/null 2>&1; then
+    need_nvim_download=1
+  else
+    nvim_v_str=$(nvim --version 2>/dev/null | head -n 1)
+    nvim_v_num=$(echo "$nvim_v_str" | grep -oE '[0-9]+\.[0-9]+' | head -n 1 || echo "0.0")
+    nvim_major=$(echo "$nvim_v_num" | cut -d. -f1)
+    nvim_minor=$(echo "$nvim_v_num" | cut -d. -f2)
+    # 若系统现有 Neovim 版本小于 0.10（如 Debian 12 自带的 0.7.2），无法适配现代插件生态，自动从官方升级
+    if (( nvim_major == 0 && nvim_minor < 10 )); then
+      info "$(msg "检测到系统 Neovim 版本过旧 ($nvim_v_str)，现代 Lua 生态（LazyVim/Treesitter等）通常需要 >= 0.10.0。" "Detected outdated Neovim ($nvim_v_str); modern Lua plugins require >= 0.10.0.")"
+      need_nvim_download=1
+    fi
+  fi
+
+  if (( need_nvim_download )) && [[ -n "$NVIM_ARCH" ]] && [[ "$FAMILY" != brew ]]; then
+    info "$(msg "正在从 GitHub Release 下载 Neovim 官方最新稳定版至 ~/.local/opt/nvim..." "Downloading latest official Neovim release from GitHub to ~/.local/opt/nvim...")"
+    nvim_stage=$(mktemp -d "$HOME/.nvim-tmp-XXXXXX")
+    nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${NVIM_ARCH}.tar.gz"
+    if curl -fsSL --connect-timeout 10 -m 90 "$nvim_url" -o "$nvim_stage/nvim.tar.gz" 2>/dev/null; then
+      if tar -xzf "$nvim_stage/nvim.tar.gz" -C "$nvim_stage" 2>/dev/null; then
+        extracted_dir=$(find "$nvim_stage" -mindepth 1 -maxdepth 1 -type d -name "nvim-linux*" 2>/dev/null | head -n 1)
+        if [[ -n "$extracted_dir" && -x "$extracted_dir/bin/nvim" ]]; then
+          mkdir -p "$HOME/.local/opt" "$HOME/.local/bin"
+          rm -rf "$HOME/.local/opt/nvim"
+          cp -r "$extracted_dir" "$HOME/.local/opt/nvim"
+          ln -sf "$HOME/.local/opt/nvim/bin/nvim" "$HOME/.local/bin/nvim"
+          nvim_installed_ver=$("$HOME/.local/bin/nvim" --version 2>/dev/null | head -n 1 || echo "latest")
+          success "$(msg "Neovim 官方最新版安装成功（已链接至 ~/.local/bin/nvim，版本: $nvim_installed_ver）" "Neovim latest official release installed successfully (~/.local/bin/nvim, version: $nvim_installed_ver)")"
+          remove_skipped neovim
+          remove_skipped nvim
+        fi
+      fi
+    fi
+    rm -rf "$nvim_stage"
   fi
 fi
 

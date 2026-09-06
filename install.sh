@@ -641,11 +641,11 @@ if [[ "$PROFILE" == full ]]; then
     rm -rf "$ff_stage"
   fi
 
-  # --- YAZI 官方独立发布包自动回退（Debian 12 等仓库无此包）---
-  if ! command -v yazi >/dev/null 2>&1 && [[ -n "$YAZI_ARCH" ]]; then
-    info "$(msg "系统仓库无 yazi，正在从 GitHub Release 下载官方发布版至 ~/.local/bin..." "yazi not in repo; downloading official release...")"
+  # --- YAZI 官方静态发布包自动回退（使用 musl 静态编译版，彻底避免 glibc 2.39 缺失问题）---
+  if (! command -v yazi >/dev/null 2>&1 || ! yazi --version >/dev/null 2>&1) && [[ -n "$YAZI_ARCH" ]]; then
+    info "$(msg "正在从 GitHub Release 下载官方静态编译发布版 (musl) 至 ~/.local/bin..." "Downloading official static musl release to ~/.local/bin...")"
     yazi_stage=$(mktemp -d "$HOME/.yazi-tmp-XXXXXX")
-    yazi_url="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${YAZI_ARCH}-unknown-linux-gnu.zip"
+    yazi_url="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${YAZI_ARCH}-unknown-linux-musl.zip"
     if curl -fsSL --connect-timeout 10 -m 60 "$yazi_url" -o "$yazi_stage/yazi.zip" 2>/dev/null; then
       if command -v unzip >/dev/null 2>&1; then
         unzip -q "$yazi_stage/yazi.zip" -d "$yazi_stage" 2>/dev/null || true
@@ -656,7 +656,7 @@ if [[ "$PROFILE" == full ]]; then
       if [[ -n "$yazi_bin" && -x "$yazi_bin" ]]; then
         mkdir -p "$HOME/.local/bin"
         install -m 755 "$yazi_bin" "$HOME/.local/bin/yazi"
-        success "$(msg "yazi 安装成功（位于 ~/.local/bin/yazi）" "yazi installed successfully (in ~/.local/bin/yazi)")"
+        success "$(msg "yazi 静态版安装成功（位于 ~/.local/bin/yazi）" "yazi static musl installed successfully (in ~/.local/bin/yazi)")"
         remove_skipped yazi
       fi
     fi
@@ -747,6 +747,12 @@ for plugin in zsh-autosuggestions zsh-completions zsh-syntax-highlighting; do
   clone_missing "https://github.com/zsh-users/$plugin.git" "$HOME/.oh-my-zsh/custom/plugins/$plugin" "$entry"
 done
 
+# 部署默认 Powerlevel10k 彩虹主题配置（若用户尚未配置 ~/.p10k.zsh，免去首次启动强行弹窗配置向导）
+if [[ ! -f "$HOME/.p10k.zsh" && -f "$HOME/powerlevel10k/config/p10k-rainbow.zsh" ]]; then
+  cp "$HOME/powerlevel10k/config/p10k-rainbow.zsh" "$HOME/.p10k.zsh"
+  success "$(msg "已生成默认 Powerlevel10k 彩虹主题配置 (~/.p10k.zsh)" "Generated default Powerlevel10k rainbow theme config (~/.p10k.zsh)")"
+fi
+
 if ((WITH_TMUX)); then
   info "$(msg "正在配置 Tmux 与 TPM 插件管理器..." "Configuring Tmux and TPM plugin manager...")"
   clone_missing https://github.com/tmux-plugins/tpm.git "$HOME/.tmux/plugins/tpm" tpm
@@ -810,7 +816,7 @@ printf '%s: %s\n' "$(msg '跳过的未安装包' 'Skipped packages')" "${SKIPPED
 if ((${#SKIPPED[@]} > 0)); then
   info "$(msg "提示：若因网络原因某些独立二进制或包未能自动下载，可参考文档手动安装或重试安装器。" "Tip: If some standalone binaries or packages failed to download due to network, please refer to the documentation or retry.")"
 fi
-printf '%s\n' "$(msg '提示：请运行 zsh 验证交互环境；首次可用 p10k configure 配置外观。' 'Tip: Run zsh to verify. Configure prompt with p10k configure.')"
+printf '%s\n' "$(msg '提示：已为您部署开箱即用的默认主题；如需个性化调整，可随时运行 p10k configure。' 'Tip: Default prompt configured. Run p10k configure anytime to customize your prompt.')"
 
 # 11. 切换默认 Shell（Linux 与 macOS 分别适配）
 if ask "$(msg '是否将 Zsh 设为当前用户的默认登录 Shell？' 'Set Zsh as default login shell for current user?') "; then

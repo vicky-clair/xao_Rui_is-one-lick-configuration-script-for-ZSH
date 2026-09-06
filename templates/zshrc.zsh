@@ -124,8 +124,16 @@ if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]]; then
 
     if _zsh_fzf_init=$(fzf --zsh 2>/dev/null); then
       eval "$_zsh_fzf_init"
+    elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+      source /usr/share/doc/fzf/examples/key-bindings.zsh
+      [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
+    elif [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
+      source /usr/share/fzf/key-bindings.zsh
+      [[ -f /usr/share/fzf/completion.zsh ]] && source /usr/share/fzf/completion.zsh
+    elif [[ -f "$HOME/.fzf.zsh" ]]; then
+      source "$HOME/.fzf.zsh"
     else
-      _zsh_msg '%F{yellow}FZF 不支持 --zsh，请升级后再启用快捷键。%f' '%F{yellow}FZF does not support --zsh; please upgrade.%f'
+      _zsh_msg '%F{yellow}FZF 不支持 --zsh，请运行 bash install.sh 升级 FZF 后启用快捷键。%f' '%F{yellow}FZF does not support --zsh; run bash install.sh to upgrade.%f'
     fi
     unset _zsh_fzf_init
   fi

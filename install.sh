@@ -166,6 +166,15 @@ if ((DO_UPDATE)); then
     success "$(msg "Tmux 插件更新完成" "Tmux plugins updated successfully")"
   fi
 
+  # FZF 官方仓库升级
+  if [[ -d "$HOME/.fzf/.git" ]]; then
+    update_git_repo "FZF" "$HOME/.fzf"
+    if [[ -x "$HOME/.fzf/install" ]]; then
+      bash "$HOME/.fzf/install" --bin --no-update-rc >/dev/null 2>&1 || true
+      ln -sf "$HOME/.fzf/bin/fzf" "$HOME/.local/bin/fzf" 2>/dev/null || true
+    fi
+  fi
+
   # 应用工具升级
   OS_TYPE=$(uname -s)
   if [[ "$OS_TYPE" == Darwin ]] && command -v brew >/dev/null 2>&1; then
@@ -387,6 +396,19 @@ case "$FAMILY" in
     ;;
 esac
 
+# 辅助函数：从已跳过列表中移除（用于回退安装成功后剔除）
+remove_skipped() {
+  local target=$1
+  local updated=()
+  for item in "${SKIPPED[@]}"; do
+    [[ "$item" != "$target" ]] && updated+=("$item")
+  done
+  SKIPPED=("${updated[@]}")
+}
+
+mkdir -p "$HOME/.local/bin"
+export PATH="$HOME/.local/bin:$PATH"
+
 # 可选软件包安装函数
 optional_package() {
   local cmd=$1 pkg=$2
@@ -435,6 +457,113 @@ if [[ "$PROFILE" == full ]]; then
     optional_package "$pkg" "$pkg"
   done
   optional_package nvim neovim
+
+  # 架构匹配定义
+  ARCH_UNAME=$(uname -m 2>/dev/null || echo "$ARCH")
+  EZA_ARCH=""
+  FF_ARCH=""
+  YAZI_ARCH=""
+  case "$ARCH_UNAME" in
+    x86_64|amd64)
+      EZA_ARCH="x86_64"
+      FF_ARCH="amd64"
+      YAZI_ARCH="x86_64"
+      ;;
+    aarch64|arm64)
+      EZA_ARCH="aarch64"
+      FF_ARCH="aarch64"
+      YAZI_ARCH="aarch64"
+      ;;
+  esac
+
+  # --- FZF 现代版本保障（针对 Debian 12 等自带旧版 0.38 不支持 fzf --zsh）---
+  if ! command -v fzf >/dev/null 2>&1 || ! fzf --zsh >/dev/null 2>&1; then
+    info "$(msg "系统 FZF 缺失或版本过旧（不支持 --zsh 快捷键），正在通过官方仓库升级至 ~/.local/bin..." "FZF missing or outdated (no --zsh support); installing modern version to ~/.local/bin...")"
+    if [[ ! -d "$HOME/.fzf" ]]; then
+      git clone --depth 1 https://github.com/junegunn/fzf.git "$HOME/.fzf" >/dev/null 2>&1 || true
+    else
+      git -C "$HOME/.fzf" pull --quiet 2>/dev/null || true
+    fi
+    if [[ -x "$HOME/.fzf/install" ]]; then
+      bash "$HOME/.fzf/install" --bin --no-update-rc >/dev/null 2>&1 || true
+      if [[ -x "$HOME/.fzf/bin/fzf" ]]; then
+        mkdir -p "$HOME/.local/bin"
+        ln -sf "$HOME/.fzf/bin/fzf" "$HOME/.local/bin/fzf"
+        success "$(msg "FZF 安装/升级成功（最新版本已链接至 ~/.local/bin/fzf）" "FZF installed/updated successfully (~/.local/bin/fzf)")"
+        remove_skipped fzf
+      fi
+    fi
+  fi
+
+  # --- EZA 官方预编译二进制自动回退（Debian 12 等发行版仓库无此包）---
+  if ! command -v eza >/dev/null 2>&1 && [[ -n "$EZA_ARCH" ]]; then
+    info "$(msg "系统仓库无 eza，正在从 GitHub Release 下载官方预编译二进制至 ~/.local/bin..." "eza not in repo; downloading official binary...")"
+    eza_stage=$(mktemp -d "$HOME/.eza-tmp-XXXXXX")
+    eza_url="https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}-unknown-linux-gnu.tar.gz"
+    if curl -fsSL --connect-timeout 10 -m 60 "$eza_url" -o "$eza_stage/eza.tar.gz" 2>/dev/null; then
+      if tar -xzf "$eza_stage/eza.tar.gz" -C "$eza_stage" 2>/dev/null; then
+        eza_bin=$(find "$eza_stage" -type f -name eza -perm -111 2>/dev/null | head -n 1)
+        if [[ -n "$eza_bin" && -x "$eza_bin" ]]; then
+          mkdir -p "$HOME/.local/bin"
+          install -m 755 "$eza_bin" "$HOME/.local/bin/eza"
+          success "$(msg "eza 安装成功（位于 ~/.local/bin/eza）" "eza installed successfully (in ~/.local/bin/eza)")"
+          remove_skipped eza
+        fi
+      fi
+    fi
+    rm -rf "$eza_stage"
+  fi
+
+  # --- FASTFETCH 官方发布版自动回退（Debian 12 等仓库无此包）---
+  if ! command -v fastfetch >/dev/null 2>&1 && [[ -n "$FF_ARCH" ]]; then
+    info "$(msg "系统仓库无 fastfetch，正在从 GitHub Release 下载官方发布版..." "fastfetch not in repo; downloading official release...")"
+    ff_stage=$(mktemp -d "$HOME/.ff-tmp-XXXXXX")
+    if [[ "$FAMILY" == apt ]]; then
+      ff_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.deb"
+      if curl -fsSL --connect-timeout 10 -m 60 "$ff_url" -o "$ff_stage/fastfetch.deb" 2>/dev/null; then
+        if sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1 || (sudo apt-get install -fy >/dev/null 2>&1 && sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1); then
+          success "$(msg "fastfetch 安装成功 (deb 软件包)" "fastfetch installed successfully via deb")"
+          remove_skipped fastfetch
+        fi
+      fi
+    fi
+    if ! command -v fastfetch >/dev/null 2>&1; then
+      ff_tar_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.tar.gz"
+      if curl -fsSL --connect-timeout 10 -m 60 "$ff_tar_url" -o "$ff_stage/fastfetch.tar.gz" 2>/dev/null; then
+        tar -xzf "$ff_stage/fastfetch.tar.gz" -C "$ff_stage" 2>/dev/null || true
+        ff_bin=$(find "$ff_stage" -type f -name fastfetch -perm -111 2>/dev/null | head -n 1)
+        if [[ -n "$ff_bin" && -x "$ff_bin" ]]; then
+          mkdir -p "$HOME/.local/bin"
+          install -m 755 "$ff_bin" "$HOME/.local/bin/fastfetch"
+          success "$(msg "fastfetch 安装成功（位于 ~/.local/bin/fastfetch）" "fastfetch installed successfully (in ~/.local/bin/fastfetch)")"
+          remove_skipped fastfetch
+        fi
+      fi
+    fi
+    rm -rf "$ff_stage"
+  fi
+
+  # --- YAZI 官方独立发布包自动回退（Debian 12 等仓库无此包）---
+  if ! command -v yazi >/dev/null 2>&1 && [[ -n "$YAZI_ARCH" ]]; then
+    info "$(msg "系统仓库无 yazi，正在从 GitHub Release 下载官方发布版至 ~/.local/bin..." "yazi not in repo; downloading official release...")"
+    yazi_stage=$(mktemp -d "$HOME/.yazi-tmp-XXXXXX")
+    yazi_url="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${YAZI_ARCH}-unknown-linux-gnu.zip"
+    if curl -fsSL --connect-timeout 10 -m 60 "$yazi_url" -o "$yazi_stage/yazi.zip" 2>/dev/null; then
+      if command -v unzip >/dev/null 2>&1; then
+        unzip -q "$yazi_stage/yazi.zip" -d "$yazi_stage" 2>/dev/null || true
+      elif command -v python3 >/dev/null 2>&1; then
+        python3 -c "import zipfile; zipfile.ZipFile('$yazi_stage/yazi.zip').extractall('$yazi_stage')" 2>/dev/null || true
+      fi
+      yazi_bin=$(find "$yazi_stage" -type f -name yazi -perm -111 2>/dev/null | head -n 1)
+      if [[ -n "$yazi_bin" && -x "$yazi_bin" ]]; then
+        mkdir -p "$HOME/.local/bin"
+        install -m 755 "$yazi_bin" "$HOME/.local/bin/yazi"
+        success "$(msg "yazi 安装成功（位于 ~/.local/bin/yazi）" "yazi installed successfully (in ~/.local/bin/yazi)")"
+        remove_skipped yazi
+      fi
+    fi
+    rm -rf "$yazi_stage"
+  fi
 fi
 
 # vfox 可选版本管理安装（优先包管理器，缺失时尝试官方用户态脚本）
@@ -446,9 +575,7 @@ if ((WITH_VFOX)) && ! command -v vfox >/dev/null 2>&1; then
     if curl -fsSL "https://raw.githubusercontent.com/version-fox/vfox/main/install.sh" -o "$vfox_stage/install.sh" 2>/dev/null; then
       if bash "$vfox_stage/install.sh" --user >/dev/null 2>&1; then
         success "$(msg "vfox 官方脚本安装成功" "vfox installed successfully via official script")"
-        new_skipped=()
-        for s in "${SKIPPED[@]}"; do [[ "$s" != vfox ]] && new_skipped+=("$s"); done
-        SKIPPED=("${new_skipped[@]}")
+        remove_skipped vfox
       fi
     fi
     rm -rf "$vfox_stage"
@@ -469,9 +596,7 @@ if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
         mkdir -p "$HOME/.local/bin"
         install -m 755 "$lzd_stage/lazydocker" "$HOME/.local/bin/lazydocker"
         success "$(msg "lazydocker 安装成功（位于 ~/.local/bin/lazydocker）" "lazydocker installed successfully (in ~/.local/bin/lazydocker)")"
-        new_skipped=()
-        for s in "${SKIPPED[@]}"; do [[ "$s" != lazydocker ]] && new_skipped+=("$s"); done
-        SKIPPED=("${new_skipped[@]}")
+        remove_skipped lazydocker
       fi
     fi
     rm -rf "$lzd_stage"
@@ -581,8 +706,8 @@ fi
 printf '\n\033[1;32m🎉 %s\033[0m\n' "$(msg 'Zsh 配置安装完成！' 'Zsh configuration installed successfully!')"
 printf '%s: %s\n' "$(msg '备份目录与安装日志' 'Backup directory and install log')" "$BACKUP"
 printf '%s: %s\n' "$(msg '跳过的未安装包' 'Skipped packages')" "${SKIPPED[*]:-none}"
-if [[ "$FAMILY" == apt ]] && [[ " ${SKIPPED[*]} " =~ " eza " || " ${SKIPPED[*]} " =~ " fastfetch " || " ${SKIPPED[*]} " =~ " yazi " ]]; then
-  info "$(msg "说明：Debian 12 官方仓库未包含 eza/fastfetch/yazi（Debian 13 已原生收录），跳过属正常现象，不影响核心体验；如需使用可参考文档手动下载。" "Note: Debian 12 repos do not include eza/fastfetch/yazi; core features remain fully functional.")"
+if ((${#SKIPPED[@]} > 0)); then
+  info "$(msg "提示：若因网络原因某些独立二进制或包未能自动下载，可参考文档手动安装或重试安装器。" "Tip: If some standalone binaries or packages failed to download due to network, please refer to the documentation or retry.")"
 fi
 printf '%s\n' "$(msg '提示：请运行 zsh 验证交互环境；首次可用 p10k configure 配置外观。' 'Tip: Run zsh to verify. Configure prompt with p10k configure.')"
 

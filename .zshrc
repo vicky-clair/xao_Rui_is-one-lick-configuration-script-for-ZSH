@@ -239,8 +239,19 @@ if command -v fzf &>/dev/null; then
   if _zsh_fzf_init=$(fzf --zsh 2>/dev/null); then
     eval "$_zsh_fzf_init"
     print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+  elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+    source /usr/share/doc/fzf/examples/key-bindings.zsh
+    [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
+    print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+  elif [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
+    source /usr/share/fzf/key-bindings.zsh
+    [[ -f /usr/share/fzf/completion.zsh ]] && source /usr/share/fzf/completion.zsh
+    print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+  elif [[ -f "$HOME/.fzf.zsh" ]]; then
+    source "$HOME/.fzf.zsh"
+    print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过用户配置加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   else
-    print -P "%F{yellow}⚠ FZF 版本过低不支持 --zsh%f"
+    print -P "%F{yellow}⚠ FZF 版本过低不支持 --zsh，请运行 bash install.sh 升级 FZF%f"
   fi
   unset _zsh_fzf_init
 fi

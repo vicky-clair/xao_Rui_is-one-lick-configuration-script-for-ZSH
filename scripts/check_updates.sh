@@ -138,6 +138,11 @@ if [[ -d "$TMUX_PLUGINS_DIR" ]]; then
   done
 fi
 
+# 4.5. 检测 FZF 官方仓库更新（若通过 ~/.fzf 安装）
+if [[ -d "$HOME/.fzf/.git" ]]; then
+  check_git_repo "FZF (Binary Repo)" "$HOME/.fzf"
+fi
+
 # 5. 检测命令行应用/工具（Linux / macOS）
 check_apps() {
   local os

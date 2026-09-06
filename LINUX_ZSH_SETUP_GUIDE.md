@@ -7,9 +7,10 @@
 **系统支持版本范围：**
 - **macOS**：最低支持 macOS 10.15 (Catalina, Intel) / macOS 11.0 (Big Sur, Apple Silicon)；最高支持 macOS 15.x+ (Sequoia 及后续版本)。
 - **Debian**：最低支持 Debian 10 (Buster)；最高支持 Debian 13 (Trixie) / Sid 滚动版（实测验证环境为 Debian 13）。
-- **Ubuntu**：最低支持 Ubuntu 20.04 LTS；最高支持 Ubuntu 24.10 / 25.04+。
-- **Fedora / RHEL**：最低支持 Fedora 34 / RHEL 8；最高支持 Fedora 41+ / RHEL 9.x+。
-- **Arch Linux / Manjaro**：滚动更新（Rolling），始终支持最新同步稳定版。
+- **Ubuntu / Linux Mint / Pop!_OS**：最低支持 Ubuntu 20.04 LTS；最高支持 Ubuntu 24.10 / 25.04+。
+- **统信 UOS / 深度 Deepin / 麒麟 Kylin**：支持 UOS V20+、Deepin 20/23、银河麒麟 V10+，原生 APT 识别与预编译包支持。
+- **Fedora / RHEL / CentOS / Rocky / Alma / Amazon Linux**：最低支持 Fedora 34 / RHEL 8 / AL2023；最高支持 Fedora 41+ / RHEL 9.x/10.x，支持 DNF 与 YUM。
+- **Arch Linux / Manjaro / EndeavourOS**：滚动更新（Rolling），始终支持最新同步稳定版。
 - **openSUSE**：最低支持 Leap 15.4+；最高支持 Tumbleweed 滚动版。
 - 完整技术底线指标与架构实现规范请参阅 [开发与架构设计文档](DEVELOPMENT.md)。
 

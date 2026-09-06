@@ -266,6 +266,14 @@ if command -v fzf &>/dev/null; then
     source /usr/share/fzf/key-bindings.zsh
     [[ -f /usr/share/fzf/completion.zsh ]] && source /usr/share/fzf/completion.zsh
     _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via system script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+  elif [[ -f "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/key-bindings.zsh" ]]; then
+    source "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/key-bindings.zsh"
+    [[ -f "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/completion.zsh" ]] && source "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/completion.zsh"
+    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过 Homebrew 脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via Homebrew script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+  elif [[ -f "/usr/local/opt/fzf/shell/key-bindings.zsh" ]]; then
+    source "/usr/local/opt/fzf/shell/key-bindings.zsh"
+    [[ -f "/usr/local/opt/fzf/shell/completion.zsh" ]] && source "/usr/local/opt/fzf/shell/completion.zsh"
+    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过 Homebrew 脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via Homebrew script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f "$HOME/.fzf.zsh" ]]; then
     source "$HOME/.fzf.zsh"
     _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过用户配置加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via user config (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
@@ -296,6 +304,20 @@ bindkey '^[[B' history-search-forward
 # ========================================
 # 14. 命令别名与工具集成
 # ========================================
+# 全平台剪贴板互通别名（兼容 macOS pbcopy / Linux X11 xclip / Wayland wl-copy / WSL clip.exe）
+if command -v pbcopy &>/dev/null; then
+  alias clipcopy="pbcopy"
+  alias clippaste="pbpaste"
+elif command -v wl-copy &>/dev/null; then
+  alias clipcopy="wl-copy"
+  alias clippaste="wl-paste"
+elif command -v xclip &>/dev/null; then
+  alias clipcopy="xclip -selection clipboard"
+  alias clippaste="xclip -selection clipboard -o"
+elif command -v clip.exe &>/dev/null; then
+  alias clipcopy="clip.exe"
+fi
+
 if command -v eza &>/dev/null; then
   alias ls="eza --icons=always"
   alias ll="eza -lh --icons=always"

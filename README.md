@@ -2,13 +2,21 @@
 
 本项目提供面向 **Linux**（Debian / Ubuntu / Fedora / Arch / openSUSE）与 **macOS**（Apple Silicon / Intel Mac）的现代化 Zsh 交互环境一键安装、自动配置及插件/应用版本更新管理工具。
 
-集成功能包括：**Powerlevel10k** 极速主题、**自动- 🍏 **全平台兼容**：原生支持 Linux 各主流发行版（APT、DNF、Pacman、Zypper）及 macOS（Homebrew），自动识别 `x86_64`、`aarch64` 与 `arm64` 架构。
+- 🍏 **全平台兼容**：原生支持 Linux 各主流发行版（APT、DNF/YUM、Pacman、Zypper、国产 UOS/Kylin/Deepin）及 macOS（Homebrew），自动识别 `x86_64`、`aarch64` 与 `arm64` 架构。
+- 📐 **终端尺寸自适应与 SSH 80x24 锁定自愈**：
+  - 内置 `TRAPWINCH` 窗口改变信号监听，实时将窗格与物理屏幕同步；
+  - 智能包装 `nvim` 启动流程，在进入 Neovim 前自动探测真实物理行列数并刷新 PTY，彻底告别远程 SSH 窗口只有 80x24 半截屏幕的痛点。
+- 📝 **Neovim 官方最新稳定版保障**：
+  - 自动检测系统 Neovim 版本，若低于 0.10.0（如 Debian 12 仍为 0.7.2）或显式指定 `--with-latest-nvim`，自动从 GitHub Release 下载官方预编译最新版部署至 `~/.local/opt/nvim`，完美驾驭现代 Lua 插件生态。
 - 🖥️ **Tmux 现代化增强与全平台剪贴板互通**：
   - 前缀键定制为人体工学的 `Ctrl + a`，继承当前工作目录的无缝分屏（`|` 与 `-`），窗格快速缩放与连续调整；
   - 终极解决终端复制粘贴痛点：启用 **OSC 52** 协议，不论本地桌面还是通过远程 SSH 连接（Windows Terminal、iTerm2、Alacritty），复制文本均可直通宿主机系统剪贴板；
-  - 智能多系统降级保障（支持 Wayland `wl-copy`、X11 `xclip`、macOS `pbcopy`、WSL `clip.exe`）；
+  - 智能多系统降级保障（提供通用 `clipcopy` / `clippaste` 别名，支持 Wayland `wl-copy`、X11 `xclip`、macOS `pbcopy`、WSL `clip.exe`）；
   - 鼠标拖拽选中文本自动复制，**保持当前视图位置，绝不闪退滚回屏幕底部**；
   - 集成 TPM 插件体系（Tokyo Night 极客美化主题、会话恢复、Vim 无缝导航等）。
+- 🎨 **Powerlevel10k 主题多风格开箱即用与向导支持**：
+  - 支持经典彩虹流线（Rainbow）、现代极简纯净（Lean）、传统经典箭头（Classic）；
+  - 支持一键 `--p10k-wizard` 直接无缝拉取官方 `p10k configure` 进行个性化全定制。
 - ⚡ **零阻塞后台更新检测**：
   - 终端启动时读取本地缓存（耗时 0ms），若有插件或 CLI 工具更新，高亮显示温馨提示；
   - 自动在后台静默轮询（默认每 7 天异步检测一次，脱离前台进程），绝不拖慢终端打开速度。
@@ -34,14 +42,15 @@
 
 | 操作系统体系 | 硬件架构 | 最低支持版本 | 推荐使用版本 | 最高支持版本 | 说明与依赖 |
 | --- | --- | --- | --- | --- | --- |
-| **macOS (Apple Silicon)** | `arm64` (M1/M2/M3/M4) | **macOS 11.0 (Big Sur)** | macOS 14 / 15+ | **macOS 15.x+ (最新)** | 苹果芯片硬件起跑版本，预装 Zsh 5.8+ |
+| **macOS (Apple Silicon)** | `arm64` (M1/M2/M3/M4) | **macOS 11.0 (Big Sur)** | macOS 14 / 15+ | **macOS 15.x+ (最新)** | 苹果芯片硬件起跑版本，预装 Zsh 5.8+，Homebrew 原生支持 |
 | **macOS (Intel)** | `x86_64` | **macOS 10.15 (Catalina)** | macOS 13 / 14 | **macOS 15.x+ (最新)** | Catalina 首次将 Zsh 设为系统默认 Shell |
-| **Debian** | `x86_64`, `aarch64` | **Debian 10 (Buster)** | Debian 12 / 13 | **Debian 13 (Trixie) / Sid** | 包含 Zsh 5.7+、Bash 5.0，实测环境 Debian 13 |
-| **Ubuntu** | `x86_64`, `aarch64` | **Ubuntu 20.04 LTS** | Ubuntu 22.04 / 24.04 | **Ubuntu 24.10 / 25.04+** | 20.04 起附带完整 Zsh 5.8 与现代 glibc |
-| **Fedora** | `x86_64`, `aarch64` | **Fedora 34** | Fedora 39 / 40 / 41 | **Fedora 41 / Rawhide** | 原生 DNF 包管理器支持 |
-| **RHEL / Rocky / Alma** | `x86_64`, `aarch64` | **RHEL 8.0+** | RHEL / Rocky 9.x | **RHEL 9.x / 10.x** | RHEL 7 (Zsh 5.0) 已停止维护且低于基准 |
-| **Arch Linux / Manjaro** | `x86_64`, `aarch64` | **Rolling (近期)** | 最新同步版本 | **Rolling (持续更新)** | Pacman 全量同步，始终提供最新 Zsh 5.9+ |
-| **openSUSE** | `x86_64`, `aarch64` | **Leap 15.4+** | Leap 15.6 / Tumbleweed | **Tumbleweed (Rolling)** | 原生 Zypper 包管理器支持 |
+| **Debian** | `x86_64`, `arm64` | **Debian 10 (Buster)** | Debian 12 / 13 | **Debian 13 (Trixie) / Sid** | 包含 Zsh 5.7+、Bash 5.0，实测环境 Debian 13 |
+| **Ubuntu / Mint / Pop!_OS** | `x86_64`, `arm64` | **Ubuntu 20.04 LTS** | Ubuntu 22.04 / 24.04 | **Ubuntu 24.10 / 25.04+** | 20.04 起附带完整 Zsh 5.8 与现代 glibc |
+| **Fedora** | `x86_64`, `arm64` | **Fedora 34** | Fedora 39 / 40 / 41 | **Fedora 41 / Rawhide** | 原生 DNF 包管理器支持 |
+| **RHEL / Rocky / Alma / Amazon Linux** | `x86_64`, `arm64` | **RHEL 8.0+ / AL2023** | Rocky 9.x / RHEL 9.x | **RHEL 9.x / 10.x** | DNF / YUM 双双平滑兼容支持 |
+| **Arch Linux / Manjaro / EndeavourOS** | `x86_64`, `arm64` | **Rolling (近期)** | 最新同步版本 | **Rolling (持续更新)** | Pacman 全量同步，始终提供最新 Zsh 5.9+ |
+| **openSUSE** | `x86_64`, `arm64` | **Leap 15.4+** | Leap 15.6 / Tumbleweed | **Tumbleweed (Rolling)** | 原生 Zypper 包管理器支持 |
+| **统信 UOS / 深度 Deepin / 麒麟 Kylin** | `x86_64`, `arm64` | **UOS V20 / Kylin V10** | 最新企业/社区版 | **持续支持** | 原生 APT 识别与多架构预编译二进制支持 |
 
 ### 2. 软件运行依赖基准
 

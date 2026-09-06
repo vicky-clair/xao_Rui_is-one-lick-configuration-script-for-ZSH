@@ -214,6 +214,37 @@ calc_sha256() {
 }
 ```
 
+#### 4. 终端 PTY 尺寸自适应与 Neovim 80x24 锁定自愈模式
+针对远程 SSH（特别是 Windows Terminal / CMD 连接）未能在连接初期向 Linux 内核发送 `TIOCSWINSZ` / `SIGWINCH` 信号导致 Linux PTY 默认卡在 80x24 的问题，本项目在模板层实现了双重自愈机制：
+```zsh
+# 1. 注册窗口尺寸动态监听钩子
+if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
+  TRAPWINCH() {
+    zle && zle reset-prompt 2>/dev/null || true
+  }
+fi
+
+# 2. 包装编辑器启动逻辑，进入前先主动探寻物理屏幕真实行列
+if command -v nvim >/dev/null 2>&1; then
+  nvim() {
+    if command -v resize >/dev/null 2>&1; then
+      eval "$(resize 2>/dev/null)" || true
+    fi
+    command nvim "$@"
+  }
+  alias vim=nvim
+  alias vi=nvim
+  alias v=nvim
+fi
+```
+
+#### 5. 跨平台多架构独立二进制资产分发策略
+针对部分发行版（如 Debian 12）仓库无 `eza`、`fastfetch`、`yazi` 或自带旧版 `fzf` 与 `neovim`（< 0.10）的情况，安装器基于 `$OS`（`Linux` / `Darwin`）与 `$ARCH`（`x86_64` / `arm64`）自动动态计算资产下载 URL：
+- **Eza**：Linux 下为 `unknown-linux-gnu`，macOS 下为 `apple-darwin`；
+- **Yazi**：Linux 下采用 `unknown-linux-musl` 静态编译包（彻底避免 glibc 2.39 缺失报错），macOS 下为 `apple-darwin`；
+- **Neovim**：Linux 为 `nvim-linux-${NVIM_ARCH}.tar.gz`，macOS 为 `nvim-macos-${NVIM_ARCH}.tar.gz`，自动软链接至 `~/.local/bin/nvim`；
+- **Fastfetch**：Linux APT 优先安装 `.deb`，非 Debian 或 macOS 则拉取官方免安装归档解压。
+
 ---
 
 ## 五、安装器 `install.sh` 架构与实现细节

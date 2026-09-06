@@ -366,18 +366,31 @@ if [[ "$OS" == Darwin ]]; then
 elif [[ "$OS" == Linux ]]; then
   if [[ -r /etc/os-release ]]; then
     . /etc/os-release
-    case "${ID:-}" in
-      debian|ubuntu|linuxmint|kali|pop|raspbian) FAMILY=apt ;;
-      fedora|rhel|centos|rocky|alma) FAMILY=dnf ;;
-      arch|manjaro|endeavouros|artix) FAMILY=pacman ;;
-      opensuse*|suse) FAMILY=zypper ;;
-      *) die "$(msg "暂不自动支持发行版：${ID:-未知系统}；请使用手动教程" "Distribution not automatically supported: ${ID:-unknown}; refer to manual guide")" ;;
+    ID_LOWER="${ID:-}"
+    ID_LIKE_LOWER="${ID_LIKE:-}"
+    case "$ID_LOWER $ID_LIKE_LOWER" in
+      *debian*|*ubuntu*|*mint*|*kali*|*pop*|*raspbian*|*deepin*|*uos*|*kylin*) FAMILY=apt ;;
+      *fedora*|*rhel*|*centos*|*rocky*|*alma*|*ol*|*amzn*) FAMILY=dnf ;;
+      *arch*|*manjaro*|*endeavouros*|*artix*|*garuda*) FAMILY=pacman ;;
+      *opensuse*|*suse*) FAMILY=zypper ;;
+      *)
+        if command -v apt-get >/dev/null 2>&1; then FAMILY=apt;
+        elif command -v dnf >/dev/null 2>&1; then FAMILY=dnf;
+        elif command -v yum >/dev/null 2>&1; then FAMILY=dnf;
+        elif command -v pacman >/dev/null 2>&1; then FAMILY=pacman;
+        elif command -v zypper >/dev/null 2>&1; then FAMILY=zypper;
+        else die "$(msg "暂不自动支持发行版：${ID:-未知系统}；请参考教程手动安装" "Distribution not automatically supported: ${ID:-unknown}; refer to manual guide")"; fi
+        ;;
     esac
   elif ((DRY_RUN)); then
     FAMILY=apt
     info "$(msg "[预演模式] 未找到 /etc/os-release，默认模拟 apt 发行版" "[Dry Run] /etc/os-release not found; simulating apt distribution")"
   else
-    die "$(msg '缺少 /etc/os-release' 'Missing /etc/os-release')"
+    if command -v apt-get >/dev/null 2>&1; then FAMILY=apt;
+    elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then FAMILY=dnf;
+    elif command -v pacman >/dev/null 2>&1; then FAMILY=pacman;
+    elif command -v zypper >/dev/null 2>&1; then FAMILY=zypper;
+    else die "$(msg '缺少 /etc/os-release 且未探测到主流包管理器' 'Missing /etc/os-release and no supported package manager found')"; fi
   fi
 fi
 
@@ -529,7 +542,11 @@ case "$FAMILY" in
     sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term
     ;;
   dnf)
-    sudo dnf install -y zsh git curl ca-certificates coreutils unzip tar
+    if command -v dnf >/dev/null 2>&1; then
+      sudo dnf install -y zsh git curl ca-certificates coreutils unzip tar
+    else
+      sudo yum install -y zsh git curl ca-certificates coreutils unzip tar
+    fi
     ;;
   pacman)
     sudo pacman -Syu --needed --noconfirm zsh git curl ca-certificates coreutils unzip tar
@@ -568,8 +585,14 @@ optional_package() {
       fi
       ;;
     dnf)
-      if dnf -q info --available "$pkg" >/dev/null 2>&1; then
-        sudo dnf install -y "$pkg" && return 0
+      if command -v dnf >/dev/null 2>&1; then
+        if dnf -q info --available "$pkg" >/dev/null 2>&1; then
+          sudo dnf install -y "$pkg" && return 0
+        fi
+      elif command -v yum >/dev/null 2>&1; then
+        if yum info "$pkg" >/dev/null 2>&1; then
+          sudo yum install -y "$pkg" && return 0
+        fi
       fi
       ;;
     pacman)
@@ -641,11 +664,15 @@ if [[ "$PROFILE" == full ]]; then
     fi
   fi
 
-  # --- EZA 官方预编译二进制自动回退（Debian 12 等发行版仓库无此包）---
+  # --- EZA 官方预编译二进制自动回退（针对无包管理器或仓库无此包）---
   if ! command -v eza >/dev/null 2>&1 && [[ -n "$EZA_ARCH" ]]; then
     info "$(msg "系统仓库无 eza，正在从 GitHub Release 下载官方预编译二进制至 ~/.local/bin..." "eza not in repo; downloading official binary...")"
     eza_stage=$(mktemp -d "$HOME/.eza-tmp-XXXXXX")
-    eza_url="https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}-unknown-linux-gnu.tar.gz"
+    if [[ "$OS" == Darwin ]]; then
+      eza_url="https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}-apple-darwin.tar.gz"
+    else
+      eza_url="https://github.com/eza-community/eza/releases/latest/download/eza_${EZA_ARCH}-unknown-linux-gnu.tar.gz"
+    fi
     if curl -fsSL --connect-timeout 10 -m 60 "$eza_url" -o "$eza_stage/eza.tar.gz" 2>/dev/null; then
       if tar -xzf "$eza_stage/eza.tar.gz" -C "$eza_stage" 2>/dev/null; then
         eza_bin=$(find "$eza_stage" -type f -name eza -perm -111 2>/dev/null | head -n 1)
@@ -660,23 +687,16 @@ if [[ "$PROFILE" == full ]]; then
     rm -rf "$eza_stage"
   fi
 
-  # --- FASTFETCH 官方发布版自动回退（Debian 12 等仓库无此包）---
+  # --- FASTFETCH 官方发布版自动回退（针对无包管理器或仓库无此包）---
   if ! command -v fastfetch >/dev/null 2>&1 && [[ -n "$FF_ARCH" ]]; then
     info "$(msg "系统仓库无 fastfetch，正在从 GitHub Release 下载官方发布版..." "fastfetch not in repo; downloading official release...")"
     ff_stage=$(mktemp -d "$HOME/.ff-tmp-XXXXXX")
-    if [[ "$FAMILY" == apt ]]; then
-      ff_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.deb"
-      if curl -fsSL --connect-timeout 10 -m 60 "$ff_url" -o "$ff_stage/fastfetch.deb" 2>/dev/null; then
-        if sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1 || (sudo apt-get install -fy >/dev/null 2>&1 && sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1); then
-          success "$(msg "fastfetch 安装成功 (deb 软件包)" "fastfetch installed successfully via deb")"
-          remove_skipped fastfetch
+    if [[ "$OS" == Darwin ]]; then
+      ff_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-macos-universal.zip"
+      if curl -fsSL --connect-timeout 10 -m 60 "$ff_url" -o "$ff_stage/fastfetch.zip" 2>/dev/null; then
+        if command -v unzip >/dev/null 2>&1; then
+          unzip -q "$ff_stage/fastfetch.zip" -d "$ff_stage" 2>/dev/null || true
         fi
-      fi
-    fi
-    if ! command -v fastfetch >/dev/null 2>&1; then
-      ff_tar_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.tar.gz"
-      if curl -fsSL --connect-timeout 10 -m 60 "$ff_tar_url" -o "$ff_stage/fastfetch.tar.gz" 2>/dev/null; then
-        tar -xzf "$ff_stage/fastfetch.tar.gz" -C "$ff_stage" 2>/dev/null || true
         ff_bin=$(find "$ff_stage" -type f -name fastfetch -perm -111 2>/dev/null | head -n 1)
         if [[ -n "$ff_bin" && -x "$ff_bin" ]]; then
           mkdir -p "$HOME/.local/bin"
@@ -685,15 +705,42 @@ if [[ "$PROFILE" == full ]]; then
           remove_skipped fastfetch
         fi
       fi
+    else
+      if [[ "$FAMILY" == apt ]]; then
+        ff_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.deb"
+        if curl -fsSL --connect-timeout 10 -m 60 "$ff_url" -o "$ff_stage/fastfetch.deb" 2>/dev/null; then
+          if sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1 || (sudo apt-get install -fy >/dev/null 2>&1 && sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1); then
+            success "$(msg "fastfetch 安装成功 (deb 软件包)" "fastfetch installed successfully via deb")"
+            remove_skipped fastfetch
+          fi
+        fi
+      fi
+      if ! command -v fastfetch >/dev/null 2>&1; then
+        ff_tar_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.tar.gz"
+        if curl -fsSL --connect-timeout 10 -m 60 "$ff_tar_url" -o "$ff_stage/fastfetch.tar.gz" 2>/dev/null; then
+          tar -xzf "$ff_stage/fastfetch.tar.gz" -C "$ff_stage" 2>/dev/null || true
+          ff_bin=$(find "$ff_stage" -type f -name fastfetch -perm -111 2>/dev/null | head -n 1)
+          if [[ -n "$ff_bin" && -x "$ff_bin" ]]; then
+            mkdir -p "$HOME/.local/bin"
+            install -m 755 "$ff_bin" "$HOME/.local/bin/fastfetch"
+            success "$(msg "fastfetch 安装成功（位于 ~/.local/bin/fastfetch）" "fastfetch installed successfully (in ~/.local/bin/fastfetch)")"
+            remove_skipped fastfetch
+          fi
+        fi
+      fi
     fi
     rm -rf "$ff_stage"
   fi
 
-  # --- YAZI 官方静态发布包自动回退（使用 musl 静态编译版，彻底避免 glibc 2.39 缺失问题）---
+  # --- YAZI 官方预编译发布包自动回退（Linux 使用 musl 静态编译版，macOS 使用 darwin 版）---
   if (! command -v yazi >/dev/null 2>&1 || ! yazi --version >/dev/null 2>&1) && [[ -n "$YAZI_ARCH" ]]; then
-    info "$(msg "正在从 GitHub Release 下载官方静态编译发布版 (musl) 至 ~/.local/bin..." "Downloading official static musl release to ~/.local/bin...")"
+    info "$(msg "正在从 GitHub Release 下载官方发布版至 ~/.local/bin..." "Downloading official release to ~/.local/bin...")"
     yazi_stage=$(mktemp -d "$HOME/.yazi-tmp-XXXXXX")
-    yazi_url="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${YAZI_ARCH}-unknown-linux-musl.zip"
+    if [[ "$OS" == Darwin ]]; then
+      yazi_url="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${YAZI_ARCH}-apple-darwin.zip"
+    else
+      yazi_url="https://github.com/sxyazi/yazi/releases/latest/download/yazi-${YAZI_ARCH}-unknown-linux-musl.zip"
+    fi
     if curl -fsSL --connect-timeout 10 -m 60 "$yazi_url" -o "$yazi_stage/yazi.zip" 2>/dev/null; then
       if command -v unzip >/dev/null 2>&1; then
         unzip -q "$yazi_stage/yazi.zip" -d "$yazi_stage" 2>/dev/null || true
@@ -704,7 +751,7 @@ if [[ "$PROFILE" == full ]]; then
       if [[ -n "$yazi_bin" && -x "$yazi_bin" ]]; then
         mkdir -p "$HOME/.local/bin"
         install -m 755 "$yazi_bin" "$HOME/.local/bin/yazi"
-        success "$(msg "yazi 静态版安装成功（位于 ~/.local/bin/yazi）" "yazi static musl installed successfully (in ~/.local/bin/yazi)")"
+        success "$(msg "yazi 安装成功（位于 ~/.local/bin/yazi）" "yazi installed successfully (in ~/.local/bin/yazi)")"
         remove_skipped yazi
       fi
     fi
@@ -732,10 +779,14 @@ if [[ "$PROFILE" == full ]]; then
   if (( need_nvim_download )) && [[ -n "$NVIM_ARCH" ]] && [[ "$FAMILY" != brew ]]; then
     info "$(msg "正在从 GitHub Release 下载 Neovim 官方最新稳定版至 ~/.local/opt/nvim..." "Downloading latest official Neovim release from GitHub to ~/.local/opt/nvim...")"
     nvim_stage=$(mktemp -d "$HOME/.nvim-tmp-XXXXXX")
-    nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${NVIM_ARCH}.tar.gz"
+    if [[ "$OS" == Darwin ]]; then
+      nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim-macos-${NVIM_ARCH}.tar.gz"
+    else
+      nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${NVIM_ARCH}.tar.gz"
+    fi
     if curl -fsSL --connect-timeout 10 -m 90 "$nvim_url" -o "$nvim_stage/nvim.tar.gz" 2>/dev/null; then
       if tar -xzf "$nvim_stage/nvim.tar.gz" -C "$nvim_stage" 2>/dev/null; then
-        extracted_dir=$(find "$nvim_stage" -mindepth 1 -maxdepth 1 -type d -name "nvim-linux*" 2>/dev/null | head -n 1)
+        extracted_dir=$(find "$nvim_stage" -mindepth 1 -maxdepth 1 -type d \( -name "nvim-linux*" -o -name "nvim-macos*" \) 2>/dev/null | head -n 1)
         if [[ -n "$extracted_dir" && -x "$extracted_dir/bin/nvim" ]]; then
           mkdir -p "$HOME/.local/opt" "$HOME/.local/bin"
           rm -rf "$HOME/.local/opt/nvim"
@@ -775,8 +826,10 @@ if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
     info "$(msg "系统仓库无 lazydocker，正在尝试下载官方独立二进制至 ~/.local/bin..." "lazydocker not in repo; downloading official binary...")"
     lzd_arch="x86_64"
     [[ "$ARCH" == arm64 || "$ARCH" == aarch64 ]] && lzd_arch="arm64"
+    lzd_os="Linux"
+    [[ "$OS" == Darwin ]] && lzd_os="Darwin"
     lzd_stage=$(mktemp -d "$HOME/.lzd-tmp-XXXXXX")
-    lzd_url="https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_Linux_${lzd_arch}.tar.gz"
+    lzd_url="https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${lzd_os}_${lzd_arch}.tar.gz"
     if curl -fsSL "$lzd_url" -o "$lzd_stage/lzd.tar.gz" 2>/dev/null; then
       if tar -xzf "$lzd_stage/lzd.tar.gz" -C "$lzd_stage" lazydocker 2>/dev/null && [[ -x "$lzd_stage/lazydocker" ]]; then
         mkdir -p "$HOME/.local/bin"

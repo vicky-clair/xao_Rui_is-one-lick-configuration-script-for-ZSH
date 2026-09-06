@@ -1,0 +1,1 @@
+[DRY RUN] --list-backups  scope=zsh；不写文件、不联网、不执行配置。

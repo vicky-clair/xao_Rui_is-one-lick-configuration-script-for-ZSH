@@ -122,7 +122,7 @@ bash install.sh
   - `full`（完整版）：在基础版之上，自动检测并安装 `fzf`、`fd`、`bat`、`eza`、`zoxide`、`yazi`、`neovim`、`fastfetch`。
 - **可选组件**：按需提示安装 `vfox`（SDK 版本管理）与 `lazydocker`（容器终端界面）。
 
-### 2. 命令行参数
+### 2. 命令行参数与常用场景
 
 ```bash
 bash install.sh [选项]
@@ -131,14 +131,36 @@ bash install.sh [选项]
 | 参数 | 说明 |
 | --- | --- |
 | `--dry-run` | 预演执行计划，不修改文件、不联网、不调用权限提升 |
-| `--profile basic\|full` | 指定基础模式或完整工具集模式 |
+| `--profile basic\|full` | 指定基础模式（核心插件）或完整工具集模式（现代 CLI 全套） |
+| `--p10k-style STYLE` | 指定 P10k 提示符风格：`rainbow`（经典彩虹，默认）、`lean`（极简纯净）、`classic`（传统流线）、`wizard`（向导配置）、`skip`（跳过/保持现有） |
+| `--p10k-wizard` | 快捷参数，等同于 `--p10k-style wizard`，安装后立即拉起官方配置向导 |
 | `--with-vfox` | 请求安装 vfox（若仓库或脚本可用） |
 | `--with-lazydocker` | 请求安装 lazydocker 容器终端管理 |
 | `--with-tmux` | 请求安装并配置 tmux（含终端剪贴板互通与美化主题） |
+| `--lang zh\|en` | 指定界面语言（中文 `zh` 或英文 `en`） |
 | `--check-updates` | 检测已安装的插件、主题与应用是否有新版本 |
 | `--update` | 交互式更新所有有新版本的组件，并重新校验配置语法 |
 | `--rollback <DIR>` | 恢复指定备份目录中的配置，安全回退 |
-| `--help` | 查看帮助文档 |
+| `--help` | 查看帮助文档与参数说明 |
+
+#### 常用安装命令示例
+
+```bash
+# 场景 1：完全交互式安装（终端引导单键选择语言、工具集与主题风格）
+bash install.sh
+
+# 场景 2：完整工具集 + 经典彩虹高颜值主题（开箱即用，双行丰富图标）
+bash install.sh --profile full --p10k-style rainbow
+
+# 场景 3：完整工具集 + 立即进入官方配置向导（自由定制单双行、时间、图标等）
+bash install.sh --profile full --p10k-wizard
+
+# 场景 4：轻量基础模式 + 极简纯净主题（Lean）
+bash install.sh --profile basic --p10k-style lean
+
+# 场景 5：完整工具集 + 极简主题 + 启用 Tmux 终端复用增强
+bash install.sh --profile full --p10k-style lean --with-tmux
+```
 
 ---
 

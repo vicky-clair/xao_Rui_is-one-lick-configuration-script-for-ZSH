@@ -39,6 +39,8 @@ PROFILE_SET=0
 WITH_VFOX=0
 WITH_LAZYDOCKER=0
 WITH_TMUX=0
+P10K_STYLE=rainbow
+P10K_STYLE_SET=0
 CHECK_UPDATES=0
 DO_UPDATE=0
 LANG_CHOICE="${ZSH_PROJECT_LANG:-zh}"
@@ -60,6 +62,8 @@ usage() {
 $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --dry-run             $(msg "只展示计划，不联网、不写文件、不调用权限提升" "Show execution plan only; no network, no file writes, no elevation")
   --profile basic|full  $(msg "基础安装（OMZ+主题+3核心插件）或完整安装（+全套CLI工具）" "Basic install (OMZ+theme+3 plugins) or full install (+all modern CLI tools)")
+  --p10k-style STYLE    $(msg "P10k 主题风格：rainbow(经典彩虹,默认), lean(极简), classic(传统), wizard(向导), skip(跳过)" "P10k prompt style: rainbow(default), lean, classic, wizard, skip")
+  --p10k-wizard         $(msg "安装完成后立即启动 p10k configure 官方交互式配置向导" "Launch p10k configure interactive wizard after installation")
   --with-vfox           $(msg "请求安装 vfox 多版本管理工具，不自动安装 SDK" "Install vfox version manager (does not install SDKs automatically)")
   --with-lazydocker     $(msg "请求安装 lazydocker，不配置 Docker 服务或权限" "Install lazydocker (does not configure Docker daemon or permissions)")
   --with-tmux           $(msg "请求安装并配置 tmux 终端复用器（含剪贴板互通与美化主题）" "Install and configure tmux terminal multiplexer (with clipboard & themes)")
@@ -133,6 +137,15 @@ while (($#)); do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
     --profile) (($# >= 2)) || die "$(msg '--profile 缺少值' '--profile requires value')"; PROFILE=$2; PROFILE_SET=1; shift ;;
+    --p10k-style)
+      (($# >= 2)) || die "$(msg '--p10k-style 缺少参数 (rainbow|lean|classic|wizard|skip)' '--p10k-style requires value (rainbow|lean|classic|wizard|skip)')"
+      P10K_STYLE="$2"; P10K_STYLE_SET=1; shift ;;
+    --p10k-style=*) P10K_STYLE="${1#*=}"; P10K_STYLE_SET=1 ;;
+    --p10k-wizard) P10K_STYLE="wizard"; P10K_STYLE_SET=1 ;;
+    --p10k-rainbow) P10K_STYLE="rainbow"; P10K_STYLE_SET=1 ;;
+    --p10k-lean) P10K_STYLE="lean"; P10K_STYLE_SET=1 ;;
+    --p10k-classic) P10K_STYLE="classic"; P10K_STYLE_SET=1 ;;
+    --p10k-skip) P10K_STYLE="skip"; P10K_STYLE_SET=1 ;;
     --with-vfox) WITH_VFOX=1 ;;
     --with-lazydocker) WITH_LAZYDOCKER=1 ;;
     --with-tmux) WITH_TMUX=1 ;;
@@ -146,6 +159,11 @@ while (($#)); do
   esac
   shift
 done
+
+case "$P10K_STYLE" in
+  rainbow|lean|classic|wizard|skip) ;;
+  *) die "$(msg "无效的 P10k 样式：$P10K_STYLE (可选：rainbow, lean, classic, wizard, skip)" "Invalid P10k style: $P10K_STYLE (available: rainbow, lean, classic, wizard, skip)")" ;;
+esac
 
 # 交互式语言选择菜单（若未通过命令行显式指定 --lang，按键即响应）
 if ((!DRY_RUN)) && [[ -t 0 ]] && ((!LANG_SET)) && [[ -z "$ROLLBACK" ]]; then
@@ -421,6 +439,25 @@ if ((!DRY_RUN)); then
   if ((!PROFILE_SET)); then
     if ask "$(msg '是否选择完整工具集？选 N 安装基础主题、补全、高亮和建议' 'Install full CLI toolchain? Select N for basic theme, completions, and suggestions')"; then PROFILE=full; fi
   fi
+  if ((!P10K_STYLE_SET)); then
+    printf '\n\033[1;36m🎨 %s:\033[0m\n' \
+      "$(msg '请选择 Powerlevel10k 终端主题配置方式' 'Select Powerlevel10k Prompt Configuration')"
+    printf '  1) %s\n' "$(msg '经典彩虹高颜值主题 (Rainbow) [默认推荐，开箱即用]' 'Classic Rainbow Theme [Recommended, ready-to-use]')"
+    printf '  2) %s\n' "$(msg '现代极简纯净主题 (Lean) [简约清爽]' 'Lean Pure Theme [Minimalist & clean]')"
+    printf '  3) %s\n' "$(msg '经典传统流线主题 (Classic) [传统箭头]' 'Classic Flow Theme [Traditional arrows]')"
+    printf '  4) %s\n' "$(msg '安装完成后启动官方配置向导 (p10k configure) [自由定制]' 'Interactive Setup Wizard (p10k configure) [Full customization]')"
+    printf '  5) %s\n' "$(msg '保持现有配置 / 暂不生成 ~/.p10k.zsh (Skip)' 'Keep existing ~/.p10k.zsh / Skip for now')"
+    printf '%s [1/2/3/4/5]: ' "$(msg '请按键选择' 'Enter choice')"
+    _p_key="$(read_key)"
+    case "$_p_key" in
+      2) echo "2"; P10K_STYLE="lean" ;;
+      3) echo "3"; P10K_STYLE="classic" ;;
+      4) echo "4"; P10K_STYLE="wizard" ;;
+      5) echo "5"; P10K_STYLE="skip" ;;
+      q|Q) echo "q"; info "$(msg "用户已中止操作。" "Operation aborted by user.")"; exit 0 ;;
+      *) echo "1"; P10K_STYLE="rainbow" ;;
+    esac
+  fi
   ((WITH_VFOX)) || { if ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
   ((WITH_LAZYDOCKER)) || { if ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
   ((WITH_TMUX)) || { if ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
@@ -431,10 +468,19 @@ printf '\n%s: %s; %s: %s; %s: %s; %s: %s\n' \
   "$(msg '架构' 'Arch')" "$ARCH" \
   "$(msg '包管理器' 'Package Manager')" "$FAMILY" \
   "$(msg '用户' 'User')" "$(id -un)"
-printf '%s: %s; vfox: %s; lazydocker: %s; tmux: %s; %s: %s\n' \
-  "$(msg '安装类型' 'Profile')" "$PROFILE" "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_TMUX" \
+printf '%s: %s; %s: %s; vfox: %s; lazydocker: %s; tmux: %s; %s: %s\n' \
+  "$(msg '安装类型' 'Profile')" "$PROFILE" \
+  "$(msg 'P10k主题' 'P10k Style')" "$P10K_STYLE" \
+  "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_TMUX" \
   "$(msg '语言' 'Language')" "$LANG_CHOICE"
-printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils；OMZ、Powerlevel10k、三个 Zsh 核心插件。' 'Base dependencies: zsh, git, curl, ca-certificates, coreutils; OMZ, Powerlevel10k, 3 core plugins.')"
+case "$P10K_STYLE" in
+  rainbow) printf '%s\n' "$(msg '主题配置：经典彩虹流线双行主题（Rainbow，开箱即用）。' 'Prompt config: Classic rainbow theme (Rainbow, ready-to-use).')" ;;
+  lean) printf '%s\n' "$(msg '主题配置：现代极简纯净主题（Lean，简约高效）。' 'Prompt config: Lean minimalist pure theme (Lean, clean & fast).')" ;;
+  classic) printf '%s\n' "$(msg '主题配置：经典传统流线主题（Classic，传统箭头）。' 'Prompt config: Classic flow theme (Classic, traditional arrows).')" ;;
+  wizard) printf '%s\n' "$(msg '主题配置：安装完成后自动唤起 p10k configure 官方配置向导。' 'Prompt config: Automatically launch p10k configure wizard after install.')" ;;
+  skip) printf '%s\n' "$(msg '主题配置：保持原有设置，不覆盖 ~/.p10k.zsh。' 'Prompt config: Keep existing setup, do not touch ~/.p10k.zsh.')" ;;
+esac
+printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils unzip tar；OMZ、Powerlevel10k、三个 Zsh 核心插件。' 'Base dependencies: zsh, git, curl, ca-certificates, coreutils, unzip, tar; OMZ, Powerlevel10k, 3 core plugins.')"
 [[ "$PROFILE" == full ]] && printf '%s\n' "$(msg '完整工具：fzf fd bat eza zoxide yazi neovim fastfetch（仓库没有则跳过并记录）。' 'Full tools: fzf, fd, bat, eza, zoxide, yazi, neovim, fastfetch (skipped if unavailable in repository).')"
 ((WITH_TMUX)) && printf '%s\n' "$(msg 'Tmux 增强：安装 tmux、终端剪贴板工具、TPM 插件生态并部署 ~/.tmux.conf。' 'Tmux enhancement: install tmux, clipboard tools, TPM plugins, and ~/.tmux.conf.')"
 printf '%s\n' "$(msg '备份并更新受管配置文件；保留 .zshenv、个人主题、custom 和历史文件。' 'Backup and update managed configurations; preserving .zshenv, custom themes and history.')"
@@ -477,20 +523,20 @@ done
 info "$(msg "正在安装基础核心依赖..." "Installing core base dependencies...")"
 case "$FAMILY" in
   brew)
-    brew install zsh git curl coreutils
+    brew install zsh git curl coreutils unzip tar
     ;;
   apt)
     sudo apt-get update
-    sudo apt-get install -y zsh git curl ca-certificates coreutils
+    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar
     ;;
   dnf)
-    sudo dnf install -y zsh git curl ca-certificates coreutils
+    sudo dnf install -y zsh git curl ca-certificates coreutils unzip tar
     ;;
   pacman)
-    sudo pacman -Syu --needed --noconfirm zsh git curl ca-certificates coreutils
+    sudo pacman -Syu --needed --noconfirm zsh git curl ca-certificates coreutils unzip tar
     ;;
   zypper)
-    sudo zypper install -y zsh git curl ca-certificates coreutils
+    sudo zypper install -y zsh git curl ca-certificates coreutils unzip tar
     ;;
 esac
 
@@ -747,11 +793,38 @@ for plugin in zsh-autosuggestions zsh-completions zsh-syntax-highlighting; do
   clone_missing "https://github.com/zsh-users/$plugin.git" "$HOME/.oh-my-zsh/custom/plugins/$plugin" "$entry"
 done
 
-# 部署默认 Powerlevel10k 彩虹主题配置（若用户尚未配置 ~/.p10k.zsh，免去首次启动强行弹窗配置向导）
-if [[ ! -f "$HOME/.p10k.zsh" && -f "$HOME/powerlevel10k/config/p10k-rainbow.zsh" ]]; then
-  cp "$HOME/powerlevel10k/config/p10k-rainbow.zsh" "$HOME/.p10k.zsh"
-  success "$(msg "已生成默认 Powerlevel10k 彩虹主题配置 (~/.p10k.zsh)" "Generated default Powerlevel10k rainbow theme config (~/.p10k.zsh)")"
-fi
+# 部署 Powerlevel10k 主题配置
+case "$P10K_STYLE" in
+  rainbow)
+    if [[ -f "$HOME/powerlevel10k/config/p10k-rainbow.zsh" ]]; then
+      cp "$HOME/powerlevel10k/config/p10k-rainbow.zsh" "$HOME/.p10k.zsh"
+      success "$(msg "已生成 Powerlevel10k 经典彩虹主题配置 (~/.p10k.zsh)" "Generated Powerlevel10k rainbow theme config (~/.p10k.zsh)")"
+    fi
+    ;;
+  lean)
+    if [[ -f "$HOME/powerlevel10k/config/p10k-lean.zsh" ]]; then
+      cp "$HOME/powerlevel10k/config/p10k-lean.zsh" "$HOME/.p10k.zsh"
+      success "$(msg "已生成 Powerlevel10k 现代极简主题配置 (~/.p10k.zsh)" "Generated Powerlevel10k lean theme config (~/.p10k.zsh)")"
+    fi
+    ;;
+  classic)
+    if [[ -f "$HOME/powerlevel10k/config/p10k-classic.zsh" ]]; then
+      cp "$HOME/powerlevel10k/config/p10k-classic.zsh" "$HOME/.p10k.zsh"
+      success "$(msg "已生成 Powerlevel10k 经典传统主题配置 (~/.p10k.zsh)" "Generated Powerlevel10k classic theme config (~/.p10k.zsh)")"
+    fi
+    ;;
+  wizard)
+    # 用户选择向导配置：若已有配置备份后移除，确保安装后向导能干净启动
+    if [[ -f "$HOME/.p10k.zsh" ]]; then
+      cp "$HOME/.p10k.zsh" "$BACKUP/old.p10k.zsh" 2>/dev/null || true
+      rm -f "$HOME/.p10k.zsh"
+    fi
+    info "$(msg "已就绪：将在安装结束时自动唤起 p10k configure 官方配置向导" "Ready: will launch p10k configure wizard automatically after install")"
+    ;;
+  skip)
+    info "$(msg "保持当前主题配置，不覆盖 ~/.p10k.zsh" "Keeping existing prompt config, ~/.p10k.zsh untouched")"
+    ;;
+esac
 
 if ((WITH_TMUX)); then
   info "$(msg "正在配置 Tmux 与 TPM 插件管理器..." "Configuring Tmux and TPM plugin manager...")"
@@ -816,7 +889,17 @@ printf '%s: %s\n' "$(msg '跳过的未安装包' 'Skipped packages')" "${SKIPPED
 if ((${#SKIPPED[@]} > 0)); then
   info "$(msg "提示：若因网络原因某些独立二进制或包未能自动下载，可参考文档手动安装或重试安装器。" "Tip: If some standalone binaries or packages failed to download due to network, please refer to the documentation or retry.")"
 fi
-printf '%s\n' "$(msg '提示：已为您部署开箱即用的默认主题；如需个性化调整，可随时运行 p10k configure。' 'Tip: Default prompt configured. Run p10k configure anytime to customize your prompt.')"
+case "$P10K_STYLE" in
+  wizard)
+    info "$(msg "提示：您已选择向导配置，稍后将自动拉起 p10k configure 进行个性化设置。" "Tip: You selected wizard mode; p10k configure will launch shortly.")"
+    ;;
+  skip)
+    info "$(msg "提示：已保留原有主题配置。" "Tip: Preserved original prompt configuration.")"
+    ;;
+  *)
+    info "$(msg "提示：已为您部署所选主题；如需个性化调整，可随时在终端运行 p10k configure。" "Tip: Default prompt configured. Run p10k configure anytime to customize.")"
+    ;;
+esac
 
 # 11. 切换默认 Shell（Linux 与 macOS 分别适配）
 if ask "$(msg '是否将 Zsh 设为当前用户的默认登录 Shell？' 'Set Zsh as default login shell for current user?') "; then
@@ -846,7 +929,12 @@ printf '\n%s:\n  bash %s/install.sh --rollback %q\n' \
   "$(msg '若需要回退配置，请运行' 'To rollback configuration, run')" "$SCRIPT_DIR" "$BACKUP"
 
 # 12. 立即启动新 Shell 会话自举（借鉴 zsh4humans 体验）
-if [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
+if [[ "$P10K_STYLE" == wizard ]] && [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
+  echo ""
+  printf '\n\033[1;36m%s\033[0m\n' "$(msg '🛠️ 正在为您启动 Powerlevel10k 官方配置向导...' '🛠️ Launching Powerlevel10k configuration wizard...')"
+  info "$(msg "提示：向导配置完成后将直接停留在全新的 Zsh 交互终端中。" "Tip: You will remain in the newly configured Zsh session when finished.")"
+  exec zsh -ic "p10k configure; exec zsh -l"
+elif [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
   echo ""
   if ask "$(msg '是否现在立即进入全新的 Zsh 交互环境？' 'Start fresh Zsh session now?') "; then
     printf '\n\033[1;32m%s\033[0m\n' "$(msg '🚀 正在启动全新 Zsh 交互环境...' '🚀 Starting fresh Zsh environment...')"

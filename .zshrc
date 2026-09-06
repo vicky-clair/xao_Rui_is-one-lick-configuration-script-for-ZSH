@@ -132,12 +132,11 @@ unset _zsh_theme_file
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
 
 # ========================================
+# ========================================
 # 09. 启动信息横幅
 # ========================================
 if [[ -o interactive ]]; then
-  print -P "\n%F{blue}========================================%f"
-  print -P "%F{blue}🔧 正在加载常用工具...%f"
-  print -P "%F{blue}========================================%f\n"
+  _zsh_msg "\n%F{blue}========================================%f\n%F{blue}🔧 正在加载常用工具...%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{blue}🔧 Loading tools...%f\n%F{blue}========================================%f\n"
 fi
 
 # ========================================
@@ -158,12 +157,12 @@ if command -v vfox &>/dev/null; then
       # 保留启动环境，移除可能引起目录切换耗时的自动钩子
       chpwd_functions=("${(@)chpwd_functions:#_vfox_hook}")
       precmd_functions=("${(@)precmd_functions:#_vfox_hook}")
-      print -P "%F{green}✓%f %F{cyan}vfox%f 已加载 (版本管理)"
+      _zsh_msg "%F{green}✓%f %F{cyan}vfox%f 已加载 (版本管理)" "%F{green}✓%f %F{cyan}vfox%f loaded (version manager)"
     else
-      print -P "%F{yellow}⚠ vfox 初始化脚本执行失败%f"
+      _zsh_msg "%F{yellow}⚠ vfox 初始化脚本执行失败%f" "%F{yellow}⚠ vfox init script execution failed%f"
     fi
   else
-    print -P "%F{yellow}⚠ vfox 初始化失败或超时，本次已跳过%f"
+    _zsh_msg "%F{yellow}⚠ vfox 初始化失败或超时，本次已跳过%f" "%F{yellow}⚠ vfox init failed or timed out, skipped%f"
   fi
   unset _vfox_init _vfox_cmd
 fi
@@ -180,7 +179,7 @@ if command -v yazi &>/dev/null; then
     fi
     rm -f -- "$tmp"
   }
-  print -P "%F{green}✓%f %F{cyan}yazi%f 文件管理器已集成 (命令: %F{yellow}y%f)"
+  _zsh_msg "%F{green}✓%f %F{cyan}yazi%f 文件管理器已集成 (命令: %F{yellow}y%f)" "%F{green}✓%f %F{cyan}yazi%f file manager integrated (cmd: %F{yellow}y%f)"
 fi
 
 # ========================================
@@ -191,52 +190,52 @@ if command -v fzf &>/dev/null; then
     export FZF_DEFAULT_COMMAND='fd --hidden --strip-cwd-prefix --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     export FZF_ALT_C_COMMAND='fd --type=d --hidden --strip-cwd-prefix --exclude .git'
-    print -P "%F{green}✓%f %F{cyan}fd%f 已集成到 FZF"
+    _zsh_msg "%F{green}✓%f %F{cyan}fd%f 已集成到 FZF" "%F{green}✓%f %F{cyan}fd%f integrated into FZF"
   elif command -v fdfind &>/dev/null; then
     export FZF_DEFAULT_COMMAND='fdfind --hidden --strip-cwd-prefix --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     export FZF_ALT_C_COMMAND='fdfind --type=d --hidden --strip-cwd-prefix --exclude .git'
-    print -P "%F{green}✓%f %F{cyan}fdfind%f 已集成到 FZF"
+    _zsh_msg "%F{green}✓%f %F{cyan}fdfind%f 已集成到 FZF" "%F{green}✓%f %F{cyan}fdfind%f integrated into FZF"
   fi
 
   if command -v bat &>/dev/null && command -v eza &>/dev/null; then
     show_file_or_dir_preview='if [ -d {} ]; then eza --tree --color=always {} | head -200; else bat -n --color=always --line-range :500 {}; fi'
     export FZF_CTRL_T_OPTS="--preview '$show_file_or_dir_preview'"
     export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
-    print -P "%F{green}✓%f %F{cyan}bat%f + %F{cyan}eza%f 预览集成完成"
+    _zsh_msg "%F{green}✓%f %F{cyan}bat%f + %F{cyan}eza%f 预览集成完成" "%F{green}✓%f %F{cyan}bat%f + %F{cyan}eza%f preview integrated"
   elif command -v batcat &>/dev/null && command -v eza &>/dev/null; then
     show_file_or_dir_preview='if [ -d {} ]; then eza --tree --color=always {} | head -200; else batcat -n --color=always --line-range :500 {}; fi'
     export FZF_CTRL_T_OPTS="--preview '$show_file_or_dir_preview'"
     export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
-    print -P "%F{green}✓%f %F{cyan}batcat%f + %F{cyan}eza%f 预览集成完成"
+    _zsh_msg "%F{green}✓%f %F{cyan}batcat%f + %F{cyan}eza%f 预览集成完成" "%F{green}✓%f %F{cyan}batcat%f + %F{cyan}eza%f preview integrated"
   elif command -v bat &>/dev/null; then
     export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always --line-range :500 {}'"
-    print -P "%F{green}✓%f %F{cyan}bat%f 预览集成完成"
+    _zsh_msg "%F{green}✓%f %F{cyan}bat%f 预览集成完成" "%F{green}✓%f %F{cyan}bat%f preview integrated"
   elif command -v batcat &>/dev/null; then
     export FZF_CTRL_T_OPTS="--preview 'batcat -n --color=always --line-range :500 {}'"
-    print -P "%F{green}✓%f %F{cyan}batcat%f 预览集成完成"
+    _zsh_msg "%F{green}✓%f %F{cyan}batcat%f 预览集成完成" "%F{green}✓%f %F{cyan}batcat%f preview integrated"
   elif command -v eza &>/dev/null; then
     export FZF_CTRL_T_OPTS="--preview 'eza --tree --color=always {} | head -200'"
     export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
-    print -P "%F{green}✓%f %F{cyan}eza%f 目录预览集成完成"
+    _zsh_msg "%F{green}✓%f %F{cyan}eza%f 目录预览集成完成" "%F{green}✓%f %F{cyan}eza%f directory preview integrated"
   fi
 
   if _zsh_fzf_init=$(fzf --zsh 2>/dev/null); then
     eval "$_zsh_fzf_init"
-    print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
     source /usr/share/doc/fzf/examples/key-bindings.zsh
     [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
-    print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via system script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
     source /usr/share/fzf/key-bindings.zsh
     [[ -f /usr/share/fzf/completion.zsh ]] && source /usr/share/fzf/completion.zsh
-    print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via system script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f "$HOME/.fzf.zsh" ]]; then
     source "$HOME/.fzf.zsh"
-    print -P "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过用户配置加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过用户配置加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via user config (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   else
-    print -P "%F{yellow}⚠ FZF 版本过低不支持 --zsh，请运行 bash install.sh 升级 FZF%f"
+    _zsh_msg "%F{yellow}⚠ FZF 版本过低不支持 --zsh，请运行 bash install.sh 升级 FZF%f" "%F{yellow}⚠ FZF version too old, please run bash install.sh to upgrade FZF%f"
   fi
   unset _zsh_fzf_init
 fi
@@ -266,12 +265,12 @@ if command -v eza &>/dev/null; then
   alias ls="eza --icons=always"
   alias ll="eza -lh --icons=always"
   alias la="eza -lah --icons=always"
-  print -P "%F{green}✓%f %F{cyan}eza%f 现代化 ls 已启用 (别名: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)"
+  _zsh_msg "%F{green}✓%f %F{cyan}eza%f 现代化 ls 已启用 (别名: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)" "%F{green}✓%f %F{cyan}eza%f modern ls enabled (aliases: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)"
 fi
 
 if command -v lazydocker &>/dev/null; then
   alias lzd="lazydocker"
-  print -P "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)"
+  _zsh_msg "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)" "%F{green}✓%f %F{cyan}lazydocker%f tool enabled (cmd: %F{yellow}lzd%f)"
 fi
 
 if command -v tmux &>/dev/null; then
@@ -282,21 +281,21 @@ if command -v tmux &>/dev/null; then
 fi
 
 if command -v nvim &>/dev/null; then
-  print -P "%F{green}✓%f %F{cyan}neovim%f 已设置为默认编辑器"
+  _zsh_msg "%F{green}✓%f %F{cyan}neovim%f 已设置为默认编辑器" "%F{green}✓%f %F{cyan}neovim%f set as default editor"
 fi
 
 alias grep="grep --color=auto"
 
 if command -v zoxide &>/dev/null; then
   eval "$(zoxide init zsh)"
-  print -P "%F{green}✓%f %F{cyan}zoxide%f 智能跳转已启用 (命令: %F{yellow}z%f)"
+  _zsh_msg "%F{green}✓%f %F{cyan}zoxide%f 智能跳转已启用 (命令: %F{yellow}z%f)" "%F{green}✓%f %F{cyan}zoxide%f smart cd enabled (cmd: %F{yellow}z%f)"
 fi
 
 # ========================================
 # 15. 自动显示系统信息
 # ========================================
 if command -v fastfetch &>/dev/null; then
-  print -P "%F{green}✓%f %F{cyan}fastfetch%f 系统信息工具已启动\n"
+  _zsh_msg "%F{green}✓%f %F{cyan}fastfetch%f 系统信息工具已启动\n" "%F{green}✓%f %F{cyan}fastfetch%f system info tool started\n"
   if [[ -r "$HOME/.config/fastfetch/config.jsonc" ]]; then
     fastfetch -c "$HOME/.config/fastfetch/config.jsonc"
   else

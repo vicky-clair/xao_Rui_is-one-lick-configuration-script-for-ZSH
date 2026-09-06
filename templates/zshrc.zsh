@@ -1,7 +1,18 @@
-# zsh-project 安装模板：跨平台兼容 Linux 与 macOS。
+# zsh-project 安装模板：跨平台兼容 Linux 与 macOS，支持中英双语提示。
 # 在启动新会话后生效；此文件不负责安装软件。
 [[ -o interactive ]] || return
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
+
+[[ -r "$HOME/.zsh-project-options" ]] && source "$HOME/.zsh-project-options"
+
+# 双语文本输出辅助函数
+_zsh_msg() {
+  if [[ "${ZSH_PROJECT_LANG:-zh}" == en ]]; then
+    print -P "$2"
+  else
+    print -P "$1"
+  fi
+}
 
 # 启动计时：使用 Zsh 内置 datetime 模块高精度计时（兼容 Linux 与 macOS）
 if zmodload zsh/datetime 2>/dev/null; then
@@ -9,12 +20,14 @@ if zmodload zsh/datetime 2>/dev/null; then
   precmd() {
     local end_time=$EPOCHREALTIME
     local elapsed=$(( int((end_time - ZSH_START_TIME) * 1000) ))
-    print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
+    if [[ "${ZSH_PROJECT_LANG:-zh}" == en ]]; then
+      print -P "%F{green}⚡ Zsh startup completed in %F{yellow}${elapsed}ms%f"
+    else
+      print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
+    fi
     unset -f precmd
   }
 fi
-
-[[ -r "$HOME/.zsh-project-options" ]] && source "$HOME/.zsh-project-options"
 
 # 跨平台环境变量与 PATH 去重设置
 typeset -U path PATH fpath
@@ -39,6 +52,10 @@ else
   export EDITOR=vi
 fi
 
+if command -v bat >/dev/null 2>&1 && bat --list-themes 2>/dev/null | grep -q "tokyonight_night"; then
+  export BAT_THEME="tokyonight_night"
+fi
+
 # Oh My Zsh 框架与插件初始化
 export ZSH="$HOME/.oh-my-zsh"
 ZSH_CUSTOM="$ZSH/custom"
@@ -60,7 +77,7 @@ fi
 [[ -r "$HOME/.p10k.zsh" ]] && source "$HOME/.p10k.zsh"
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
 
-print -P '\n%F{blue}🔧 正在加载 Zsh 工具...%f'
+_zsh_msg '\n%F{blue}🔧 正在加载 Zsh 工具...%f' '\n%F{blue}🔧 Loading Zsh tools...%f'
 
 # vfox 可选版本管理：安全超时防护（兼容 Linux timeout 与 macOS gtimeout）
 if [[ ${ZSH_PROJECT_VFOX:-0} == 1 ]] && command -v vfox >/dev/null 2>&1; then
@@ -76,9 +93,9 @@ if [[ ${ZSH_PROJECT_VFOX:-0} == 1 ]] && command -v vfox >/dev/null 2>&1; then
     eval "$_zsh_vfox_init"
     chpwd_functions=("${(@)chpwd_functions:#_vfox_hook}")
     precmd_functions=("${(@)precmd_functions:#_vfox_hook}")
-    print -P "%F{green}✓%f %F{cyan}vfox%f 已加载"
+    _zsh_msg '%F{green}✓%f %F{cyan}vfox%f 已加载' '%F{green}✓%f %F{cyan}vfox%f loaded'
   else
-    print -P '%F{yellow}vfox 初始化失败或超时，已跳过。%f'
+    _zsh_msg '%F{yellow}vfox 初始化失败或超时，已跳过。%f' '%F{yellow}vfox init failed or timed out, skipped.%f'
   fi
   unset _zsh_vfox_init _vfox_cmd
 fi
@@ -108,7 +125,7 @@ if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]]; then
     if _zsh_fzf_init=$(fzf --zsh 2>/dev/null); then
       eval "$_zsh_fzf_init"
     else
-      print -P '%F{yellow}FZF 不支持 --zsh，请升级后再启用快捷键。%f'
+      _zsh_msg '%F{yellow}FZF 不支持 --zsh，请升级后再启用快捷键。%f' '%F{yellow}FZF does not support --zsh; please upgrade.%f'
     fi
     unset _zsh_fzf_init
   fi
@@ -166,11 +183,11 @@ _zsh_check_script="$_zsh_project_state_dir/scripts/check_updates.sh"
 
 # 1. 终端启动时展示可用更新提示（仅读本地缓存文件，耗时 0ms）
 if [[ -s "$_zsh_updates_file" ]]; then
-  print -P '\n%F{yellow}💡 [Zsh 更新提示] 检测到以下插件/应用有可用更新：%f'
+  _zsh_msg '\n%F{yellow}💡 [Zsh 更新提示] 检测到以下插件/应用有可用更新：%f' '\n%F{yellow}💡 [Zsh Update Notice] Updates available for the following components:%f'
   while IFS= read -r _u_line; do
     [[ -n "$_u_line" ]] && print -P "  %F{cyan}•%f $_u_line"
   done < "$_zsh_updates_file"
-  print -P '  %F{green}提示：%f可在终端输入 %F{yellow}zsh-update%f 执行升级\n'
+  _zsh_msg '  %F{green}提示：%f可在终端输入 %F{yellow}zsh-update%f 执行升级\n' '  %F{green}Tip:%f Run %F{yellow}zsh-update%f in terminal to upgrade\n'
   unset _u_line
 fi
 
@@ -184,7 +201,7 @@ if [[ ${ZSH_PROJECT_AUTO_CHECK_UPDATE:-1} == 1 && -f "$_zsh_check_script" ]]; th
 
   if (( _now - _last > _interval_sec )); then
     echo "$_now" > "$_zsh_last_check_file" 2>/dev/null || true
-    ( bash "$_zsh_check_script" -q >/dev/null 2>&1 ) &!
+    ( bash "$_zsh_check_script" -q --lang "${ZSH_PROJECT_LANG:-zh}" >/dev/null 2>&1 ) &!
   fi
   unset _now _last _interval_days _interval_sec
 fi
@@ -198,25 +215,25 @@ function zsh-update() {
     installer="$HOME/.zsh-project/install.sh"
   fi
   if [[ -n "$installer" ]]; then
-    bash "$installer" --update
+    bash "$installer" --update --lang "${ZSH_PROJECT_LANG:-zh}"
   elif [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script"
+    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
-    print -P "%F{red}未找到安装器或更新脚本。%f"
+    _zsh_msg "%F{red}未找到安装器或更新脚本。%f" "%F{red}Installer or update script not found.%f"
   fi
 }
 
 function zsh-check-updates() {
   if [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script"
+    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
-    print -P "%F{red}未找到更新检测脚本。%f"
+    _zsh_msg "%F{red}未找到更新检测脚本。%f" "%F{red}Update check script not found.%f"
   fi
 }
 
 unset _zsh_project_state_dir _zsh_updates_file _zsh_last_check_file _zsh_check_script
 
-print -P '%F{green}✓ Zsh 配置加载完成%f'
+_zsh_msg '%F{green}✓ Zsh 配置加载完成%f' '%F{green}✓ Zsh configuration loaded successfully%f'
 
 # 语法高亮：在所有组件加载完成后置底加载
 [[ -r "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] && source "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"

@@ -1,6 +1,17 @@
 # Linux / macOS / Debian / Zsh 5.9 交互配置。修改后先运行 zsh -n ~/.zshrc，再重新启动 Zsh。
 # 本文件不安装工具；工具缺失时通常跳过对应集成。详细说明见 README.md。
 
+[[ -r "$HOME/.zsh-project-options" ]] && source "$HOME/.zsh-project-options"
+
+# 双语文本输出辅助函数
+_zsh_msg() {
+  if [[ "${ZSH_PROJECT_LANG:-zh}" == en ]]; then
+    print -P "$2"
+  else
+    print -P "$1"
+  fi
+}
+
 # ========================================
 # 01. 启动计时
 # ========================================
@@ -10,12 +21,16 @@ if zmodload zsh/datetime 2>/dev/null; then
   precmd() {
     local end_time=$EPOCHREALTIME
     local elapsed=$(( int((end_time - ZSH_START_TIME) * 1000) ))
-    print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
+    if [[ "${ZSH_PROJECT_LANG:-zh}" == en ]]; then
+      print -P "%F{green}⚡ Zsh startup completed in %F{yellow}${elapsed}ms%f"
+    else
+      print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
+    fi
     unset -f precmd
   }
 else
   precmd() {
-    print -P "%F{green}⚡ Zsh 启动完成%f"
+    _zsh_msg "%F{green}⚡ Zsh 启动完成%f" "%F{green}⚡ Zsh startup completed%f"
     unset -f precmd
   }
 fi
@@ -297,25 +312,25 @@ _zsh_check_script="$_zsh_project_state_dir/scripts/check_updates.sh"
 
 # 终端启动时读取本地缓存并提示可用更新
 if [[ -s "$_zsh_updates_file" ]]; then
-  print -P '\n%F{yellow}💡 [Zsh 更新提示] 检测到以下插件/应用有可用更新：%f'
+  _zsh_msg '\n%F{yellow}💡 [Zsh 更新提示] 检测到以下插件/应用有可用更新：%f' '\n%F{yellow}💡 [Zsh Update Notice] Updates available for the following components:%f'
   while IFS= read -r _u_line; do
     [[ -n "$_u_line" ]] && print -P "  %F{cyan}•%f $_u_line"
   done < "$_zsh_updates_file"
-  print -P '  %F{green}提示：%f可在终端输入 %F{yellow}zsh-update%f 执行升级\n'
+  _zsh_msg '  %F{green}提示：%f可在终端输入 %F{yellow}zsh-update%f 执行升级\n' '  %F{green}Tip:%f Run %F{yellow}zsh-update%f in terminal to upgrade\n'
   unset _u_line
 fi
 
 # 后台异步轻量检测（默认 7 天检测一次）
-if [[ -f "$_zsh_check_script" ]]; then
+if [[ ${ZSH_PROJECT_AUTO_CHECK_UPDATE:-1} == 1 && -f "$_zsh_check_script" ]]; then
   local _now=$(date +%s 2>/dev/null || echo 0)
   local _last=0
   [[ -f "$_zsh_last_check_file" ]] && _last=$(cat "$_zsh_last_check_file" 2>/dev/null || echo 0)
-  local _interval_days=7
+  local _interval_days=${ZSH_PROJECT_CHECK_INTERVAL_DAYS:-7}
   local _interval_sec=$(( _interval_days * 86400 ))
 
   if (( _now - _last > _interval_sec )); then
     echo "$_now" > "$_zsh_last_check_file" 2>/dev/null || true
-    ( bash "$_zsh_check_script" -q >/dev/null 2>&1 ) &!
+    ( bash "$_zsh_check_script" -q --lang "${ZSH_PROJECT_LANG:-zh}" >/dev/null 2>&1 ) &!
   fi
   unset _now _last _interval_days _interval_sec
 fi
@@ -328,19 +343,19 @@ function zsh-update() {
     installer="$HOME/.zsh-project/install.sh"
   fi
   if [[ -n "$installer" ]]; then
-    bash "$installer" --update
+    bash "$installer" --update --lang "${ZSH_PROJECT_LANG:-zh}"
   elif [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script"
+    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
-    print -P "%F{red}未找到安装器或更新脚本。%f"
+    _zsh_msg "%F{red}未找到安装器或更新脚本。%f" "%F{red}Installer or update script not found.%f"
   fi
 }
 
 function zsh-check-updates() {
   if [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script"
+    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
-    print -P "%F{red}未找到更新检测脚本。%f"
+    _zsh_msg "%F{red}未找到更新检测脚本。%f" "%F{red}Update check script not found.%f"
   fi
 }
 
@@ -350,9 +365,7 @@ unset _zsh_project_state_dir _zsh_updates_file _zsh_last_check_file _zsh_check_s
 # 17. 加载完成横幅与高亮加载
 # ========================================
 if [[ -o interactive ]]; then
-  print -P "\n%F{blue}========================================%f"
-  print -P "%F{green}✅ ZSH 环境加载完成！%f"
-  print -P "%F{blue}========================================%f\n"
+  _zsh_msg "\n%F{blue}========================================%f\n%F{green}✅ ZSH 环境加载完成！%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{green}✅ ZSH environment loaded successfully!%f\n%F{blue}========================================%f\n"
 fi
 
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off

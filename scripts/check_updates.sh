@@ -1,32 +1,44 @@
 #!/usr/bin/env bash
 # Zsh 插件与常用应用新版本检测工具
-# 兼容 Linux 与 macOS，支持交互式展示与静默后台缓存写入。
+# 兼容 Linux 与 macOS，支持双语（中/英）交互与静默后台缓存写入。
 set -Eeuo pipefail
 export LC_ALL=C
 
 TIMEOUT_SEC=5
 QUIET=0
+LANG_CHOICE="${ZSH_PROJECT_LANG:-zh}"
 STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
 OUTPUT_FILE="$STATE_ROOT/available_updates"
 TIMESTAMP_FILE="$STATE_ROOT/last_update_check"
 
+msg() {
+  if [[ "$LANG_CHOICE" == en ]]; then
+    printf '%s' "$2"
+  else
+    printf '%s' "$1"
+  fi
+}
+
 usage() {
-  cat <<'EOF'
-用法：bash check_updates.sh [选项]
-  -q, --quiet         静默运行，仅将结果写入缓存文件（适用于 Shell 启动时后台轮询）
-  -o, --output FILE   指定更新结果缓存文件路径
-  -t, --timeout SEC   网络检测超时时间（秒，默认 5 秒）
-  -h, --help          显示帮助
+  cat <<EOF
+$(msg "用法：bash check_updates.sh [选项]" "Usage: bash check_updates.sh [options]")
+  -q, --quiet         $(msg "静默运行，仅将结果写入缓存文件" "Quiet mode, write results to cache file only")
+  -o, --output FILE   $(msg "指定更新结果缓存文件路径" "Specify output cache file path")
+  -t, --timeout SEC   $(msg "网络检测超时时间（秒，默认 5 秒）" "Network check timeout in seconds (default 5s)")
+  --lang zh|en        $(msg "界面语言（zh 为中文，en 为英文）" "UI language (zh: Chinese, en: English)")
+  -h, --help          $(msg "显示帮助" "Show help")
 EOF
 }
 
 while (($#)); do
   case "$1" in
     -q|--quiet) QUIET=1 ;;
-    -o|--output) (($# >= 2)) || { echo "缺少输出文件路径" >&2; exit 1; }; OUTPUT_FILE=$2; shift ;;
-    -t|--timeout) (($# >= 2)) || { echo "缺少超时秒数" >&2; exit 1; }; TIMEOUT_SEC=$2; shift ;;
+    -o|--output) (($# >= 2)) || { echo "Missing output path / 缺少输出文件路径" >&2; exit 1; }; OUTPUT_FILE=$2; shift ;;
+    -t|--timeout) (($# >= 2)) || { echo "Missing timeout / 缺少超时秒数" >&2; exit 1; }; TIMEOUT_SEC=$2; shift ;;
+    --lang) (($# >= 2)) || { echo "Missing language / 缺少语言值" >&2; exit 1; }; LANG_CHOICE=$2; shift ;;
+    --lang=*) LANG_CHOICE="${1#*=}" ;;
     -h|--help) usage; exit 0 ;;
-    *) echo "未知参数：$1" >&2; exit 1 ;;
+    *) echo "Unknown parameter / 未知参数：$1" >&2; exit 1 ;;
   esac
   shift
 done
@@ -51,7 +63,7 @@ run_with_timeout() {
 
 # 快速网络连通性测试（若离线则直接退出，不阻塞）
 if ! run_with_timeout 2 curl -fsI --connect-timeout 2 https://github.com >/dev/null 2>&1; then
-  ((QUIET)) || echo "网络不可用或连接 GitHub 超时，跳过更新检测。"
+  ((QUIET)) || echo "$(msg "网络不可用或连接 GitHub 超时，跳过更新检测。" "Network unavailable or GitHub connection timed out, skipping update check.")"
   exit 0
 fi
 
@@ -83,14 +95,14 @@ check_git_repo() {
     if [[ -n "$local_hash" && -n "$remote_hash" && "$local_hash" != "$remote_hash" ]]; then
       behind=$(git -C "$dir" rev-list --count HEAD.."$upstream" 2>/dev/null || echo 0)
       if ((behind > 0)); then
-        UPDATES+=("[插件/主题] $name (落后 $behind 个提交)")
-        ALL_CHECKED+=("$name: 有新版本 (落后 $behind 提交)")
+        UPDATES+=("$(msg "[插件/主题] $name (落后 $behind 个提交)" "[Plugin/Theme] $name (behind $behind commits)")")
+        ALL_CHECKED+=("$name: $(msg "有新版本 (落后 $behind 提交)" "update available (behind $behind commits)")")
         return 0
       fi
     fi
-    ALL_CHECKED+=("$name: 已是最新")
+    ALL_CHECKED+=("$name: $(msg "已是最新" "up to date")")
   else
-    ALL_CHECKED+=("$name: 检测超时")
+    ALL_CHECKED+=("$name: $(msg "检测超时" "check timed out")")
   fi
 }
 
@@ -127,8 +139,8 @@ check_apps() {
       local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git)
       for t in "${tools[@]}"; do
         if echo "$outdated" | grep -qFx "$t"; then
-          UPDATES+=("[应用工具] $t (Homebrew 有新版本)")
-          ALL_CHECKED+=("$t: 有新版本")
+          UPDATES+=("$(msg "[应用工具] $t (Homebrew 有新版本)" "[CLI Tool] $t (Homebrew update available)")")
+          ALL_CHECKED+=("$t: $(msg "有新版本" "update available")")
         fi
       done
     fi
@@ -139,8 +151,8 @@ check_apps() {
       local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t/"; then
-          UPDATES+=("[应用工具] $t (系统包管理器有新版本)")
-          ALL_CHECKED+=("$t: 有新版本")
+          UPDATES+=("$(msg "[应用工具] $t (APT 包管理器有新版本)" "[CLI Tool] $t (APT package update available)")")
+          ALL_CHECKED+=("$t: $(msg "有新版本" "update available")")
         fi
       done
     elif command -v dnf >/dev/null 2>&1; then
@@ -149,8 +161,8 @@ check_apps() {
       local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t\."; then
-          UPDATES+=("[应用工具] $t (DNF 包仓库有新版本)")
-          ALL_CHECKED+=("$t: 有新版本")
+          UPDATES+=("$(msg "[应用工具] $t (DNF 包仓库有新版本)" "[CLI Tool] $t (DNF repository update available)")")
+          ALL_CHECKED+=("$t: $(msg "有新版本" "update available")")
         fi
       done
     elif command -v checkupdates >/dev/null 2>&1; then
@@ -160,8 +172,8 @@ check_apps() {
       local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t "; then
-          UPDATES+=("[应用工具] $t (Arch 包仓库有新版本)")
-          ALL_CHECKED+=("$t: 有新版本")
+          UPDATES+=("$(msg "[应用工具] $t (Arch 包仓库有新版本)" "[CLI Tool] $t (Arch repository update available)")")
+          ALL_CHECKED+=("$t: $(msg "有新版本" "update available")")
         fi
       done
     fi
@@ -182,17 +194,17 @@ mv "$temp_out" "$OUTPUT_FILE"
 # 若非静默模式，直接输出清晰汇总
 if ((!QUIET)); then
   echo "========================================"
-  echo "         Zsh 插件与工具检测结果         "
+  echo "       $(msg 'Zsh 插件与工具检测结果' 'Zsh Plugins & Tools Update Check')       "
   echo "========================================"
   if ((${#UPDATES[@]} > 0)); then
-    echo "💡 发现以下 ${#UPDATES[@]} 个组件可更新："
+    echo "$(msg "💡 发现以下 ${#UPDATES[@]} 个组件可更新：" "💡 Found ${#UPDATES[@]} component(s) with updates available:")"
     for item in "${UPDATES[@]}"; do
       echo "  • $item"
     done
     echo ""
-    echo "提示：可运行 'bash install.sh --update' 或在 Zsh 中运行 'zsh-update' 进行升级。"
+    echo "$(msg "提示：可运行 'bash install.sh --update' 或在 Zsh 中运行 'zsh-update' 进行升级。" "Tip: Run 'bash install.sh --update' or 'zsh-update' in Zsh to upgrade.")"
   else
-    echo "✅ 所有已安装的插件、主题与应用均为最新版本！"
+    echo "$(msg "✅ 所有已安装的插件、主题与应用均为最新版本！" "✅ All installed plugins, themes, and CLI tools are up to date!")"
   fi
   echo "========================================"
 fi

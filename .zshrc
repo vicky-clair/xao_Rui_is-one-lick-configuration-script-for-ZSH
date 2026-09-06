@@ -3,6 +3,23 @@
 
 [[ -r "$HOME/.zsh-project-options" ]] && source "$HOME/.zsh-project-options"
 
+# ------------------------------------------------------------------------------
+# 字符编码与语言环境保障（确保 UTF-8，彻底杜绝 Neovim、Tmux 与终端符号乱码）
+# ------------------------------------------------------------------------------
+if [[ -z "$LANG" || "$LANG" == "C" || "$LANG" == "POSIX" ]]; then
+  if locale -a 2>/dev/null | grep -qi "^C\.utf8$"; then
+    export LANG="C.UTF-8"
+  elif locale -a 2>/dev/null | grep -qi "en_US\.utf8"; then
+    export LANG="en_US.UTF-8"
+  elif locale -a 2>/dev/null | grep -qi "zh_CN\.utf8"; then
+    export LANG="zh_CN.UTF-8"
+  else
+    export LANG="C.UTF-8"
+  fi
+fi
+[[ "$LC_ALL" == "C" || "$LC_ALL" == "POSIX" ]] && unset LC_ALL
+export LC_CTYPE="${LC_CTYPE:-$LANG}"
+
 # 双语文本输出辅助函数
 _zsh_msg() {
   if [[ "${ZSH_PROJECT_LANG:-zh}" == en ]]; then
@@ -48,6 +65,10 @@ export PATH
 
 if command -v nvim >/dev/null 2>&1; then
   export EDITOR=nvim
+  export VISUAL=nvim
+  alias vim=nvim
+  alias vi=nvim
+  alias v=nvim
 else
   export EDITOR=vi
 fi

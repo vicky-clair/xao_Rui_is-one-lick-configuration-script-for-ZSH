@@ -2,6 +2,7 @@
 # Linux 与 macOS Zsh 跨平台一键配置脚本与更新管理器
 # 兼容 Debian/Ubuntu/Fedora/Arch/openSUSE 及 macOS (Homebrew)，支持中英双语交互
 set -Eeuo pipefail
+ORIG_LC_ALL="${LC_ALL:-}"
 export LC_ALL=C
 
 # --- 防范使用 sudo 运行导致污染普通用户家目录权限（借鉴 zsh4humans 防护规范）---
@@ -83,29 +84,23 @@ info() { printf '\033[1;34mℹ %s\033[0m\n' "$*"; }
 success() { printf '\033[1;32m✓ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 
-# --- 单键免回车瞬时读取函数（借鉴 zsh4humans，按键即响应，免按回车）---
+# --- 单键免回车瞬时读取函数（静默捕获，彻底消除终端回显+脚本echo导致的重复显示如 yy）---
 read_key() {
   local key=''
-  if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
-    local old_stty
-    old_stty="$(command stty -g 2>/dev/null || true)"
-    command stty -icanon min 1 time 0 2>/dev/null || true
-    while :; do
-      local c
-      c="$(command dd bs=1 count=1 2>/dev/null && echo x)"
-      key="$key${c%x}"
-      [[ -n "$key" ]] && break
-    done
-    [[ -n "$old_stty" ]] && command stty "$old_stty" 2>/dev/null || true
-    if [[ "$key" == $'\n' || "$key" == $'\r' ]]; then
-      echo ""
-      return 0
-    fi
-    echo "$key"
+  if [[ -t 0 ]]; then
+    # -s: 关闭终端硬件回显，彻底杜绝按键在终端被打印两次（如 yy）的问题
+    # -n 1: 瞬时读取单个字符，无需用户敲击 Enter 回车键
+    read -s -n 1 -r key || key=''
+    # 清理输入流中可能残留的多余换行符，防止污染后续选项
+    while read -t 0.05 -n 1000 -r _discard 2>/dev/null; do :; done
   else
     read -r key || key=''
-    echo "$key"
   fi
+  if [[ "$key" == $'\n' || "$key" == $'\r' ]]; then
+    echo ""
+    return 0
+  fi
+  echo "$key"
 }
 
 ask() {
@@ -530,7 +525,7 @@ case "$FAMILY" in
     ;;
   apt)
     sudo apt-get update
-    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar
+    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term
     ;;
   dnf)
     sudo dnf install -y zsh git curl ca-certificates coreutils unzip tar
@@ -973,6 +968,13 @@ fi
 
 printf '\n%s:\n  bash %s/install.sh --rollback %q\n' \
   "$(msg '若需要回退配置，请运行' 'To rollback configuration, run')" "$SCRIPT_DIR" "$BACKUP"
+
+# 恢复原始语言环境，彻底杜绝全新的 Zsh 与 Neovim 受到 C 字符集污染产生乱码
+if [[ -n "${ORIG_LC_ALL:-}" ]]; then
+  export LC_ALL="$ORIG_LC_ALL"
+else
+  unset LC_ALL
+fi
 
 # 12. 立即启动新 Shell 会话自举（借鉴 zsh4humans 体验）
 if [[ "$P10K_STYLE" == wizard ]] && [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then

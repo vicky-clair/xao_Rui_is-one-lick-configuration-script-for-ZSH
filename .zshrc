@@ -278,6 +278,13 @@ if command -v lazydocker &>/dev/null; then
   print -P "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)"
 fi
 
+if command -v tmux &>/dev/null; then
+  alias t="tmux"
+  alias ta="tmux attach -t"
+  alias tls="tmux ls"
+  alias tn="tmux new -s"
+fi
+
 if command -v nvim &>/dev/null; then
   print -P "%F{green}✓%f %F{cyan}neovim%f 已设置为默认编辑器"
 fi

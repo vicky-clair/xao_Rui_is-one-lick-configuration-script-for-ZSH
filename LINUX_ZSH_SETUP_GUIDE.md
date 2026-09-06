@@ -306,6 +306,46 @@ go env GOBIN GOPATH
 
 能显示 `lazydocker --version` 只证明程序可以运行；`lzd` 打不开 Docker 时，先查看连接错误，不自动启动服务、改 socket 权限或把用户加入 docker 组。这些属于独立系统管理操作。
 
+### 7.5 tmux：终端复用与全平台剪贴板互通
+
+本项目提供了现代化配置的 `templates/tmux.conf`，将前缀键设为 `Ctrl+a`，分屏自动继承当前目录，并彻底打通了终端复制粘贴。
+
+#### 1. 安装软件与剪贴板依赖
+- **Debian / Ubuntu**：
+  ```bash
+  sudo apt install -y tmux xclip wl-clipboard ncurses-term
+  ```
+- **Fedora / RHEL**：
+  ```bash
+  sudo dnf install -y tmux xclip wl-clipboard ncurses-term
+  ```
+- **Arch Linux**：
+  ```bash
+  sudo pacman -S --needed --noconfirm tmux xclip wl-clipboard
+  ```
+- **macOS**：
+  ```bash
+  brew install tmux
+  ```
+
+#### 2. 安装 TPM 插件管理器并部署配置
+```bash
+# 克隆 TPM
+git clone --depth=1 https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+
+# 复制模板配置
+cp templates/tmux.conf ~/.tmux.conf
+
+# 自动批量拉取并安装配置中的插件
+~/.tmux/plugins/tpm/bin/install_plugins
+```
+
+#### 3. 终端复制粘贴操作验收
+- **鼠标拖选复制**：用鼠标在窗格内划选文字，松手自动写入系统剪贴板，且屏幕**保持在当前视图位置，绝不闪退滚回底部**。
+- **键盘 Vi 模式复制**：按 `Ctrl+a` 再按 `[` 进入复制模式，按 `v` 选区，按 `y` 复制到系统剪贴板。
+- **Shift 穿透选择**：按住键盘 `Shift` 键的同时鼠标划选，可绕过 tmux 捕获，直接使用本地终端的原生复制/右键粘贴。
+- **粘贴到 Tmux**：直接在终端按常规粘贴快捷键（`Ctrl+Shift+V` 或 `Cmd+V`），或按 `Ctrl+a` 紧接着按 `p`。
+
 ## 八、适配项目中的机器专用设置
 
 先把项目 `.zshrc` 复制为目标机器的 `~/.zshrc.new`，**在临时配置上编辑**，不要边阅读边改正在使用的配置。

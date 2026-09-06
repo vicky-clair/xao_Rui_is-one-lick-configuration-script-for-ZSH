@@ -127,7 +127,18 @@ if [[ -d "$CUSTOM_PLUGINS_DIR" ]]; then
   done
 fi
 
-# 4. 检测命令行应用/工具（Linux / macOS）
+# 4. 检测 Tmux TPM 插件
+TMUX_PLUGINS_DIR="$HOME/.tmux/plugins"
+if [[ -d "$TMUX_PLUGINS_DIR" ]]; then
+  for pdir in "$TMUX_PLUGINS_DIR"/*; do
+    if [[ -d "$pdir/.git" ]]; then
+      pname=$(basename "$pdir")
+      check_git_repo "tmux/$pname" "$pdir"
+    fi
+  done
+fi
+
+# 5. 检测命令行应用/工具（Linux / macOS）
 check_apps() {
   local os
   os=$(uname -s)
@@ -136,7 +147,7 @@ check_apps() {
     local outdated
     outdated=$(run_with_timeout "$TIMEOUT_SEC" brew outdated --formula --quiet 2>/dev/null || true)
     if [[ -n "$outdated" ]]; then
-      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git)
+      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git tmux)
       for t in "${tools[@]}"; do
         if echo "$outdated" | grep -qFx "$t"; then
           UPDATES+=("$(msg "[应用工具] $t (Homebrew 有新版本)" "[CLI Tool] $t (Homebrew update available)")")
@@ -148,7 +159,7 @@ check_apps() {
     if command -v apt-get >/dev/null 2>&1 && command -v apt >/dev/null 2>&1; then
       local upgradable
       upgradable=$(apt list --upgradable 2>/dev/null || true)
-      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh)
+      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t/"; then
           UPDATES+=("$(msg "[应用工具] $t (APT 包管理器有新版本)" "[CLI Tool] $t (APT package update available)")")
@@ -158,7 +169,7 @@ check_apps() {
     elif command -v dnf >/dev/null 2>&1; then
       local upgradable
       upgradable=$(dnf check-update --quiet 2>/dev/null || true)
-      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh)
+      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t\."; then
           UPDATES+=("$(msg "[应用工具] $t (DNF 包仓库有新版本)" "[CLI Tool] $t (DNF repository update available)")")
@@ -169,7 +180,7 @@ check_apps() {
       # Arch Linux
       local upgradable
       upgradable=$(checkupdates 2>/dev/null || true)
-      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh)
+      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t "; then
           UPDATES+=("$(msg "[应用工具] $t (Arch 包仓库有新版本)" "[CLI Tool] $t (Arch repository update available)")")

@@ -228,15 +228,20 @@ sequenceDiagram
     participant Git as Git 远端仓库
     participant FS as 本地文件系统
 
-    User->>Installer: bash install.sh [--profile full]
+    User->>Installer: bash install.sh [--profile full] [--with-tmux]
     Installer->>Installer: 校验用户非 root、ZDOTDIR 与目录合法性
     Installer->>System: 识别 OS、架构与包管理器
-    Installer->>User: 提示交互选项 (全套工具集 / vfox / lazydocker)
+    Installer->>User: 提示交互选项 (全套工具集 / vfox / lazydocker / tmux)
     User-->>Installer: 确认安装方案
     Installer->>FS: 创建带时间戳的备份目录，计算当前 SHA-256 并生成 manifest
     Installer->>System: 安装基础依赖 (zsh, git, curl, coreutils)
     opt 完整模式 (full)
         Installer->>System: 安装可选工具 (fzf, fd, bat, eza, yazi, nvim, fastfetch)
+    end
+    opt Tmux 增强 (--with-tmux)
+        Installer->>System: 安装 tmux 及剪贴板依赖 (xclip, wl-clipboard, ncurses-term)
+        Installer->>Git: 克隆 TPM (Tmux Plugin Manager) 并批量安装插件
+        Installer->>FS: 部署 ~/.tmux.conf 并计算 SHA-256
     end
     Installer->>Git: 克隆 Oh My Zsh, Powerlevel10k, 3 个核心插件
     Installer->>FS: 部署 ~/.zsh-project-options 与 ~/.zshrc
@@ -257,10 +262,39 @@ sequenceDiagram
 ZSH_PROJECT_FULL=1
 ZSH_PROJECT_VFOX=0
 ZSH_PROJECT_LAZYDOCKER=0
+ZSH_PROJECT_TMUX=1
 ZSH_PROJECT_DIR="/home/user/.zsh-project"
 ZSH_PROJECT_AUTO_CHECK_UPDATE=1
 ZSH_PROJECT_CHECK_INTERVAL_DAYS=7
 ```
+
+---
+
+## 附录：Tmux 架构与全平台剪贴板穿透工程规范
+
+### 1. 终端剪贴板穿透核心痛点与解决方案
+
+在复杂的远程开发、虚拟机及容器场景下，传统的 `xclip` / `pbcopy` 常常因缺乏本地显示服务（`$DISPLAY` 或 `$WAYLAND_DISPLAY`）而失效。本项目采用 **OSC 52 + 智能本地多工具降级** 的双保险机制：
+
+```mermaid
+flowchart TD
+    A[用户划选 / Vi 键位复制] --> B{Tmux copy-mode}
+    B --> C[触发 OSC 52 转义码透传]
+    C --> D[外层终端: Windows Terminal / iTerm2 / WezTerm / Alacritty]
+    D --> E[物理机操作系统剪贴板]
+    
+    B --> F[并发触发智能管道降级]
+    F --> G{环境探测}
+    G -- Wayland --> H[wl-copy]
+    G -- X11 --> I[xclip -selection clipboard]
+    G -- macOS --> J[pbcopy]
+    G -- WSL --> K[clip.exe]
+    G -- 无剪贴板工具 --> L[|| true 静默容错，不抛错误蜂鸣]
+```
+
+### 2. 鼠标体验防跳跃设计
+- **经典痛点**：tmux 默认在鼠标松开（`MouseDragEnd1Pane`）后调用 `copy-pipe-and-cancel`，导致屏幕立即跳回底部并退出复制模式，极易破坏正在排查的长日志视图。
+- **工程解决**：绑定 `MouseDragEnd1Pane` 执行 `copy-pipe`（去除 `-and-cancel`）。用户划选后自动静默同步至剪贴板，同时视野锚定在当前窗格位置，极大提升调试体验。
 
 ---
 

@@ -344,10 +344,40 @@ echo "退出码=$?"
 
 此命令只输出激活脚本，不执行输出的脚本。
 
+## Tmux 与终端剪贴板常见问题排查
+
+### 1. 终端提示 `missing or unsuitable terminal: tmux-256color`
+- **现象**：在 Linux 上输入 `tmux` 报错并无法启动。
+- **根因**：精简版 Linux 系统（如部分 Debian/Ubuntu 容器或基础镜像）未预装 `ncurses-term` 终端描述数据库。
+- **排查与解决**：
+  ```bash
+  sudo apt install -y ncurses-term   # Debian / Ubuntu
+  sudo dnf install -y ncurses-term   # Fedora
+  ```
+
+### 2. 在 Tmux 中复制后，外部系统（Windows/Mac）无法粘贴
+- **现象**：在 SSH 远程终端的 Tmux 中划选或按 `y` 复制后，在本地宿主机按 `Ctrl+V` 粘贴为空。
+- **根因与排查**：
+  1. **终端未启用 OSC 52 剪贴板透传**：Windows Terminal、iTerm2、WezTerm 等现代终端均原生支持。若使用极旧的 Putty 或未开启 OSC 52 的客户端，转义序列会被终端忽略。
+  2. **终极兜底方案（Shift 原生穿透）**：按住键盘 `Shift` 键，直接用鼠标在终端框选所需文本，点击右键或按 `Ctrl+C` 复制。此操作 100% 由外层终端直接处理，彻底绕过 tmux。
+  3. **检查本地剪贴板工具（针对本地桌面环境）**：
+     - Wayland 会话确认安装了 `wl-clipboard`（可用 `command -v wl-copy` 验证）；
+     - X11 会话确认安装了 `xclip`。
+
+### 3. 鼠标选中文本后屏幕自动跳回底部
+- **现象**：在查看长日志时用鼠标划选，一松开鼠标视野就被弹回屏幕最底部。
+- **根因**：原生 Tmux 默认绑定了 `copy-pipe-and-cancel`。
+- **解决**：本项目在 `templates/tmux.conf` 中已覆写为 `copy-pipe`，松手仅复制，保持当前视野不跳跃。
+
+### 4. Tokyo Night 主题状态栏图标乱码（显示方框或问号）
+- **现象**：Tmux 底部状态栏的时钟、分支或状态指示出现乱码方格。
+- **根因**：外层终端（如 Windows Terminal / macOS iTerm2）所选字体不是 Nerd Font。
+- **解决**：在终端软件设置中，将字体切换为已打图标补丁的字体（如 `JetBrainsMono Nerd Font`、`MesloLGS NF` 等）。
+
 ## 后续注意事项
 
 - Windows 项目文件与 Debian 家目录配置是两份文件；本地修改不会自动同步到服务器。
 - 保留已连接的终端，先检查语法，再启动新 Zsh 验证。
-- 当前计时器通过 `date` 和一次性 `precmd` 函数计时，沿用用户原有展示方式；并未开展完整性能分析。
+- 当前计时器通过 `zmodload zsh/datetime` 和一次性 `precmd` 函数计时；已彻底解决跨平台 BSD date 兼容性问题。
 - 工具状态提示不能替代各工具功能测试。已测范围以本文测试矩阵为准，不等于验证所有工具的全部能力。
 - 未修改 Windows Terminal 字体、Debian 系统设置、Fastfetch 配置或 vfox 配置。

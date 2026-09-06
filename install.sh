@@ -10,6 +10,7 @@ PROFILE=basic
 PROFILE_SET=0
 WITH_VFOX=0
 WITH_LAZYDOCKER=0
+WITH_TMUX=0
 CHECK_UPDATES=0
 DO_UPDATE=0
 LANG_CHOICE="${ZSH_PROJECT_LANG:-zh}"
@@ -33,8 +34,9 @@ $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --profile basic|full  $(msg "基础安装（OMZ+主题+3核心插件）或完整安装（+全套CLI工具）" "Basic install (OMZ+theme+3 plugins) or full install (+all modern CLI tools)")
   --with-vfox           $(msg "请求安装 vfox 多版本管理工具，不自动安装 SDK" "Install vfox version manager (does not install SDKs automatically)")
   --with-lazydocker     $(msg "请求安装 lazydocker，不配置 Docker 服务或权限" "Install lazydocker (does not configure Docker daemon or permissions)")
+  --with-tmux           $(msg "请求安装并配置 tmux 终端复用器（含剪贴板互通与美化主题）" "Install and configure tmux terminal multiplexer (with clipboard & themes)")
   --check-updates       $(msg "检测已安装的 Zsh 插件与常用应用是否有新版本" "Check if installed plugins and CLI tools have new updates")
-  --update              $(msg "交互式升级已安装的 Zsh 插件、主题与包管理器工具" "Interactively update installed plugins, themes, and CLI tools")
+  --update              $(msg "交互式升级已安装的 Zsh/Tmux 插件、主题与包管理器工具" "Interactively update installed plugins, themes, and CLI tools")
   --lang zh|en          $(msg "界面语言（zh 为中文，en 为英文）" "UI language (zh for Chinese, en for English)")
   --rollback DIR        $(msg "恢复某次安装备份，只恢复配置文件" "Rollback configurations from a specific backup directory")
   --help|-h             $(msg "显示帮助" "Show help")
@@ -74,6 +76,7 @@ while (($#)); do
     --profile) (($# >= 2)) || die "$(msg '--profile 缺少值' '--profile requires value')"; PROFILE=$2; PROFILE_SET=1; shift ;;
     --with-vfox) WITH_VFOX=1 ;;
     --with-lazydocker) WITH_LAZYDOCKER=1 ;;
+    --with-tmux) WITH_TMUX=1 ;;
     --check-updates) CHECK_UPDATES=1 ;;
     --update) DO_UPDATE=1 ;;
     --lang) (($# >= 2)) || die "$(msg '--lang 缺少语言代码 (zh|en)' '--lang requires value (zh|en)')"; LANG_CHOICE=$2; LANG_SET=1; shift ;;
@@ -156,11 +159,18 @@ if ((DO_UPDATE)); then
     done
   fi
 
+  # Tmux 插件升级
+  if [[ -x "$HOME/.tmux/plugins/tpm/bin/update_plugins" ]]; then
+    info "$(msg "正在更新 Tmux 插件..." "Updating Tmux plugins...")"
+    bash "$HOME/.tmux/plugins/tpm/bin/update_plugins" all >/dev/null 2>&1 || true
+    success "$(msg "Tmux 插件更新完成" "Tmux plugins updated successfully")"
+  fi
+
   # 应用工具升级
   OS_TYPE=$(uname -s)
   if [[ "$OS_TYPE" == Darwin ]] && command -v brew >/dev/null 2>&1; then
     info "$(msg "正在通过 Homebrew 升级命令行工具..." "Upgrading CLI tools via Homebrew...")"
-    brew upgrade fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git 2>/dev/null || true
+    brew upgrade fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git tmux 2>/dev/null || true
   elif [[ "$OS_TYPE" == Linux ]]; then
     if command -v apt-get >/dev/null 2>&1; then
       info "$(msg "提示：可在终端运行 sudo apt update && sudo apt --only-upgrade install <包名> 升级系统包。" "Tip: You can run sudo apt update && sudo apt --only-upgrade install <pkg> to upgrade system packages.")"
@@ -203,7 +213,9 @@ restore() {
   local dir=$1 file expected actual
   [[ -d "$dir" && ! -L "$dir" && -f "$dir/manifest" ]] || die "$(msg '备份目录或清单不存在' 'Backup directory or manifest does not exist')"
   [[ $(head -n 1 "$dir/manifest") == "$HOME" ]] || die "$(msg '备份不属于当前 HOME' 'Backup does not belong to current HOME')"
-  for file in .zshrc .zsh-project-options; do
+  local managed_files=(.zshrc .zsh-project-options)
+  [[ -f "$dir/.tmux.conf.state" ]] && managed_files+=(.tmux.conf)
+  for file in "${managed_files[@]}"; do
     [[ -f "$dir/$file.sha256" && -f "$dir/$file.state" ]] || die "$(msg "备份不完整：$file" "Incomplete backup: $file")"
     [[ ! -L "$HOME/$file" ]] || die "$(msg "目标已变成符号链接：$file" "Target is a symlink: $file")"
     expected=$(cat "$dir/$file.sha256")
@@ -215,10 +227,10 @@ restore() {
       *) die "$(msg '备份状态无效' 'Invalid backup state')" ;;
     esac
   done
-  printf '%s\n' "$(msg '将恢复 .zshrc 与安装器选项文件。软件、插件、默认 Shell 不会自动回退。' 'Restoring .zshrc and options file. Software, plugins, and default shell will not be reverted.')"
+  printf '%s\n' "$(msg '将恢复受管配置文件。软件、插件、默认 Shell 不会自动回退。' 'Restoring managed configurations. Software, plugins, and default shell will not be reverted.')"
   ((DRY_RUN)) && return
   ask "$(msg '确认恢复以上配置？' 'Confirm restoring the above configuration?')" || return
-  for file in .zshrc .zsh-project-options; do
+  for file in "${managed_files[@]}"; do
     if [[ $(cat "$dir/$file.state") == present ]]; then
       cp -p -- "$dir/$file" "$HOME/$file"
     else
@@ -282,7 +294,12 @@ elif [[ "$OS" == Linux ]]; then
 fi
 
 [[ -r "$SCRIPT_DIR/templates/zshrc.zsh" ]] || die "$(msg '缺少 templates/zshrc.zsh，请下载完整项目' 'templates/zshrc.zsh missing; please download the full repository')"
-for file in .zshrc .zsh-project-options; do
+target_files=(.zshrc .zsh-project-options)
+if ((WITH_TMUX)); then
+  [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]] || die "$(msg '缺少 templates/tmux.conf，请下载完整项目' 'templates/tmux.conf missing; please download the full repository')"
+  target_files+=(.tmux.conf)
+fi
+for file in "${target_files[@]}"; do
   [[ ! -L "$HOME/$file" && ! -d "$HOME/$file" ]] || die "$(msg "$file 是链接或目录，请手动处理" "$file is a symlink or directory; please resolve manually")"
   [[ ! -e "$HOME/$file" || -f "$HOME/$file" ]] || die "$(msg "$file 不是普通文件" "$file is not a regular file")"
 done
@@ -299,6 +316,7 @@ if ((!DRY_RUN)); then
   fi
   ((WITH_VFOX)) || { if ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
   ((WITH_LAZYDOCKER)) || { if ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
+  ((WITH_TMUX)) || { if ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
 fi
 
 printf '\n%s: %s; %s: %s; %s: %s; %s: %s\n' \
@@ -306,12 +324,13 @@ printf '\n%s: %s; %s: %s; %s: %s; %s: %s\n' \
   "$(msg '架构' 'Arch')" "$ARCH" \
   "$(msg '包管理器' 'Package Manager')" "$FAMILY" \
   "$(msg '用户' 'User')" "$(id -un)"
-printf '%s: %s; vfox: %s; lazydocker: %s; %s: %s\n' \
-  "$(msg '安装类型' 'Profile')" "$PROFILE" "$WITH_VFOX" "$WITH_LAZYDOCKER" \
+printf '%s: %s; vfox: %s; lazydocker: %s; tmux: %s; %s: %s\n' \
+  "$(msg '安装类型' 'Profile')" "$PROFILE" "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_TMUX" \
   "$(msg '语言' 'Language')" "$LANG_CHOICE"
 printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils；OMZ、Powerlevel10k、三个 Zsh 核心插件。' 'Base dependencies: zsh, git, curl, ca-certificates, coreutils; OMZ, Powerlevel10k, 3 core plugins.')"
 [[ "$PROFILE" == full ]] && printf '%s\n' "$(msg '完整工具：fzf fd bat eza zoxide yazi neovim fastfetch（仓库没有则跳过并记录）。' 'Full tools: fzf, fd, bat, eza, zoxide, yazi, neovim, fastfetch (skipped if unavailable in repository).')"
-printf '%s\n' "$(msg '备份并更新 ~/.zshrc 和 ~/.zsh-project-options；保留 .zshenv、个人主题、custom 和历史文件。' 'Backup and update ~/.zshrc and ~/.zsh-project-options; preserving .zshenv, custom themes and history.')"
+((WITH_TMUX)) && printf '%s\n' "$(msg 'Tmux 增强：安装 tmux、终端剪贴板工具、TPM 插件生态并部署 ~/.tmux.conf。' 'Tmux enhancement: install tmux, clipboard tools, TPM plugins, and ~/.tmux.conf.')"
+printf '%s\n' "$(msg '备份并更新受管配置文件；保留 .zshenv、个人主题、custom 和历史文件。' 'Backup and update managed configurations; preserving .zshenv, custom themes and history.')"
 printf '%s\n' "$(msg '默认 Shell 将在配置安装成功后单独询问。' 'Default login shell will be prompted separately after configuration.')"
 
 if ((DRY_RUN)); then
@@ -336,7 +355,9 @@ exec > >(tee -a "$BACKUP/install.log") 2>&1
 trap 'printf "安装未完成。日志与原配置：%s\n系统软件安装不会自动回退。\n" "$BACKUP" >&2' ERR
 
 printf '%s\n' "$HOME" > "$BACKUP/manifest"
-for file in .zshrc .zsh-project-options; do
+backup_files=(.zshrc .zsh-project-options)
+((WITH_TMUX)) && backup_files+=(.tmux.conf)
+for file in "${backup_files[@]}"; do
   if [[ -f "$HOME/$file" ]]; then
     cp -p -- "$HOME/$file" "$BACKUP/$file"
     printf 'present\n' > "$BACKUP/$file.state"
@@ -419,6 +440,16 @@ fi
 ((WITH_VFOX)) && optional_package vfox vfox
 ((WITH_LAZYDOCKER)) && optional_package lazydocker lazydocker
 
+if ((WITH_TMUX)); then
+  info "$(msg "正在安装 tmux 及终端剪贴板依赖..." "Installing tmux and clipboard dependencies...")"
+  optional_package tmux tmux
+  if [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
+    optional_package xclip xclip
+    optional_package wl-copy wl-clipboard
+    [[ "$FAMILY" == apt ]] && optional_package "" ncurses-term
+  fi
+fi
+
 # 命令名软链接映射（兼容各发行版的 fdfind / batcat）
 mkdir -p "$HOME/.local/bin"
 if ! command -v fd >/dev/null 2>&1 && command -v fdfind >/dev/null 2>&1; then
@@ -455,6 +486,21 @@ for plugin in zsh-autosuggestions zsh-completions zsh-syntax-highlighting; do
   clone_missing "https://github.com/zsh-users/$plugin.git" "$HOME/.oh-my-zsh/custom/plugins/$plugin" "$entry"
 done
 
+if ((WITH_TMUX)); then
+  info "$(msg "正在配置 Tmux 与 TPM 插件管理器..." "Configuring Tmux and TPM plugin manager...")"
+  clone_missing https://github.com/tmux-plugins/tpm.git "$HOME/.tmux/plugins/tpm" tpm
+  if [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]]; then
+    cp "$SCRIPT_DIR/templates/tmux.conf" "$BACKUP/new.tmux.conf"
+    install -m 600 "$BACKUP/new.tmux.conf" "$HOME/.tmux.conf"
+    success "$(msg "已部署 ~/.tmux.conf" "Deployed ~/.tmux.conf successfully")"
+  fi
+  if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
+    info "$(msg "正在自动下载并安装 Tmux 插件..." "Installing Tmux plugins automatically...")"
+    bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
+    success "$(msg "Tmux 插件初始化完成" "Tmux plugins initialized successfully")"
+  fi
+fi
+
 # 复制更新检测辅助脚本到统一状态或脚本目录
 mkdir -p "$STATE_ROOT/scripts"
 if [[ -f "$SCRIPT_DIR/scripts/check_updates.sh" ]]; then
@@ -470,6 +516,7 @@ cat <<EOF > "$BACKUP/new.options"
 ZSH_PROJECT_FULL=$([[ "$PROFILE" == full ]] && echo 1 || echo 0)
 ZSH_PROJECT_VFOX=$WITH_VFOX
 ZSH_PROJECT_LAZYDOCKER=$WITH_LAZYDOCKER
+ZSH_PROJECT_TMUX=$WITH_TMUX
 ZSH_PROJECT_DIR="$SCRIPT_DIR"
 ZSH_PROJECT_LANG="$LANG_CHOICE"
 ZSH_PROJECT_AUTO_CHECK_UPDATE=1
@@ -482,8 +529,10 @@ zsh -n "$BACKUP/new.options"
 install -m 600 "$BACKUP/new.options" "$HOME/.zsh-project-options"
 install -m 600 "$BACKUP/new.zshrc" "$HOME/.zshrc"
 
-for file in .zshrc .zsh-project-options; do
-  calc_sha256 "$HOME/$file" > "$BACKUP/$file.sha256"
+deployed_files=(.zshrc .zsh-project-options)
+((WITH_TMUX)) && deployed_files+=(.tmux.conf)
+for file in "${deployed_files[@]}"; do
+  [[ -f "$HOME/$file" ]] && calc_sha256 "$HOME/$file" > "$BACKUP/$file.sha256"
 done
 
 # 首次执行一次静默后台版本检测（生成初始缓存）

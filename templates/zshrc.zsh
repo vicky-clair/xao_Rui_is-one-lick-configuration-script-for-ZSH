@@ -163,6 +163,13 @@ if [[ ${ZSH_PROJECT_LAZYDOCKER:-0} == 1 ]] && command -v lazydocker >/dev/null 2
   alias lzd=lazydocker
 fi
 
+if command -v tmux >/dev/null 2>&1; then
+  alias t='tmux'
+  alias ta='tmux attach -t'
+  alias tls='tmux ls'
+  alias tn='tmux new -s'
+fi
+
 # 历史记录与按键设置
 HISTFILE="$HOME/.zhistory"
 HISTSIZE=4000

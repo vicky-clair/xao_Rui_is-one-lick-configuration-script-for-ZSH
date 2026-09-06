@@ -43,11 +43,11 @@ while (($#)); do
   shift
 done
 
-mkdir -p "$(dirname "$OUTPUT_FILE")"
-mkdir -p "$STATE_ROOT"
+command mkdir -p "$(dirname "$OUTPUT_FILE")"
+command mkdir -p "$STATE_ROOT"
 
 # 记录本次检查时间戳
-date +%s > "$TIMESTAMP_FILE" 2>/dev/null || true
+command date +%s > "$TIMESTAMP_FILE" 2>/dev/null || true
 
 # 超时命令封装（兼容 Linux timeout 与 macOS gtimeout / 降级）
 run_with_timeout() {

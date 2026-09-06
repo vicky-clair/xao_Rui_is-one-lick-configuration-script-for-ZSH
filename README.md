@@ -17,6 +17,12 @@
   - 升级前自动检测本地未提交修改，避免代码覆盖与冲突；升级后自动校验 `.zshrc` 语法。
 - 🛡️ **可靠的备份与回滚**：安装或恢复时对配置文件（含 `.zshrc` 与 `.tmux.conf`）进行 SHA-256 校验与状态快照，提供 `bash install.sh --rollback <DIR>` 一键回退。
 - ⏱️ **纯 Zsh 内置高精度计时**：采用 `zmodload zsh/datetime` 毫秒级计时，彻底解决 macOS BSD `date` 不支持 `%N` 导致的算术报错。
+- 💎 **工业级 Shell 工程规范（融合 `zsh4humans` 核心写法）**：
+  - **单键免回车瞬时交互**：选项按键（`y`/`n`/`1`/`2`/`q`）瞬间生效，无需反复敲 Enter 回车键；
+  - **防 Sudo 踩坑防护（Anti-Sudo Check）**：严密检测若误用 `sudo` 运行则立即叫停，防止将普通用户家目录及插件属主污染为 root；
+  - **防命令别名干扰**：底层操作显式调用 `command` 前缀，彻底免疫系统全局别名；
+  - **.zwc 编译字节码清理与原子替换**：新配置生成后自动清理过期缓存，杜绝命中旧字节码；
+  - **安装完成自举接管**：安装完成后可一键 `exec zsh -l` 直接无缝接入新环境。
 
 ---
 
@@ -89,12 +95,24 @@
 
 ## 快速安装与使用
 
-### 1. 一键安装
+### 1. 一键远程极速安装（推荐，无需事先克隆，借鉴 zsh4humans 设计）
 
-在目标 Linux 或 macOS 终端中克隆并运行安装脚本：
+在全新的 Linux 或 macOS 终端中直接复制运行以下指令即可：
 
 ```bash
-git clone https://github.com/your-username/ZSH.git ~/.zsh-project
+if command -v curl >/dev/null 2>&1; then
+  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/install.sh)"
+else
+  bash -c "$(wget -O- https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/install.sh)"
+fi
+```
+
+### 2. 传统本地克隆安装方式
+
+若习惯先克隆仓库再执行：
+
+```bash
+git clone https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git ~/.zsh-project
 cd ~/.zsh-project
 bash install.sh
 ```

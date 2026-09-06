@@ -436,3 +436,32 @@ timeout -k 1s 5s vfox activate zsh
 5. **权限严控**：
    - 必须先判断当前用户是否为普通用户（`[[ $EUID -ne 0 ]]`）；
    - 严禁整个安装过程以 root/sudo 全局运行。
+
+---
+
+## 十、借鉴 romkatv/zsh4humans 的工业级 Shell 工程规范
+
+本项目吸收了 [romkatv/zsh4humans](https://github.com/romkatv/zsh4humans)（Powerlevel10k 作者）的核心工程实践：
+
+### 10.1 防 Sudo 踩坑防护（Anti-Sudo Check）
+- **痛点**：新手常使用 `sudo bash install.sh`，导致用户家目录生成的 `.zshrc`、`~/.local/`、插件目录属主被赋为 root，后续普通用户无法写入历史或更新。
+- **规范**：检测若当前为 root 但 `$HOME` 拥有者为非 root，立即中断并提示用户以普通身份重新运行。
+
+### 10.2 终端 TTY 保护与状态还原 Trap
+- **痛点**：若用户中途按 `Ctrl+C` 中断或发生错误，可能导致终端停留在非规范模式（无回显或键位错乱）。
+- **规范**：脚本启动时用 `command stty -g` 记录终端原始状态，并在 `trap cleanup_terminal INT TERM EXIT` 中确保无论如何都安全恢复。
+
+### 10.3 单键免回车瞬时读取（`read_key`）
+- **规范**：利用 `stty -icanon min 1 time 0` 与 `dd bs=1 count=1`，捕获用户单次敲击（`y`/`n`/`1`/`2`/`q`），按下瞬间立刻触发下一步，免去繁琐的 Enter 回车确认。
+
+### 10.4 管道免克隆远程自举（Pipe Execution Bootstrap）
+- **规范**：支持 `bash -c "$(curl -fsSL ...)"` 一行命令安装。检测若处于管道运行模式，自动将源码自举拉取至 `~/.config/zsh-project-repo`，并在原地衔接完整安装。
+
+### 10.5 底层操作防别名劫持（`command` 显式包裹）
+- **规范**：对底层文件与系统工具（`rm`, `cp`, `mv`, `mkdir`, `id`, `uname` 等）均包裹 `command` 前缀，彻底免疫系统全局或用户环境中的干扰性别名（如 `alias rm='rm -i'`）。
+
+### 10.6 过期编译字节码（`.zwc`）清理与原子替换
+- **规范**：新配置文件就绪后，主动清理历史残余的 `.zshrc.zwc` 与 `.zshenv.zwc`，确保 Zsh 启动时立刻读取最新语法树。
+
+### 10.7 安装完成自举体验（Instant Bootstrapping）
+- **规范**：配置安装成功且切换 Shell 确认后，提供一键 `exec zsh -l` 直接接管当前进程，无缝切入新环境。

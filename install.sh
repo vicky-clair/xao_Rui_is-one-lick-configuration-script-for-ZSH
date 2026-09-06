@@ -4,6 +4,34 @@
 set -Eeuo pipefail
 export LC_ALL=C
 
+# --- 防范使用 sudo 运行导致污染普通用户家目录权限（借鉴 zsh4humans 防护规范）---
+EUID_VAL="$(command id -u 2>/dev/null || echo 1)"
+if [[ "$EUID_VAL" == 0 ]]; then
+  HOME_LS="$(command ls -ld -- "$HOME" 2>/dev/null || true)"
+  HOME_OWNER="$(printf '%s\n' "$HOME_LS" | command awk 'NR==1 {print $3}')"
+  if [[ "$HOME_OWNER" != root && -n "$HOME_OWNER" ]]; then
+    printf '\033[1;33m[Notice / 提示]\033[0m: %s\n' \
+      "检测到您正在使用 sudo 运行安装脚本！" >&2
+    printf '请作为普通用户直接运行: \033[1;32mbash install.sh\033[0m （脚本在需要安装系统包时会自动请求 sudo 权限）。\n' >&2
+    printf 'Please run directly as normal user without sudo. The script will request sudo when installing system packages.\n' >&2
+    exit 1
+  fi
+fi
+
+# --- 终端 TTY 保护与自动还原 Trap（借鉴 zsh4humans 终端健壮性规范）---
+SAVED_TTY=""
+if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
+  SAVED_TTY="$(command stty -g 2>/dev/null || true)"
+fi
+
+cleanup_terminal() {
+  trap - INT TERM EXIT
+  if [[ -n "$SAVED_TTY" ]] && command -v stty >/dev/null 2>&1; then
+    command stty "$SAVED_TTY" 2>/dev/null || true
+  fi
+}
+trap 'cleanup_terminal' INT TERM EXIT
+
 SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 DRY_RUN=0
 PROFILE=basic
@@ -49,10 +77,41 @@ info() { printf '\033[1;34mℹ %s\033[0m\n' "$*"; }
 success() { printf '\033[1;32m✓ %s\033[0m\n' "$*"; }
 warn() { printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 
+# --- 单键免回车瞬时读取函数（借鉴 zsh4humans，按键即响应，免按回车）---
+read_key() {
+  local key=''
+  if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
+    local old_stty
+    old_stty="$(command stty -g 2>/dev/null || true)"
+    command stty -icanon min 1 time 0 2>/dev/null || true
+    while :; do
+      local c
+      c="$(command dd bs=1 count=1 2>/dev/null && echo x)"
+      key="$key${c%x}"
+      [[ -n "$key" ]] && break
+    done
+    [[ -n "$old_stty" ]] && command stty "$old_stty" 2>/dev/null || true
+    if [[ "$key" == $'\n' || "$key" == $'\r' ]]; then
+      echo ""
+      return 0
+    fi
+    echo "$key"
+  else
+    read -r key || key=''
+    echo "$key"
+  fi
+}
+
 ask() {
-  local answer
-  read -r -p "$1 [y/N] " answer || return 1
-  [[ "$answer" == y || "$answer" == Y ]]
+  local prompt=$1
+  printf '%s [y/N] ' "$prompt"
+  local ans
+  ans="$(read_key)"
+  case "$ans" in
+    y|Y) echo "y"; return 0 ;;
+    q|Q) echo "q"; info "$(msg "用户已中止操作。" "Operation aborted by user.")"; exit 0 ;;
+    *) echo "n"; return 1 ;;
+  esac
 }
 
 # 跨平台计算 SHA-256 哈希值
@@ -88,15 +147,18 @@ while (($#)); do
   shift
 done
 
-# 交互式语言选择菜单（若未通过命令行显式指定 --lang）
+# 交互式语言选择菜单（若未通过命令行显式指定 --lang，按键即响应）
 if ((!DRY_RUN)) && [[ -t 0 ]] && ((!LANG_SET)) && [[ -z "$ROLLBACK" ]]; then
   printf '\n\033[1;36m🌐 Please select language / 请选择界面语言:\033[0m\n'
   printf '  1) 简体中文 (Chinese) [默认]\n'
   printf '  2) English\n'
-  read -r -p "Enter choice / 请输入编号 [1/2]: " _l_choice || _l_choice=1
-  case "$_l_choice" in
-    2|en|EN|English|english) LANG_CHOICE="en" ;;
-    *) LANG_CHOICE="zh" ;;
+  printf '  q) Quit / 退出\n'
+  printf 'Enter choice / 请按键选择 [1/2/q]: '
+  _l_key="$(read_key)"
+  case "$_l_key" in
+    2|e|E) echo "2"; LANG_CHOICE="en" ;;
+    q|Q) echo "q"; exit 0 ;;
+    *) echo "1"; LANG_CHOICE="zh" ;;
   esac
 fi
 
@@ -241,11 +303,12 @@ restore() {
   ask "$(msg '确认恢复以上配置？' 'Confirm restoring the above configuration?')" || return
   for file in "${managed_files[@]}"; do
     if [[ $(cat "$dir/$file.state") == present ]]; then
-      cp -p -- "$dir/$file" "$HOME/$file"
+      command cp -p -- "$dir/$file" "$HOME/$file"
     else
-      rm -f -- "$HOME/$file"
+      command rm -f -- "$HOME/$file"
     fi
   done
+  command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" 2>/dev/null || true
   success "$(msg '配置已恢复。请新开终端验证。' 'Configuration restored. Please open a new terminal session to verify.')"
 }
 
@@ -302,7 +365,42 @@ elif [[ "$OS" == Linux ]]; then
   fi
 fi
 
-[[ -r "$SCRIPT_DIR/templates/zshrc.zsh" ]] || die "$(msg '缺少 templates/zshrc.zsh，请下载完整项目' 'templates/zshrc.zsh missing; please download the full repository')"
+# 检查并自动自举项目模板（支持一行 curl/wget 管道远程直装，借鉴 zsh4humans 远程免克隆设计）
+if [[ ! -r "$SCRIPT_DIR/templates/zshrc.zsh" ]]; then
+  LOCAL_BOOTSTRAP_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/zsh-project-repo"
+  info "$(msg "未在本地检测到完整模板，正在通过网络自动拉取最新项目资源至 $LOCAL_BOOTSTRAP_DIR..." "Templates not found locally; auto-bootstrapping repository into $LOCAL_BOOTSTRAP_DIR...")"
+  command mkdir -p "$LOCAL_BOOTSTRAP_DIR"
+  REPO_REMOTE="https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git"
+  if command -v git >/dev/null 2>&1; then
+    if [[ -d "$LOCAL_BOOTSTRAP_DIR/.git" ]]; then
+      command git -C "$LOCAL_BOOTSTRAP_DIR" pull --quiet 2>/dev/null || true
+    else
+      command git clone --depth=1 "$REPO_REMOTE" "$LOCAL_BOOTSTRAP_DIR" --quiet 2>/dev/null || true
+    fi
+  fi
+  # 若无 git 或 clone 失败，通过 curl/wget 提取必要模板
+  if [[ ! -r "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" ]]; then
+    RAW_BASE="https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main"
+    command mkdir -p "$LOCAL_BOOTSTRAP_DIR/templates" "$LOCAL_BOOTSTRAP_DIR/scripts"
+    if command -v curl >/dev/null 2>&1; then
+      command curl -fsSL "$RAW_BASE/templates/zshrc.zsh" -o "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" 2>/dev/null || true
+      command curl -fsSL "$RAW_BASE/templates/tmux.conf" -o "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" 2>/dev/null || true
+      command curl -fsSL "$RAW_BASE/scripts/check_updates.sh" -o "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" 2>/dev/null || true
+    elif command -v wget >/dev/null 2>&1; then
+      command wget -qO "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" "$RAW_BASE/templates/zshrc.zsh" 2>/dev/null || true
+      command wget -qO "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" "$RAW_BASE/templates/tmux.conf" 2>/dev/null || true
+      command wget -qO "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" "$RAW_BASE/scripts/check_updates.sh" 2>/dev/null || true
+    fi
+    command chmod +x "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" 2>/dev/null || true
+  fi
+  if [[ -r "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" ]]; then
+    SCRIPT_DIR="$LOCAL_BOOTSTRAP_DIR"
+    success "$(msg "项目资源自举成功" "Repository bootstrapped successfully")"
+  else
+    die "$(msg '缺少 templates/zshrc.zsh，且自动下载失败，请检查网络或克隆完整仓库' 'templates/zshrc.zsh missing and auto-download failed; please check network or clone repository')"
+  fi
+fi
+
 target_files=(.zshrc .zsh-project-options)
 if ((WITH_TMUX)); then
   [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]] || die "$(msg '缺少 templates/tmux.conf，请下载完整项目' 'templates/tmux.conf missing; please download the full repository')"
@@ -692,6 +790,9 @@ zsh -n "$BACKUP/new.options"
 install -m 600 "$BACKUP/new.options" "$HOME/.zsh-project-options"
 install -m 600 "$BACKUP/new.zshrc" "$HOME/.zshrc"
 
+# 清理旧的编译字节码（若存在，借鉴 zsh4humans 规范），防止 Zsh 继续读取失效旧缓存
+command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" 2>/dev/null || true
+
 deployed_files=(.zshrc .zsh-project-options)
 ((WITH_TMUX)) && deployed_files+=(.tmux.conf)
 for file in "${deployed_files[@]}"; do
@@ -737,3 +838,12 @@ fi
 
 printf '\n%s:\n  bash %s/install.sh --rollback %q\n' \
   "$(msg '若需要回退配置，请运行' 'To rollback configuration, run')" "$SCRIPT_DIR" "$BACKUP"
+
+# 12. 立即启动新 Shell 会话自举（借鉴 zsh4humans 体验）
+if [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
+  echo ""
+  if ask "$(msg '是否现在立即进入全新的 Zsh 交互环境？' 'Start fresh Zsh session now?') "; then
+    printf '\n\033[1;32m%s\033[0m\n' "$(msg '🚀 正在启动全新 Zsh 交互环境...' '🚀 Starting fresh Zsh environment...')"
+    exec zsh -l
+  fi
+fi

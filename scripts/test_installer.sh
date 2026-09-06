@@ -134,7 +134,15 @@ if command -v zsh >/dev/null 2>&1; then
     printf '#!/usr/bin/env bash\necho "$0" >> "$TOOL_MARKER"\n' > "$STAGE/bin/$tool"
     chmod +x "$STAGE/bin/$tool"
   done
-  zsh -fic 'source "$1"; (( ${+aliases[lzd]} == 0 )); (( ${+functions[nvim]} == 0 ))' test "$ROOT/templates/zshrc.zsh" > "$STAGE/template.log"
+  if ! zsh -fic 'source "$1" || exit 1; (( ${+aliases[lzd]} == 0 )) || exit 1; (( ${+functions[nvim]} == 0 )) || exit 1' test "$ROOT/templates/zshrc.zsh" > "$STAGE/template.log" 2> "$STAGE/template.stderr"; then
+    cat "$STAGE/template.stderr" >&2
+    fail 'template execution or disabled feature assertions failed'
+  fi
+  if [[ -s "$STAGE/template.stderr" ]]; then
+    cat "$STAGE/template.stderr" >&2
+    fail 'template emitted startup errors or warnings'
+  fi
+  grep -Eq '[0-9]+ms' "$STAGE/template.log" || fail 'startup timer did not render milliseconds'
   [[ ! -s "$TOOL_MARKER" ]] || fail 'disabled optional tools executed'
   pass 'disabled feature flags bypass installed optional tools'
 else

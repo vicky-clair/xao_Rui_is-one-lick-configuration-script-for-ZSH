@@ -176,7 +176,8 @@ if zmodload zsh/datetime 2>/dev/null; then
   ZSH_START_TIME=$EPOCHREALTIME
   precmd() {
     local end_time=$EPOCHREALTIME
-    local elapsed=$(( int((end_time - ZSH_START_TIME) * 1000) ))
+    local -i elapsed
+    elapsed=$(( (end_time - ZSH_START_TIME) * 1000 ))
     print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
     unset -f precmd
   }

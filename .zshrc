@@ -426,7 +426,9 @@ unset _zsh_project_state_dir _zsh_updates_file _zsh_last_check_file _zsh_check_s
 if [[ -o interactive ]]; then
   local _elapsed_str_zh="" _elapsed_str_en=""
   if [[ -n "${ZSH_START_TIME:-}" ]] && zmodload zsh/datetime 2>/dev/null; then
-    local _elapsed=$(( int((EPOCHREALTIME - ZSH_START_TIME) * 1000) ))
+    # 整数变量直接截取毫秒值，不依赖额外数学函数模块中的 int()。
+    local -i _elapsed
+    _elapsed=$(( (EPOCHREALTIME - ZSH_START_TIME) * 1000 ))
     _elapsed_str_zh=" %F{green}(用时 %F{yellow}${_elapsed}ms%F{green})%f"
     _elapsed_str_en=" %F{green}(took %F{yellow}${_elapsed}ms%F{green})%f"
   fi

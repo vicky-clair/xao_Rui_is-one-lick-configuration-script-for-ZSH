@@ -77,4 +77,6 @@ bash install.sh --dry-run --rollback /实际备份路径 --lang zh
 
 ## 本地验证边界
 
+Linux 首轮回归曾在启动计时处报 `unknown function: int`，而旧测试只检查最后的命令状态，误报了通过。现已将模板和项目 `.zshrc` 改为整数变量转换；测试同时检查 source 返回值、每个断言、标准错误输出和毫秒计时展示。该修复需要在 Linux 重跑确认，不将之前带错误的结果记录为全通过。
+
 Bash 语法和隔离测试已在当前 Windows/MSYS 环境运行：预演各入口、非法 Neovim 二进制保护、主题恢复与修改保护、tmux 目标检查、离线缓存保留均通过。Neovim 原生符号链接切换用例和 Zsh 运行用例标为 SKIP，不算通过。没有运行真实系统包安装，也没有声称 macOS 和所有 Linux 发行版均已验证。

@@ -17,16 +17,6 @@ _zsh_msg() {
 # 启动计时：使用 Zsh 内置 datetime 模块高精度计时（兼容 Linux 与 macOS）
 if zmodload zsh/datetime 2>/dev/null; then
   ZSH_START_TIME=$EPOCHREALTIME
-  precmd() {
-    local end_time=$EPOCHREALTIME
-    local elapsed=$(( int((end_time - ZSH_START_TIME) * 1000) ))
-    if [[ "${ZSH_PROJECT_LANG:-zh}" == en ]]; then
-      print -P "%F{green}⚡ Zsh startup completed in %F{yellow}${elapsed}ms%f"
-    else
-      print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
-    fi
-    unset -f precmd
-  }
 fi
 
 # 跨平台环境变量与 PATH 去重设置
@@ -248,7 +238,15 @@ function zsh-check-updates() {
 
 unset _zsh_project_state_dir _zsh_updates_file _zsh_last_check_file _zsh_check_script
 
-_zsh_msg '%F{green}✓ Zsh 配置加载完成%f' '%F{green}✓ Zsh configuration loaded successfully%f'
+if [[ -o interactive ]]; then
+  local _elapsed_str_zh="" _elapsed_str_en=""
+  if [[ -n "${ZSH_START_TIME:-}" ]] && zmodload zsh/datetime 2>/dev/null; then
+    local _elapsed=$(( int((EPOCHREALTIME - ZSH_START_TIME) * 1000) ))
+    _elapsed_str_zh=" %F{green}(用时 %F{yellow}${_elapsed}ms%F{green})%f"
+    _elapsed_str_en=" %F{green}(took %F{yellow}${_elapsed}ms%F{green})%f"
+  fi
+  _zsh_msg "\n%F{blue}========================================%f\n%F{green}✅ ZSH 环境加载完成！${_elapsed_str_zh}%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{green}✅ ZSH environment loaded successfully!${_elapsed_str_en}%f\n%F{blue}========================================%f\n"
+fi
 
 # 语法高亮：在所有组件加载完成后置底加载
 [[ -r "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]] && source "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"

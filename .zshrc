@@ -18,21 +18,6 @@ _zsh_msg() {
 # 使用 Zsh 内置 datetime 模块高精度计时，完全兼容 Linux 与 macOS，无需 fork 外部进程。
 if zmodload zsh/datetime 2>/dev/null; then
   ZSH_START_TIME=$EPOCHREALTIME
-  precmd() {
-    local end_time=$EPOCHREALTIME
-    local elapsed=$(( int((end_time - ZSH_START_TIME) * 1000) ))
-    if [[ "${ZSH_PROJECT_LANG:-zh}" == en ]]; then
-      print -P "%F{green}⚡ Zsh startup completed in %F{yellow}${elapsed}ms%f"
-    else
-      print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
-    fi
-    unset -f precmd
-  }
-else
-  precmd() {
-    _zsh_msg "%F{green}⚡ Zsh 启动完成%f" "%F{green}⚡ Zsh startup completed%f"
-    unset -f precmd
-  }
 fi
 
 # ========================================
@@ -383,7 +368,13 @@ unset _zsh_project_state_dir _zsh_updates_file _zsh_last_check_file _zsh_check_s
 # 17. 加载完成横幅与高亮加载
 # ========================================
 if [[ -o interactive ]]; then
-  _zsh_msg "\n%F{blue}========================================%f\n%F{green}✅ ZSH 环境加载完成！%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{green}✅ ZSH environment loaded successfully!%f\n%F{blue}========================================%f\n"
+  local _elapsed_str_zh="" _elapsed_str_en=""
+  if [[ -n "${ZSH_START_TIME:-}" ]] && zmodload zsh/datetime 2>/dev/null; then
+    local _elapsed=$(( int((EPOCHREALTIME - ZSH_START_TIME) * 1000) ))
+    _elapsed_str_zh=" %F{green}(用时 %F{yellow}${_elapsed}ms%F{green})%f"
+    _elapsed_str_en=" %F{green}(took %F{yellow}${_elapsed}ms%F{green})%f"
+  fi
+  _zsh_msg "\n%F{blue}========================================%f\n%F{green}✅ ZSH 环境加载完成！${_elapsed_str_zh}%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{green}✅ ZSH environment loaded successfully!${_elapsed_str_en}%f\n%F{blue}========================================%f\n"
 fi
 
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off

@@ -12,7 +12,7 @@ normalize() {
   case "$1" in
     fd-find|fd) echo fd ;; batcat|bat) echo bat ;; neovim|nvim) echo neovim ;;
     wl-copy|wl-clipboard) echo wl-clipboard ;;
-    fzf|eza|zoxide|yazi|fastfetch|lazydocker|vfox|tmux|xclip|ncurses-term) echo "$1" ;;
+    fzf|eza|zoxide|yazi|fastfetch|lazydocker|lazygit|vfox|tmux|xclip|ncurses-term) echo "$1" ;;
     *) printf '不支持的组件：%s\n' "$1" >&2; return 1 ;;
   esac
 }
@@ -27,9 +27,9 @@ elif [[ -f "$STATE/failed-components" ]]; then
     REQUESTED+=("$component")
   done < "$STATE/failed-components"
 fi
-if ((${#REQUESTED[@]} == 0)); then echo '没有失败项记录；旧安装可指定 --retry-failed lazydocker。'; exit 0; fi
+if ((${#REQUESTED[@]} == 0)); then echo '没有失败项记录；旧安装可指定 --retry-failed lazydocker 或 lazygit。'; exit 0; fi
 printf '仅重试组件：%s\n' "${REQUESTED[*]}"
-echo '使用系统包管理器；lazydocker 缺包时下载官方 Release。不会重写 Zsh 配置。'
+echo '使用系统包管理器；lazydocker/lazygit 缺包时下载官方 Release。不会重写 Zsh 配置。'
 ((DRY == 0)) || exit 0
 if ((YES == 0)); then
   [[ -t 0 ]] || { echo '请交互确认，或显式使用 --yes'; exit 1; }
@@ -91,6 +91,26 @@ lazydocker_release() {
   "$stage/lazydocker" --version || return 1
   install -m 755 "$stage/lazydocker" "$HOME/.local/bin/lazydocker"
 }
+lazygit_release() {
+  local url tag version arch os asset stage
+  command -v curl >/dev/null || return 1
+  arch=$(uname -m); os=$(uname -s)
+  case "$arch" in x86_64) ;; aarch64|arm64) arch=arm64 ;; *) return 1 ;; esac
+  [[ "$os" == Linux || "$os" == Darwin ]] || return 1
+  url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/jesseduffield/lazygit/releases/latest) || return 1
+  tag=${url##*/}
+  [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  version=${tag#v}
+  asset="lazygit_${version}_${os}_${arch}.tar.gz"
+  stage="$RUN/lazygit"
+  mkdir -p "$stage" "$HOME/.local/bin"
+  [[ ! -e "$HOME/.local/bin/lazygit" && ! -L "$HOME/.local/bin/lazygit" ]] || return 1
+  curl -fSL --connect-timeout 10 --max-time 90 "https://github.com/jesseduffield/lazygit/releases/download/$tag/$asset" -o "$stage/archive.tar.gz" || return 1
+  tar -xzf "$stage/archive.tar.gz" -C "$stage" lazygit || return 1
+  [[ -f "$stage/lazygit" && ! -L "$stage/lazygit" && -x "$stage/lazygit" ]] || return 1
+  "$stage/lazygit" --version || return 1
+  install -m 755 "$stage/lazygit" "$HOME/.local/bin/lazygit"
+}
 
 PENDING=()
 if [[ -f "$STATE/failed-components" ]]; then
@@ -109,6 +129,9 @@ for component in "${REQUESTED[@]}"; do
   fi
   if ((ok == 0)) && [[ "$component" == lazydocker ]]; then
     if lazydocker_release >> "$RUN/$component.log" 2>&1; then ok=1; fi
+  fi
+  if ((ok == 0)) && [[ "$component" == lazygit ]]; then
+    if lazygit_release >> "$RUN/$component.log" 2>&1; then ok=1; fi
   fi
   next=()
   for previous in "${PENDING[@]}"; do [[ "$previous" == "$component" ]] || next+=("$previous"); done

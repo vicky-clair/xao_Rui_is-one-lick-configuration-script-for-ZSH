@@ -113,10 +113,10 @@ get_option() {
 option_key() {
   case "$1" in
     full) echo ZSH_PROJECT_FULL ;; vfox) echo ZSH_PROJECT_VFOX ;;
-    lazydocker) echo ZSH_PROJECT_LAZYDOCKER ;; tmux) echo ZSH_PROJECT_TMUX ;;
+    lazydocker) echo ZSH_PROJECT_LAZYDOCKER ;; lazygit) echo ZSH_PROJECT_LAZYGIT ;; tmux) echo ZSH_PROJECT_TMUX ;;
     banner) echo ZSH_PROJECT_BANNER ;; fastfetch) echo ZSH_PROJECT_FASTFETCH ;;
     timer) echo ZSH_PROJECT_TIMER ;; auto-update) echo ZSH_PROJECT_AUTO_CHECK_UPDATE ;;
-    *) fail '可选项：full vfox lazydocker tmux banner fastfetch timer auto-update' ;;
+    *) fail '可选项：full vfox lazydocker lazygit tmux banner fastfetch timer auto-update' ;;
   esac
 }
 set_option() {
@@ -167,9 +167,9 @@ case "$ACTION" in
   --configure)
     [[ -t 0 ]] || fail '配置菜单需要交互终端；脚本化设置请用 --set banner=0'
     echo '可选项（0=关闭，1=开启；不安装/卸载软件）：'
-    for name in full vfox lazydocker tmux banner fastfetch timer auto-update; do
+    for name in full vfox lazydocker lazygit tmux banner fastfetch timer auto-update; do
       key=$(option_key "$name"); default=0
-      case "$name" in banner|fastfetch|timer|auto-update) default=1 ;; esac
+      case "$name" in banner|fastfetch|timer|auto-update|lazygit) default=1 ;; esac
       printf '  %s=%s\n' "$name" "$(get_option "$key" "$default")"
     done
     read -r -p '输入一项设置，如 banner=0；直接回车取消：' choice
@@ -224,12 +224,12 @@ case "$ACTION" in
     for path in .oh-my-zsh/oh-my-zsh.sh powerlevel10k/powerlevel10k.zsh-theme .oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh .oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh; do
       if [[ -r "$HOME/$path" ]]; then echo "PASS: $path"; else echo "WARN: 缺少 $path"; issues=$((issues+1)); fi
     done
-    for tool in zsh git fzf fd fdfind bat batcat eza zoxide yazi nvim vfox lazydocker tmux fastfetch; do
+    for tool in zsh git fzf fd fdfind bat batcat eza zoxide yazi nvim vfox lazydocker lazygit tmux fastfetch; do
       if location=$(command -v "$tool"); then printf 'FOUND: %s -> %s\n' "$tool" "$location"; else printf 'INFO: 未在当前 PATH 中找到 %s（可选组件不一定需要）\n' "$tool"; fi
     done
     limiter=$(command -v timeout || command -v gtimeout || true)
     if [[ -n "$limiter" ]]; then
-      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker fastfetch; do
+      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch; do
         command -v "$tool" >/dev/null || continue
         if version=$("$limiter" -k 1s 2s "$tool" --version 2>&1); then
           printf 'VERSION: %s: %s\n' "$tool" "${version%%$'\n'*}"

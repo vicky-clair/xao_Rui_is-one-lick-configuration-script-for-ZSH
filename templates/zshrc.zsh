@@ -269,6 +269,20 @@ if [[ ${ZSH_PROJECT_LAZYDOCKER:-0} == 1 ]] && command -v lazydocker &>/dev/null;
   _zsh_startup_msg "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)" "%F{green}✓%f %F{cyan}lazydocker%f tool enabled (cmd: %F{yellow}lzd%f)"
 fi
 
+if [[ ${ZSH_PROJECT_LAZYGIT:-1} == 1 ]] && command -v lazygit &>/dev/null; then
+  alias lg="lazygit"
+  function lazygit-widget() {
+    zle && zle -I
+    lazygit
+    zle && zle reset-prompt
+  }
+  zle -N lazygit-widget
+  bindkey '^G' lazygit-widget
+  bindkey -M emacs '^G' lazygit-widget 2>/dev/null || true
+  bindkey -M viins '^G' lazygit-widget 2>/dev/null || true
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}lazygit%f Git 终端管理已启用 (命令: %F{yellow}lg%f, 快捷键: %F{yellow}Ctrl+G%f)" "%F{green}✓%f %F{cyan}lazygit%f Git TUI enabled (cmd: %F{yellow}lg%f, shortcut: %F{yellow}Ctrl+G%f)"
+fi
+
 if [[ ${ZSH_PROJECT_TMUX:-0} == 1 ]] && command -v tmux &>/dev/null; then
   alias t="tmux"
   alias ta="tmux attach -t"

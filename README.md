@@ -133,7 +133,7 @@ bash install.sh
 - **安装类型**：
   - `basic`（基础版）：安装 Oh My Zsh、Powerlevel10k 主题，以及 `zsh-autosuggestions`、`zsh-completions`、`zsh-syntax-highlighting` 三大核心插件。
   - `full`（完整版）：在基础版之上，自动检测并安装 `fzf`、`fd`、`bat`、`eza`、`zoxide`、`yazi`、`neovim`、`fastfetch`。
-- **可选组件**：按需提示安装 `vfox`（SDK 版本管理）与 `lazydocker`（容器终端界面）。
+- **可选组件**：按需提示安装 `vfox`（SDK 版本管理）、`lazydocker`（容器终端界面）与 `lazygit`（Git 终端面板）。
 
 ### 2. 命令行参数与常用场景
 
@@ -150,6 +150,7 @@ bash install.sh [选项]
 | `--with-latest-nvim` | 从 GitHub Release 直接拉取并安装最新官方稳定版 Neovim（>= 0.10.x） |
 | `--with-vfox` | 请求安装 vfox（若仓库或脚本可用） |
 | `--with-lazydocker` | 请求安装 lazydocker 容器终端管理 |
+| `--with-lazygit` | 请求安装 lazygit Git 终端管理面板 |
 | `--with-tmux` | 请求安装并配置 tmux（含终端剪贴板互通与美化主题） |
 | `--lang zh\|en` | 指定界面语言（中文 `zh` 或英文 `en`） |
 | `--check-updates` | 检测已安装的插件、主题与应用是否有新版本 |
@@ -227,6 +228,8 @@ bash install.sh --profile full --p10k-style lean --with-tmux
 | **`Ctrl+a` 然后 `m`** | 最大化 / 还原当前窗格 | 快速专注调试，再按一次还原分屏 |
 | **`Ctrl+a` 然后 `j / k / l / h`** | 调整窗格大小（下/上/右/左 5格） | **支持连续按键**（按一次 `Ctrl+a` 即可连击 `j/k/l/h`） |
 | **`Ctrl+a` 然后 `r`** | 重新加载 `~/.tmux.conf` | 状态栏会弹出绿色重载成功提示 |
+| **`Ctrl+a` 然后 `g`** | 快速唤出 lazygit 居中悬浮窗（支持 Tmux >= 3.2，按 `q` 或 `Esc` 退出返回） |
+| **`Ctrl+a` 然后 `G`** | 在新 Tmux 窗口中打开 lazygit 并继承当前目录 |
 | **`Ctrl+a` 然后 `Shift + I`** | 自动下载并安装新增的 TPM 插件 | 首次使用 TPM 或添加插件时使用 |
 
 ---
@@ -241,12 +244,14 @@ bash install.sh --profile full --p10k-style lean --with-tmux
 | **Ctrl + R** | FZF 历史命令模糊查找（支持多终端实时共享历史） |
 | **Ctrl + T** | FZF 文件选择（集成 `bat` 代码实时预览） |
 | **Alt + C** | FZF 目录选择（集成 `eza` 目录树预览） |
+| **Ctrl + G** | 快速唤出 lazygit Git 终端面板（退出后自动重绘提示符，保留当前输入行） |
 | **上 / 下方向键** | 按已输入前缀搜索历史命令 |
 | **双击 Esc** | OMZ sudo 插件：为当前正在输入的命令添加 `sudo` 前缀 |
 | **`y`** | 启动 Yazi 终端文件管理器，退出时自动跳转至所选目录 |
 | **`z <关键词>`** | zoxide 智能目录跳转 |
 | **`ll` / `la`** | eza 现代化彩色列表（带图标、文件大小与详细权限） |
 | **`gst`** | OMZ Git 状态别名（等同于 `git status`） |
+| **`lg`** | 启动 lazygit Git 终端面板 |
 | **`lzd`** | 启动 lazydocker 容器终端面板 |
 
 ---

@@ -34,7 +34,7 @@
    - 受管配置保留备份与 SHA-256 校验；软件包、插件和系统默认 Shell 不属于配置回退范围；
    - 更新组件前检测本地 Git 工作区状态，严禁无感知覆盖用户自定义修改；
    - 完备的语法预检（`zsh -n`）机制，防止因语法中断导致终端无法打开。
-4. **防御性编程**：各模块与工具之间彻底解耦，任何单一工具（如 vfox、fastfetch、lazydocker）缺失或报错，绝不影响 Shell 整体加载。
+4. **防御性编程**：各模块与工具之间彻底解耦，任何单一工具（如 vfox、fastfetch、lazydocker、lazygit）缺失或报错，绝不影响 Shell 整体加载。
 
 ### 1.2 技术选型考量
 
@@ -111,7 +111,7 @@ flowchart TD
    ↓
 [阶段 13] 历史记录行为设置 (share_history, 前缀搜索绑定)
    ↓
-[阶段 14] 现代化命令别名与工具加载 (eza 别名, lazydocker, zoxide)
+[阶段 14] 现代化命令别名与工具加载 (eza 别名, lazydocker, lazygit, zoxide)
    ↓
 [阶段 15] 系统信息展示 (fastfetch)
    ↓
@@ -265,7 +265,7 @@ sequenceDiagram
     User->>Installer: bash install.sh [--profile full] [--with-tmux]
     Installer->>Installer: 校验用户非 root、ZDOTDIR 与目录合法性
     Installer->>System: 识别 OS、架构与包管理器
-    Installer->>User: 提示交互选项 (全套工具集 / vfox / lazydocker / tmux)
+    Installer->>User: 提示交互选项 (全套工具集 / vfox / lazydocker / lazygit / tmux)
     User-->>Installer: 确认安装方案
     Installer->>FS: 创建带时间戳的备份目录，计算当前 SHA-256 并生成 manifest
     Installer->>System: 安装基础依赖 (zsh, git, curl, coreutils)
@@ -296,6 +296,7 @@ sequenceDiagram
 ZSH_PROJECT_FULL=1
 ZSH_PROJECT_VFOX=0
 ZSH_PROJECT_LAZYDOCKER=0
+ZSH_PROJECT_LAZYGIT=0
 ZSH_PROJECT_TMUX=1
 ZSH_PROJECT_DIR="/home/user/.zsh-project"
 ZSH_PROJECT_AUTO_CHECK_UPDATE=1

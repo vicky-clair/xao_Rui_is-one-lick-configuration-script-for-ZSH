@@ -129,13 +129,13 @@ if command -v zsh >/dev/null 2>&1; then
   : > "$HOME/powerlevel10k/powerlevel10k.zsh-theme"
   : > "$HOME/.p10k.zsh"
   : > "$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
-  printf 'ZSH_PROJECT_FULL=0\nZSH_PROJECT_VFOX=0\nZSH_PROJECT_LAZYDOCKER=0\nZSH_PROJECT_TMUX=0\nZSH_PROJECT_AUTO_CHECK_UPDATE=0\n' > "$HOME/.zsh-project-options"
+  printf 'ZSH_PROJECT_FULL=0\nZSH_PROJECT_VFOX=0\nZSH_PROJECT_LAZYDOCKER=0\nZSH_PROJECT_LAZYGIT=0\nZSH_PROJECT_TMUX=0\nZSH_PROJECT_AUTO_CHECK_UPDATE=0\n' > "$HOME/.zsh-project-options"
   export TOOL_MARKER="$STAGE/tools-ran"
-  for tool in vfox lazydocker nvim fzf zoxide fastfetch eza yazi bat; do
+  for tool in vfox lazydocker lazygit nvim fzf zoxide fastfetch eza yazi bat; do
     printf '#!/usr/bin/env bash\necho "$0" >> "$TOOL_MARKER"\n' > "$STAGE/bin/$tool"
     chmod +x "$STAGE/bin/$tool"
   done
-  if ! zsh -fic 'source "$1" || exit 1; (( ${+aliases[lzd]} == 0 )) || exit 1; (( ${+functions[nvim]} == 0 )) || exit 1' test "$ROOT/templates/zshrc.zsh" > "$STAGE/template.log" 2> "$STAGE/template.stderr"; then
+  if ! zsh -fic 'source "$1" || exit 1; (( ${+aliases[lzd]} == 0 )) || exit 1; (( ${+aliases[lg]} == 0 )) || exit 1; (( ${+functions[nvim]} == 0 )) || exit 1' test "$ROOT/templates/zshrc.zsh" > "$STAGE/template.log" 2> "$STAGE/template.stderr"; then
     cat "$STAGE/template.stderr" >&2
     fail 'template execution or disabled feature assertions failed'
   fi

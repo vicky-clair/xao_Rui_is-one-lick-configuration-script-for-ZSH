@@ -151,7 +151,7 @@ check_apps() {
     local outdated
     outdated=$(run_with_timeout "$TIMEOUT_SEC" brew outdated --formula --quiet 2>/dev/null) || { CHECK_FAILED=1; return 0; }
     if [[ -n "$outdated" ]]; then
-      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git tmux)
+      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux)
       for t in "${tools[@]}"; do
         if echo "$outdated" | grep -qFx "$t"; then
           UPDATES+=("$(msg "[应用工具] $t (Homebrew 有新版本)" "[CLI Tool] $t (Homebrew update available)")")
@@ -163,7 +163,7 @@ check_apps() {
     if command -v apt-get >/dev/null 2>&1 && command -v apt >/dev/null 2>&1; then
       local upgradable
       upgradable=$(run_with_timeout "$TIMEOUT_SEC" apt list --upgradable 2>/dev/null) || { CHECK_FAILED=1; return 0; }
-      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
+      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t/"; then
           UPDATES+=("$(msg "[应用工具] $t (APT 包管理器有新版本)" "[CLI Tool] $t (APT package update available)")")
@@ -175,7 +175,7 @@ check_apps() {
       local status=0
       upgradable=$(run_with_timeout "$TIMEOUT_SEC" dnf check-update --quiet 2>/dev/null) || status=$?
       if [[ "$status" != 0 && "$status" != 100 ]]; then CHECK_FAILED=1; return 0; fi
-      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
+      local tools=(fzf fd-find bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t\."; then
           UPDATES+=("$(msg "[应用工具] $t (DNF 包仓库有新版本)" "[CLI Tool] $t (DNF repository update available)")")
@@ -188,7 +188,7 @@ check_apps() {
       local status=0
       upgradable=$(run_with_timeout "$TIMEOUT_SEC" checkupdates 2>/dev/null) || status=$?
       if [[ "$status" != 0 && "$status" != 2 ]]; then CHECK_FAILED=1; return 0; fi
-      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh tmux)
+      local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh tmux)
       for t in "${tools[@]}"; do
         if echo "$upgradable" | grep -qE "^$t "; then
           UPDATES+=("$(msg "[应用工具] $t (Arch 包仓库有新版本)" "[CLI Tool] $t (Arch repository update available)")")

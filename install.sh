@@ -48,6 +48,7 @@ PROFILE=basic
 PROFILE_SET=0
 WITH_VFOX=0
 WITH_LAZYDOCKER=0
+WITH_LAZYGIT=0
 WITH_TMUX=0
 WITH_LATEST_NVIM=0
 P10K_STYLE=rainbow
@@ -78,6 +79,7 @@ $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --with-latest-nvim    $(msg "从 GitHub Release 下载安装最新官方 Neovim (>= 0.10.x)" "Install latest official Neovim from GitHub release (>= 0.10.x)")
   --with-vfox           $(msg "请求安装 vfox 多版本管理工具，不自动安装 SDK" "Install vfox version manager (does not install SDKs automatically)")
   --with-lazydocker     $(msg "请求安装 lazydocker，不配置 Docker 服务或权限" "Install lazydocker (does not configure Docker daemon or permissions)")
+  --with-lazygit        $(msg "请求安装 lazygit Git 终端管理面板" "Install lazygit Git TUI panel")
   --with-tmux           $(msg "请求安装并配置 tmux 终端复用器（含剪贴板互通与美化主题）" "Install and configure tmux terminal multiplexer (with clipboard & themes)")
   --check-updates       $(msg "检测已安装的 Zsh 插件与常用应用是否有新版本" "Check if installed plugins and CLI tools have new updates")
   --update              $(msg "交互式升级已安装的 Zsh/Tmux 插件、主题与包管理器工具" "Interactively update installed plugins, themes, and CLI tools")
@@ -206,6 +208,7 @@ while (($#)); do
     --with-latest-nvim) WITH_LATEST_NVIM=1 ;;
     --with-vfox) WITH_VFOX=1 ;;
     --with-lazydocker) WITH_LAZYDOCKER=1 ;;
+    --with-lazygit) WITH_LAZYGIT=1 ;;
     --with-tmux) WITH_TMUX=1 ;;
     --check-updates) CHECK_UPDATES=1 ;;
     --update) DO_UPDATE=1 ;;
@@ -228,7 +231,7 @@ esac
 [[ "$LANG_CHOICE" == zh || "$LANG_CHOICE" == en ]] || die 'Invalid language: zh|en'
 if ((DRY_RUN)); then
   printf '[DRY RUN] OS=%s ARCH=%s profile=%s theme=%s\n' "$(uname -s)" "$(uname -m)" "$PROFILE" "$P10K_STYLE"
-  printf '[DRY RUN] vfox=%s lazydocker=%s tmux=%s latest-nvim=%s\n' "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_TMUX" "$WITH_LATEST_NVIM"
+  printf '[DRY RUN] vfox=%s lazydocker=%s lazygit=%s tmux=%s latest-nvim=%s\n' "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_LAZYGIT" "$WITH_TMUX" "$WITH_LATEST_NVIM"
   if [[ -n "$ROLLBACK" ]]; then
     printf '[DRY RUN] 将校验并恢复备份目录：%s（此次不验证或写入）\n' "$ROLLBACK"
   elif ((CHECK_UPDATES || DO_UPDATE)); then
@@ -347,7 +350,7 @@ if ((DO_UPDATE)); then
   OS_TYPE=$(uname -s)
   if [[ "$OS_TYPE" == Darwin ]] && command -v brew >/dev/null 2>&1; then
     info "$(msg "正在通过 Homebrew 升级命令行工具..." "Upgrading CLI tools via Homebrew...")"
-    brew upgrade fzf fd bat eza zoxide yazi neovim fastfetch lazydocker vfox zsh git tmux || UPDATE_INCOMPLETE=1
+    brew upgrade fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux || UPDATE_INCOMPLETE=1
   elif [[ "$OS_TYPE" == Linux ]]; then
     if command -v apt-get >/dev/null 2>&1; then
       info "$(msg "提示：可在终端运行 sudo apt update && sudo apt --only-upgrade install <包名> 升级系统包。" "Tip: You can run sudo apt update && sudo apt --only-upgrade install <pkg> to upgrade system packages.")"
@@ -558,6 +561,7 @@ if ((!DRY_RUN)); then
   fi
   ((WITH_VFOX)) || { if ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
   ((WITH_LAZYDOCKER)) || { if ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
+  ((WITH_LAZYGIT)) || { if ask "$(msg '是否安装 lazygit Git 终端管理面板？' 'Install lazygit Git TUI panel?')"; then WITH_LAZYGIT=1; fi; }
   ((WITH_TMUX)) || { if ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
 fi
 
@@ -578,10 +582,10 @@ printf '\n%s: %s; %s: %s; %s: %s; %s: %s\n' \
   "$(msg '架构' 'Arch')" "$ARCH" \
   "$(msg '包管理器' 'Package Manager')" "$FAMILY" \
   "$(msg '用户' 'User')" "$(id -un)"
-printf '%s: %s; %s: %s; vfox: %s; lazydocker: %s; tmux: %s; %s: %s\n' \
+printf '%s: %s; %s: %s; vfox: %s; lazydocker: %s; lazygit: %s; tmux: %s; %s: %s\n' \
   "$(msg '安装类型' 'Profile')" "$PROFILE" \
   "$(msg 'P10k主题' 'P10k Style')" "$P10K_STYLE" \
-  "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_TMUX" \
+  "$WITH_VFOX" "$WITH_LAZYDOCKER" "$WITH_LAZYGIT" "$WITH_TMUX" \
   "$(msg '语言' 'Language')" "$LANG_CHOICE"
 case "$P10K_STYLE" in
   rainbow) printf '%s\n' "$(msg '主题配置：经典彩虹流线双行主题（Rainbow，开箱即用）。' 'Prompt config: Classic rainbow theme (Rainbow, ready-to-use).')" ;;
@@ -939,6 +943,34 @@ if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
   fi
 fi
 
+# lazygit Git 终端面板安装（优先包管理器，缺失时尝试官方独立预编译二进制）
+if ((WITH_LAZYGIT)) && ! command -v lazygit >/dev/null 2>&1; then
+  optional_package lazygit lazygit
+  if ! command -v lazygit >/dev/null 2>&1; then
+    info "$(msg "系统仓库无 lazygit，正在尝试下载官方独立二进制至 ~/.local/bin..." "lazygit not in repo; downloading official binary...")"
+    lg_arch="x86_64"
+    [[ "$ARCH" == arm64 || "$ARCH" == aarch64 ]] && lg_arch="arm64"
+    lg_os="Linux"
+    [[ "$OS" == Darwin ]] && lg_os="Darwin"
+    lg_stage=$(mktemp -d "$HOME/.lg-tmp-XXXXXX")
+    lg_url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/jesseduffield/lazygit/releases/latest 2>/dev/null) || true
+    lg_tag=${lg_url##*/}
+    lg_version=${lg_tag#v}
+    if [[ "$lg_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      lg_download_url="https://github.com/jesseduffield/lazygit/releases/download/${lg_tag}/lazygit_${lg_version}_${lg_os}_${lg_arch}.tar.gz"
+      if curl -fsSL "$lg_download_url" -o "$lg_stage/lg.tar.gz" 2>/dev/null; then
+        if tar -xzf "$lg_stage/lg.tar.gz" -C "$lg_stage" lazygit 2>/dev/null && [[ -x "$lg_stage/lazygit" ]]; then
+          mkdir -p "$HOME/.local/bin"
+          install -m 755 "$lg_stage/lazygit" "$HOME/.local/bin/lazygit"
+          success "$(msg "lazygit 安装成功（位于 ~/.local/bin/lazygit）" "lazygit installed successfully (in ~/.local/bin/lazygit)")"
+          remove_skipped lazygit
+        fi
+      fi
+    fi
+    rm -rf "$lg_stage"
+  fi
+fi
+
 if ((WITH_TMUX)); then
   info "$(msg "正在安装 tmux 及终端剪贴板依赖..." "Installing tmux and clipboard dependencies...")"
   optional_package tmux tmux
@@ -1048,6 +1080,7 @@ cat <<EOF > "$BACKUP/new.options"
 ZSH_PROJECT_FULL=$([[ "$PROFILE" == full ]] && echo 1 || echo 0)
 ZSH_PROJECT_VFOX=$WITH_VFOX
 ZSH_PROJECT_LAZYDOCKER=$WITH_LAZYDOCKER
+ZSH_PROJECT_LAZYGIT=$WITH_LAZYGIT
 ZSH_PROJECT_TMUX=$WITH_TMUX
 ZSH_PROJECT_DIR="$SCRIPT_DIR"
 ZSH_PROJECT_LANG="$LANG_CHOICE"

@@ -264,7 +264,7 @@ if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v eza &>/dev/null; then
   _zsh_startup_msg "%F{green}✓%f %F{cyan}eza%f 现代化 ls 已启用 (别名: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)" "%F{green}✓%f %F{cyan}eza%f modern ls enabled (aliases: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)"
 fi
 
-if [[ ${ZSH_PROJECT_LAZYDOCKER:-0} == 1 ]] && command -v lazydocker &>/dev/null; then
+if [[ ${ZSH_PROJECT_LAZYDOCKER:-1} == 1 ]] && command -v lazydocker &>/dev/null; then
   alias lzd="lazydocker"
   _zsh_startup_msg "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)" "%F{green}✓%f %F{cyan}lazydocker%f tool enabled (cmd: %F{yellow}lzd%f)"
 fi
@@ -295,6 +295,18 @@ if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v nvim &>/dev/null; then
 fi
 
 alias grep="grep --color=auto"
+
+if command -v man &>/dev/null; then
+  export LESS_TERMCAP_mb=$'\e[1;31m'      # 闪烁
+  export LESS_TERMCAP_md=$'\e[1;38;5;74m' # 标题/粗体
+  export LESS_TERMCAP_me=$'\e[0m'         # 恢复
+  export LESS_TERMCAP_so=$'\e[1;44;33m'   # 状态栏/提示
+  export LESS_TERMCAP_se=$'\e[0m'         # 恢复
+  export LESS_TERMCAP_us=$'\e[1;32m'      # 下划线/参数
+  export LESS_TERMCAP_ue=$'\e[0m'         # 恢复
+  export GROFF_NO_SGR=1                   # groff 颜色兼容
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}man%f 彩色手册已启用 (命令: %F{yellow}man%f)" "%F{green}✓%f %F{cyan}man%f colored man pages enabled (cmd: %F{yellow}man%f)"
+fi
 
 if [[ ${ZSH_PROJECT_FULL:-0} == 1 ]] && command -v zoxide &>/dev/null; then
   eval "$(zoxide init zsh)"

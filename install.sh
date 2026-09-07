@@ -559,10 +559,10 @@ if ((!DRY_RUN)); then
       *) echo "1"; P10K_STYLE="rainbow" ;;
     esac
   fi
-  ((WITH_VFOX)) || { if ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
-  ((WITH_LAZYDOCKER)) || { if ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
-  ((WITH_LAZYGIT)) || { if ask "$(msg '是否安装 lazygit Git 终端管理面板？' 'Install lazygit Git TUI panel?')"; then WITH_LAZYGIT=1; fi; }
-  ((WITH_TMUX)) || { if ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
+  ((WITH_VFOX)) || { if command -v vfox >/dev/null 2>&1; then WITH_VFOX=1; elif ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
+  ((WITH_LAZYDOCKER)) || { if command -v lazydocker >/dev/null 2>&1; then WITH_LAZYDOCKER=1; elif ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
+  ((WITH_LAZYGIT)) || { if command -v lazygit >/dev/null 2>&1; then WITH_LAZYGIT=1; elif ask "$(msg '是否安装 lazygit Git 终端管理面板？' 'Install lazygit Git TUI panel?')"; then WITH_LAZYGIT=1; fi; }
+  ((WITH_TMUX)) || { if command -v tmux >/dev/null 2>&1; then WITH_TMUX=1; elif ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
 fi
 
 # 选项收集完成后生成同一份清单，供检查、备份、部署校验和回退使用。

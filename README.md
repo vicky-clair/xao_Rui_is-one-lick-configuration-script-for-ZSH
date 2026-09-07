@@ -70,36 +70,19 @@
 
 | 文件 / 目录 | 用途说明 |
 | --- | --- |
-| `install.sh` | 跨平台一键交互式安装器与版本更新升级入口 |
+| `install.sh` | 跨平台一键交互式安装器、配置管理与版本更新升级总入口 |
+| `scripts/manage.sh` | 配置管理底层脚本（支持停用/恢复、配置选项修改、只读体检与备份恢复） |
+| `scripts/retry_tools.sh` | 失败组件独立重试安装脚本 |
 | `scripts/check_updates.sh` | 独立的轻量级插件与应用版本检测脚本（供后台轮询与命令调用） |
+| `scripts/test_installer.sh` | 安装器隔离自动化回归测试套件 |
+| `scripts/test_management.sh` | 配置管理器隔离自动化回归测试套件 |
 | `templates/zshrc.zsh` | 经过多平台适配的 `.zshrc` 安装模板文件 |
 | `templates/tmux.conf` | 支持全平台剪贴板互通与美化主题的 `.tmux.conf` 模板文件 |
 | `.tmux.conf` | 项目内已就绪的现代化 Tmux 参考配置文件 |
 | `.zshrc` | 交互式 Zsh 完整参考配置（已分节并包含详尽中文注释） |
 | `.zshenv` | 跨平台环境变量配置（按需加载 Cargo 等环境） |
-| `LINUX_ZSH_SETUP_GUIDE.md` | 从零开始的手动部署、跨平台配置与分步验收指南 |
-| `DEVELOPMENT.md` | 架构设计、加载生命周期、开发维护与跨平台工程规范 |
-| `ZSH_TROUBLESHOOTING.md` | 常见问题根因、排查命令与最终测试矩阵记录 |ch Linux / Manjaro** | `x86_64`, `aarch64` | **Rolling (近期)** | 最新同步版本 | **Rolling (持续更新)** | Pacman 全量同步，始终提供最新 Zsh 5.9+ |
-| **openSUSE** | `x86_64`, `aarch64` | **Leap 15.4+** | Leap 15.6 / Tumbleweed | **Tumbleweed (Rolling)** | 原生 Zypper 包管理器支持 |
-
-### 2. 软件运行依赖基准
-
-| 核心组件 | 最低版本要求 | 推荐版本 | 关键功能说明 |
-| --- | --- | --- | --- |
-| **Zsh** | **>= 5.1** | **>= 5.8** (推荐 5.9) | Powerlevel10k 与 Oh My Zsh 运行底座；内置 `zsh/datetime` 计时模块 |
-| **Bash** | **>= 4.2** | **>= 5.0** | `install.sh` 与 `check_updates.sh` 需支持安全错误拦截与关联数组 |
-| **Git** | **>= 2.0** | **>= 2.25+** | 支持 `git clone --depth=1` 极速拉取与 `git -C` 路径隔离 |
-| **FZF** | **>= 0.20** | **>= 0.48.0** | 0.48+ 原生启用 `--zsh` 极速集成，低版本自动安全降级 |
-
-## 文件结构说明
-
-| 文件 / 目录 | 用途说明 |
-| --- | --- |
-| `install.sh` | 跨平台一键交互式安装器与版本更新升级入口 |
-| `scripts/check_updates.sh` | 独立的轻量级插件与应用版本检测脚本（供后台轮询与命令调用） |
-| `templates/zshrc.zsh` | 经过多平台适配的 `.zshrc` 安装模板文件 |
-| `.zshrc` | 交互式 Zsh 完整参考配置（已分节并包含详尽中文注释） |
-| `.zshenv` | 跨平台环境变量配置（按需加载 Cargo 等环境） |
+| `CONFIGURATION_MANAGEMENT.md` | 配置管理指南（停用恢复、选项修改、体检诊断与备份恢复） |
+| `INSTALLER_TESTING.md` | 安装器审计修复、隔离测试与平台验证规范 |
 | `LINUX_ZSH_SETUP_GUIDE.md` | 从零开始的手动部署、跨平台配置与分步验收指南 |
 | `DEVELOPMENT.md` | 架构设计、加载生命周期、开发维护与跨平台工程规范 |
 | `ZSH_TROUBLESHOOTING.md` | 常见问题根因、排查命令与最终测试矩阵记录 |
@@ -253,6 +236,26 @@ bash install.sh --profile full --p10k-style lean --with-tmux
 | **`gst`** | OMZ Git 状态别名（等同于 `git status`） |
 | **`lg`** | 启动 lazygit Git 终端面板 |
 | **`lzd`** | 启动 lazydocker 容器终端面板 |
+| **`man <命令>`** | 打开彩色手册页（带语法高亮与 TokyoNight 样式配色） |
+
+---
+
+## 二次运行与增量部署机制（幂等性）
+
+当你第一次运行 `bash install.sh` 完成安装后，如果后续修改了项目（如调整了模板、更新了别名、新增了函数），并推送到 Git 远端后在各台机器执行 `git pull`，再次运行 `bash install.sh` **绝不会从头到尾重新下载或重装一遍**，而是具备完整的**幂等性（Idempotence）**：
+
+1. **软件与 CLI 工具（0 秒跳过）**：
+   - 核心系统包管理器（APT/DNF/Pacman/Brew）检测到软件包已是最新时，直接报告 `already installed`，不重复下载。
+   - 现代化 CLI 工具（`fzf`、`eza`、`bat`、`zoxide`、`yazi`、`fastfetch`、`nvim` 等）以及可选工具（`vfox`、`lazydocker`、`lazygit` 等），均由安装器前置检查 `command -v <tool>`，已存在时**立刻跳过**。
+2. **Git 仓库与插件（完整保留）**：
+   - Oh My Zsh、Powerlevel10k、各大插件及 TPM 目录若已存在且结构完整，安装器直接提示 `保留已有组件` 并立即返回，**绝不重新克隆**。
+3. **配置文件精准增量更新**：
+   - 自动为现有 `~/.zshrc` 生成带时间戳与 SHA-256 校验的快照备份（保存在 `~/.local/state/zsh-project/`）。
+   - 将项目中最新修改的 `templates/zshrc.zsh` 原子部署至 `~/.zshrc`，并刷新选项配置。
+   - 自动清理旧的编译字节码缓存（`~/.zshrc.zwc`），杜绝因旧缓存命中导致新配置不生效。
+
+> [!TIP]
+> **日常开发更新工作流**：在仓库修改并 `git push` → 目标机器 `git pull` → 运行 `bash install.sh`。全过程仅需 **2~5 秒** 即可将最新改动安全生效，既省时又可靠。
 
 ---
 

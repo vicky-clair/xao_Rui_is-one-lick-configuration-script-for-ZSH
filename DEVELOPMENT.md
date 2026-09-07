@@ -295,13 +295,50 @@ sequenceDiagram
 # 安装器生成；1 为启用，0 为关闭。
 ZSH_PROJECT_FULL=1
 ZSH_PROJECT_VFOX=0
-ZSH_PROJECT_LAZYDOCKER=0
-ZSH_PROJECT_LAZYGIT=0
+ZSH_PROJECT_LAZYDOCKER=1
+ZSH_PROJECT_LAZYGIT=1
 ZSH_PROJECT_TMUX=1
 ZSH_PROJECT_DIR="/home/user/.zsh-project"
+ZSH_PROJECT_LANG="zh"
 ZSH_PROJECT_AUTO_CHECK_UPDATE=1
 ZSH_PROJECT_CHECK_INTERVAL_DAYS=7
+ZSH_PROJECT_BANNER=1
+ZSH_PROJECT_FASTFETCH=1
+ZSH_PROJECT_TIMER=1
 ```
+
+### 5.3 增量部署与安装幂等性架构设计 (Idempotent Architecture)
+
+本项目安装器设计严格遵循**工业级 Shell 幂等性标准**。对于重复执行（例如修改项目并推送到 Git 远端，在服务器执行 `git pull` 后再次运行 `bash install.sh`），保证做到“已存在的免重装、未变动的免重复、修改过的精准热更新”：
+
+```mermaid
+flowchart TD
+    Start[运行 bash install.sh] --> Step1{依赖与工具检查}
+    Step1 -- command -v 命中 --> SkipTool["跳过工具安装/下载 (0ms)"]
+    Step1 -- 命令缺失 --> InstallTool[调用包管理器或拉取预编译 Release]
+    
+    SkipTool --> Step2{OMZ 与插件目录}
+    InstallTool --> Step2
+    Step2 -- 目录完整存在 --> SkipClone["保留已有组件 return (0ms)"]
+    Step2 -- 目录不存在 --> CloneRepo[git clone 浅克隆]
+    
+    SkipClone --> Step3["安全快照备份 (~/.local/state/zsh-project)"]
+    CloneRepo --> Step3
+    Step3 --> Step4["原子部署 templates/zshrc.zsh 至 ~/.zshrc"]
+    Step4 --> Step5["清理 ~/.zshrc.zwc 编译字节码缓存"]
+    Step5 --> Done[秒级完成，新功能即刻生效]
+```
+
+1. **第一层：包管理器与可选软件守卫**
+   - 基础系统软件交由操作系统包管理器管理，包管理器自带已安装检测。
+   - 可选工具安装入口 `optional_package` 第一行执行 `command -v "$cmd" >/dev/null 2>&1 && return 0`，命令存在即跳过。
+   - 官方独立预编译二进制下载前，严格判断 `! command -v <tool>`，杜绝重复向 GitHub 发起流量请求。
+2. **第二层：Git 仓库与插件守卫**
+   - 通过 `clone_missing()` 统一调度，目标目录存在且入口文件可读时，打印 `保留已有组件` 并直接 `return`，绝不重复拉取或覆盖。
+3. **第三层：配置文件原子增量部署**
+   - 部署前必须先建立带时间戳、manifest 及 SHA-256 校验的备份快照。
+   - 将最新修改的 `templates/zshrc.zsh` 安全拷贝到目标文件。
+   - 清理旧的编译字节码（`~/.zshrc.zwc`），确保 Zsh 进程在下次启动时重新解析最新代码，杜绝旧缓存命中。
 
 ---
 

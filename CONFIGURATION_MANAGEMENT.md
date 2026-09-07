@@ -42,7 +42,7 @@ bash install.sh --set auto-update=0
 | --- | --- | --- |
 | `full` | FZF、Yazi、eza、zoxide、Neovim 等完整工具集成 | 关闭 |
 | `vfox` | vfox 激活 | 关闭 |
-| `lazydocker` | lazydocker 别名 | 关闭 |
+| `lazydocker` | lazydocker 别名 | 开启（检测到命令时生效） |
 | `lazygit` | lazygit 别名与 Ctrl+G 快捷键 | 开启（检测到命令时生效） |
 | `tmux` | tmux 别名 | 关闭 |
 | `banner` | 启动横幅与成功信息；错误及更新提示仍显示 | 开启 |

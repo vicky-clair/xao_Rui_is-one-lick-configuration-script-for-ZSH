@@ -96,7 +96,7 @@ printf '#!/usr/bin/env bash\necho Darwin\n' > "$STAGE/bin/uname"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$STAGE/bin/fzf"
 for tool in brew sudo curl; do printf '#!/usr/bin/env bash\nexit 1\n' > "$STAGE/bin/$tool"; done
 chmod +x "$STAGE/bin/"*
-export PATH="$STAGE/bin:$PATH"
+case ${OSTYPE:-} in msys*|cygwin*) export PATH="$STAGE/bin:/usr/bin:/bin" ;; *) export PATH="$STAGE/bin:$PATH" ;; esac
 printf 'fzf\nlazydocker\n' > "$XDG_STATE_HOME/zsh-project/failed-components"
 cp "$HOME/.zshrc" "$STAGE/pre-retry"
 manage --retry-failed fzf --yes

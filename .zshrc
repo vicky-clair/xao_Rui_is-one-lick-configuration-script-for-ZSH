@@ -357,6 +357,18 @@ fi
 
 alias grep="grep --color=auto"
 
+if command -v man &>/dev/null; then
+  export LESS_TERMCAP_mb=$'\e[1;31m'      # 闪烁
+  export LESS_TERMCAP_md=$'\e[1;38;5;74m' # 标题/粗体
+  export LESS_TERMCAP_me=$'\e[0m'         # 恢复
+  export LESS_TERMCAP_so=$'\e[1;44;33m'   # 状态栏/提示
+  export LESS_TERMCAP_se=$'\e[0m'         # 恢复
+  export LESS_TERMCAP_us=$'\e[1;32m'      # 下划线/参数
+  export LESS_TERMCAP_ue=$'\e[0m'         # 恢复
+  export GROFF_NO_SGR=1                   # groff 颜色兼容
+  _zsh_msg "%F{green}✓%f %F{cyan}man%f 彩色手册已启用 (命令: %F{yellow}man%f)" "%F{green}✓%f %F{cyan}man%f colored man pages enabled (cmd: %F{yellow}man%f)"
+fi
+
 if command -v zoxide &>/dev/null; then
   eval "$(zoxide init zsh)"
   _zsh_msg "%F{green}✓%f %F{cyan}zoxide%f 智能跳转已启用 (命令: %F{yellow}z%f)" "%F{green}✓%f %F{cyan}zoxide%f smart cd enabled (cmd: %F{yellow}z%f)"

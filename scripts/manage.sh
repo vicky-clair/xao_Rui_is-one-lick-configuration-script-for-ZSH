@@ -169,7 +169,7 @@ case "$ACTION" in
     echo '可选项（0=关闭，1=开启；不安装/卸载软件）：'
     for name in full vfox lazydocker lazygit tmux banner fastfetch timer auto-update; do
       key=$(option_key "$name"); default=0
-      case "$name" in banner|fastfetch|timer|auto-update|lazygit) default=1 ;; esac
+      case "$name" in banner|fastfetch|timer|auto-update|lazygit|lazydocker) default=1 ;; esac
       printf '  %s=%s\n' "$name" "$(get_option "$key" "$default")"
     done
     read -r -p '输入一项设置，如 banner=0；直接回车取消：' choice

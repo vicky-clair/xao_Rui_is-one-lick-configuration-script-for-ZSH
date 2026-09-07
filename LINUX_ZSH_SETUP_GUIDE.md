@@ -484,7 +484,8 @@ print -r -- "共享=${options[sharehistory]} 增量=${options[incappendhistory]}
 | Git | `gst` | 实际调用 Git，非仓库提示可接受 |
 | vfox | `vfox --version`、`vfox list` | 正常返回 |
 | lazydocker | `lazydocker --version`、`lzd` | 版本正常、可连接 Docker |
-| 手册 | `man ls`，按 q 退出 | 正常打开 |
+| lazygit | `lazygit --version`、`lg`、`Ctrl+G` | 版本正常，能唤出 Git 终端面板 |
+| 手册 | `man ls`，按 q 退出 | 正常打开，标题、下划线带终端主题彩色高亮 |
 | Fastfetch | 查看启动展示 | 正常显示，无配置文件错误 |
 
 ### 第四轮：共享历史
@@ -538,6 +539,7 @@ chsh -s "$(command -v zsh)"
 - **自动更新检测机制**：本项目内置非阻塞后台轮询（默认每 7 天检测一次），若发现 OMZ、Powerlevel10k、插件或系统工具有新版本，会在新打开的终端顶部给出高亮提醒。
 - **一键交互更新**：在终端直接运行 `zsh-update` 或 `bash install.sh --update`，确认后安全拉取并重新校验配置语法。
 - **手动检查更新**：随时在终端运行 `zsh-check-updates` 或 `bash install.sh --check-updates` 查看详细对比。
+- **项目二次更新与 Git 拉取同步工作流**：若在仓库中修改了配置模板并推送，在目标机 `git pull` 后只需再次运行 `bash install.sh`。安装器具备完全的幂等性（已有软件和插件全部秒级跳过，绝不重复下载重装），只会原子更新改动过的配置模板，自动安全备份并清理旧字节码缓存，仅需 2~5 秒即可完成同步。
 - 更新后新开会话测试，而不是反复 `source ~/.zshrc` 堆叠初始化。
 - 记录版本、现象和改动内容，避免只保留一张启动截图。
 

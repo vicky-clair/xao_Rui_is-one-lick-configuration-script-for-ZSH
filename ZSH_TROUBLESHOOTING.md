@@ -408,6 +408,64 @@ echo "退出码=$?"
 4. **客户端推荐**：
    在 Windows 上推荐使用微软官方开源的 **Windows Terminal**，原生支持完美 PTY 握手、RGB 真彩色与 Nerd Fonts 图标。
 
+## 16. lazydocker (lzd) 与 y (yazi) 启动提醒与功能缺失排查
+
+### 现象
+终端启动横幅中缺少 `✓ lazydocker 管理工具已启用 (命令: lzd)`，且输入 `lzd` 提示 `command not found`；或者 Yazi 的快捷命令 `y` 不可用。
+
+### 根因剖析
+1. **选项默认值不一致**：在引入 `~/.zsh-project-options` 配置管理后，`lazygit` 的未配置默认值为 `1`（`${ZSH_PROJECT_LAZYGIT:-1}`），只要检测到命令即生效；而 `lazydocker` 的未配置默认值被设为了 `0`（`${ZSH_PROJECT_LAZYDOCKER:-0}`）。未在选项文件中显式写明 `ZSH_PROJECT_LAZYDOCKER=1` 时，别名与提示会被静默跳过。
+2. **安装器未自动继承已有工具**：当系统中已有 lazydocker 时，重新运行 `install.sh` 若用户在安装提示处选 `n`（跳过安装），安装器将 `WITH_LAZYDOCKER=0` 写入了选项文件，导致误关停已有工具。
+3. **Yazi `y` 命令依赖 `full` 档案**：Yazi 的快捷包装函数 `y()` 处于 `[[ ${ZSH_PROJECT_FULL:-0} == 1 ]]` 门禁中，在 `basic` 档案或未开启 `full=1` 时不生效。
+
+### 修复与恢复方案
+- **本地终端即时恢复**：
+  ```bash
+  bash install.sh --set lazydocker=1
+  bash install.sh --set full=1
+  source ~/.zshrc
+  ```
+- **项目长效补丁**：
+  1. 将 `templates/zshrc.zsh` 中 `lazydocker` 默认判断对齐为 `${ZSH_PROJECT_LAZYDOCKER:-1}`。
+  2. 在 `install.sh` 交互提示前检测本地 `command -v`，已有工具自动置为 `1`，杜绝覆盖。
+  3. 在 `scripts/manage.sh` 的 `--configure` 菜单中将 `lazydocker` 加入默认开启列表。
+
+---
+
+## 17. man 彩色手册页增强与终端提醒集成
+
+### 需求与背景
+用户希望将 `man`（系统手册查阅）功能像 `eza`、`lazydocker`、`zoxide` 等工具一样，清晰地在终端启动横幅中展示出来，并保证各平台手册阅读时具备清晰高雅的语法高亮。
+
+### 实现方案
+1. 在 `templates/zshrc.zsh` 与 `.zshrc` 中导出标准的 `LESS_TERMCAP_*` 终端高亮变量及 `GROFF_NO_SGR=1`，无论是否加载 Oh My Zsh 插件，`less` 和 `man` 均原生呈现 TokyoNight 配色风格高亮。
+2. 在启动横幅加入统一风格的双语提示：
+   ```zsh
+   _zsh_startup_msg "%F{green}✓%f %F{cyan}man%f 彩色手册已启用 (命令: %F{yellow}man%f)" "%F{green}✓%f %F{cyan}man%f colored man pages enabled (cmd: %F{yellow}man%f)"
+   ```
+3. 受 `banner=0` 集中静音管理，无任何外部额外依赖，零性能损耗。
+
+---
+
+## 18. 项目二次运行与 Git 拉取后的安装机制答疑（幂等性保证）
+
+### 用户疑问
+> 第一次运行 `bash install.sh` 安装配置完成后，如果之后修改了项目并上传 Git，拉取后再次运行 `bash install.sh`，是彻底从头到尾安装一遍，还是会跳过已安装好的部分、只安装修改过的内容？
+
+### 结论与机制
+再次运行 `bash install.sh` **绝不会从头到尾重装**，而是具备完整的**幂等性（Idempotence）**，全过程仅需 2~5 秒：
+1. **系统与 CLI 依赖 0 秒跳过**：
+   - 包管理器在依赖已是最新时直接跳过；
+   - `optional_package` 及独立下载均有 `command -v <tool>` 前置守卫，已安装即跳过。
+2. **Git 插件与主题完整保留**：
+   - `clone_missing()` 遇到已有完整目录直接提示 `保留已有组件` 并立即返回，绝不重新 clone。
+3. **配置文件精准热替换**：
+   - 自动在 `~/.local/state/zsh-project/` 创建带时间戳和 SHA-256 校验的快照备份；
+   - 将最新修改的 `templates/zshrc.zsh` 部署到 `~/.zshrc`；
+   - 自动清理旧的 `~/.zshrc.zwc` 编译字节码缓存，保证改动即刻生效。
+
+---
+
 ## 后续注意事项
 
 - Windows 项目文件与 Debian 家目录配置是两份文件；本地修改不会自动同步到服务器。

@@ -466,6 +466,49 @@ echo "退出码=$?"
 
 ---
 
+## 19. `bash install.sh --update` 提示『更新检测未完整完成，保留缓存，本次不自动升级』排查与处理
+
+### 现象
+在目标机器执行 `git pull` 后运行 `bash install.sh --update`，终端提示：
+```text
+ℹ 正在检测已安装插件与工具的更新状态...
+部分检测失败，保留原缓存，请稍后重试。
+错误: 更新检测未完整完成，保留缓存，本次不自动升级。
+```
+
+### 根因剖析
+1. **职责定位差异**：
+   - `install.sh --update` 的设计定位是**在线检测并更新第三方插件与软件包**（如 Oh My Zsh、Powerlevel10k、fzf、tmux 插件及 APT/Homebrew 软件包），**并不负责重新部署项目仓库内的 `.zshrc`**。
+   - 要让 Git 拉取到的最新 `.zshrc` 生效，直接复制 `.zshrc` 到家目录或重新运行 `bash install.sh` 即可。
+2. **严格的单项网络超时机制**：
+   - 更新检测脚本 `scripts/check_updates.sh` 默认单项网络检查超时仅为 5 秒（`TIMEOUT_SEC=5`）。
+   - 在网络波动、连接 GitHub 延迟较高或 Linux `apt list` 扫描耗时较长时，单项超时会标记 `CHECK_FAILED=1`。为了避免把“网络检测失败”误报为“无更新”，脚本会保留旧缓存并返回非零退出码阻止自动升级。
+
+### 正确处理方案
+
+#### 场景 A：仅需生效拉取到的 `.zshrc` 最新配置（推荐）
+直接将工作区的 `.zshrc` 覆盖至用户家目录，并重新加载即可，无需执行 `--update`：
+```bash
+cp .zshrc ~/.zshrc
+source ~/.zshrc
+```
+或者运行安装器执行增量幂等部署：
+```bash
+bash install.sh
+```
+
+#### 场景 B：确实需要升级已安装的第三方工具与 Git 插件
+通过放宽超时参数手动运行更新检测，确认网络通畅并生成有效缓存后，再执行升级：
+```bash
+# 1. 显式指定 15 秒超时进行检测并排查具体耗时组件
+bash scripts/check_updates.sh -t 15
+
+# 2. 检测完成后执行批量更新
+bash install.sh --update
+```
+
+---
+
 ## 后续注意事项
 
 - Windows 项目文件与 Debian 家目录配置是两份文件；本地修改不会自动同步到服务器。
@@ -473,3 +516,4 @@ echo "退出码=$?"
 - 当前计时器通过 `zmodload zsh/datetime` 和一次性 `precmd` 函数计时；已彻底解决跨平台 BSD date 兼容性问题。
 - 工具状态提示不能替代各工具功能测试。已测范围以本文测试矩阵为准，不等于验证所有工具的全部能力。
 - 未修改 Windows Terminal 字体、Debian 系统设置、Fastfetch 配置或 vfox 配置。
+

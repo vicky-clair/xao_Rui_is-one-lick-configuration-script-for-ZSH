@@ -255,7 +255,9 @@ bash install.sh --profile full --p10k-style lean --with-tmux
    - 自动清理旧的编译字节码缓存（`~/.zshrc.zwc`），杜绝因旧缓存命中导致新配置不生效。
 
 > [!TIP]
-> **日常开发更新工作流**：在仓库修改并 `git push` → 目标机器 `git pull` → 运行 `bash install.sh`。全过程仅需 **2~5 秒** 即可将最新改动安全生效，既省时又可靠。
+> **日常更新工作流区分**：
+> 1. **同步项目配置修改**：在仓库修改并 `git push` → 目标机器 `git pull` → 运行 `bash install.sh`（或直接 `cp .zshrc ~/.zshrc && source ~/.zshrc`）。全过程仅需 **2~5 秒** 即可将最新改动安全生效，绝不重复下载或重装工具。
+> 2. **升级第三方插件与系统工具**：运行 `bash install.sh --update`（或终端运行 `zsh-update`），专门用于在线升级 Oh My Zsh、Powerlevel10k 及 CLI 软件包。
 
 ---
 

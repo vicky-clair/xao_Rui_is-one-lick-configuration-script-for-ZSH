@@ -1,7 +1,22 @@
 # Linux / macOS / Debian / Zsh 5.9 交互配置。修改后先运行 zsh -n ~/.zshrc，再重新启动 Zsh。
 # 本文件不安装工具；工具缺失时通常跳过对应集成。详细说明见 README.md。
+[[ -o interactive ]] || return
+
+# 性能诊断仅在显式命令中启用，日常启动不输出性能明细。
+if [[ ${ZSH_PROJECT_PROFILING:-0} == 1 ]]; then
+  zmodload zsh/datetime
+  typeset -F _zsh_profile_last=$EPOCHREALTIME
+  function _zsh_profile_mark() {
+    local -i elapsed
+    elapsed=$(( (EPOCHREALTIME - _zsh_profile_last) * 1000 ))
+    print -r -- "[PROFILE] $1: ${elapsed}ms"
+    _zsh_profile_last=$EPOCHREALTIME
+  }
+fi
+typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
 
 [[ -r "$HOME/.zsh-project-options" ]] && source "$HOME/.zsh-project-options"
+[[ ${ZSH_PROJECT_PROFILING:-0} != 1 ]] || ZSH_PROJECT_AUTO_CHECK_UPDATE=0
 
 # ------------------------------------------------------------------------------
 # 字符编码与语言环境保障（确保 UTF-8，彻底杜绝 Neovim、Tmux 与终端符号乱码）
@@ -27,6 +42,11 @@ _zsh_msg() {
   else
     print -P "$1"
   fi
+}
+
+_zsh_startup_msg() {
+  [[ ${ZSH_PROJECT_BANNER:-1} == 1 ]] || return 0
+  _zsh_msg "$@"
 }
 
 # ========================================
@@ -167,11 +187,10 @@ unset _zsh_theme_file
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
 
 # ========================================
-# ========================================
 # 09. 启动信息横幅
 # ========================================
 if [[ -o interactive ]]; then
-  _zsh_msg "\n%F{blue}========================================%f\n%F{blue}🔧 正在加载常用工具...%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{blue}🔧 Loading tools...%f\n%F{blue}========================================%f\n"
+  _zsh_startup_msg "\n%F{blue}========================================%f\n%F{blue}🔧 正在加载常用工具...%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{blue}🔧 Loading tools...%f\n%F{blue}========================================%f\n"
 fi
 
 # ========================================
@@ -192,7 +211,7 @@ if command -v vfox &>/dev/null; then
       # 保留启动环境，移除可能引起目录切换耗时的自动钩子
       chpwd_functions=("${(@)chpwd_functions:#_vfox_hook}")
       precmd_functions=("${(@)precmd_functions:#_vfox_hook}")
-      _zsh_msg "%F{green}✓%f %F{cyan}vfox%f 已加载 (版本管理)" "%F{green}✓%f %F{cyan}vfox%f loaded (version manager)"
+      _zsh_startup_msg "%F{green}✓%f %F{cyan}vfox%f 已加载 (版本管理)" "%F{green}✓%f %F{cyan}vfox%f loaded (version manager)"
     else
       _zsh_msg "%F{yellow}⚠ vfox 初始化脚本执行失败%f" "%F{yellow}⚠ vfox init script execution failed%f"
     fi
@@ -214,7 +233,7 @@ if command -v yazi &>/dev/null; then
     fi
     rm -f -- "$tmp"
   }
-  _zsh_msg "%F{green}✓%f %F{cyan}yazi%f 文件管理器已集成 (命令: %F{yellow}y%f)" "%F{green}✓%f %F{cyan}yazi%f file manager integrated (cmd: %F{yellow}y%f)"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}yazi%f 文件管理器已集成 (命令: %F{yellow}y%f)" "%F{green}✓%f %F{cyan}yazi%f file manager integrated (cmd: %F{yellow}y%f)"
 fi
 
 # ========================================
@@ -225,58 +244,58 @@ if command -v fzf &>/dev/null; then
     export FZF_DEFAULT_COMMAND='fd --hidden --strip-cwd-prefix --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     export FZF_ALT_C_COMMAND='fd --type=d --hidden --strip-cwd-prefix --exclude .git'
-    _zsh_msg "%F{green}✓%f %F{cyan}fd%f 已集成到 FZF" "%F{green}✓%f %F{cyan}fd%f integrated into FZF"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fd%f 已集成到 FZF" "%F{green}✓%f %F{cyan}fd%f integrated into FZF"
   elif command -v fdfind &>/dev/null; then
     export FZF_DEFAULT_COMMAND='fdfind --hidden --strip-cwd-prefix --exclude .git'
     export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
     export FZF_ALT_C_COMMAND='fdfind --type=d --hidden --strip-cwd-prefix --exclude .git'
-    _zsh_msg "%F{green}✓%f %F{cyan}fdfind%f 已集成到 FZF" "%F{green}✓%f %F{cyan}fdfind%f integrated into FZF"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fdfind%f 已集成到 FZF" "%F{green}✓%f %F{cyan}fdfind%f integrated into FZF"
   fi
 
   if command -v bat &>/dev/null && command -v eza &>/dev/null; then
     show_file_or_dir_preview='if [ -d {} ]; then eza --tree --color=always {} | head -200; else bat -n --color=always --line-range :500 {}; fi'
     export FZF_CTRL_T_OPTS="--preview '$show_file_or_dir_preview'"
     export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
-    _zsh_msg "%F{green}✓%f %F{cyan}bat%f + %F{cyan}eza%f 预览集成完成" "%F{green}✓%f %F{cyan}bat%f + %F{cyan}eza%f preview integrated"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}bat%f + %F{cyan}eza%f 预览集成完成" "%F{green}✓%f %F{cyan}bat%f + %F{cyan}eza%f preview integrated"
   elif command -v batcat &>/dev/null && command -v eza &>/dev/null; then
     show_file_or_dir_preview='if [ -d {} ]; then eza --tree --color=always {} | head -200; else batcat -n --color=always --line-range :500 {}; fi'
     export FZF_CTRL_T_OPTS="--preview '$show_file_or_dir_preview'"
     export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
-    _zsh_msg "%F{green}✓%f %F{cyan}batcat%f + %F{cyan}eza%f 预览集成完成" "%F{green}✓%f %F{cyan}batcat%f + %F{cyan}eza%f preview integrated"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}batcat%f + %F{cyan}eza%f 预览集成完成" "%F{green}✓%f %F{cyan}batcat%f + %F{cyan}eza%f preview integrated"
   elif command -v bat &>/dev/null; then
     export FZF_CTRL_T_OPTS="--preview 'bat -n --color=always --line-range :500 {}'"
-    _zsh_msg "%F{green}✓%f %F{cyan}bat%f 预览集成完成" "%F{green}✓%f %F{cyan}bat%f preview integrated"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}bat%f 预览集成完成" "%F{green}✓%f %F{cyan}bat%f preview integrated"
   elif command -v batcat &>/dev/null; then
     export FZF_CTRL_T_OPTS="--preview 'batcat -n --color=always --line-range :500 {}'"
-    _zsh_msg "%F{green}✓%f %F{cyan}batcat%f 预览集成完成" "%F{green}✓%f %F{cyan}batcat%f preview integrated"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}batcat%f 预览集成完成" "%F{green}✓%f %F{cyan}batcat%f preview integrated"
   elif command -v eza &>/dev/null; then
     export FZF_CTRL_T_OPTS="--preview 'eza --tree --color=always {} | head -200'"
     export FZF_ALT_C_OPTS="--preview 'eza --tree --color=always {} | head -200'"
-    _zsh_msg "%F{green}✓%f %F{cyan}eza%f 目录预览集成完成" "%F{green}✓%f %F{cyan}eza%f directory preview integrated"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}eza%f 目录预览集成完成" "%F{green}✓%f %F{cyan}eza%f directory preview integrated"
   fi
 
   if _zsh_fzf_init=$(fzf --zsh 2>/dev/null); then
     eval "$_zsh_fzf_init"
-    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
     source /usr/share/doc/fzf/examples/key-bindings.zsh
     [[ -f /usr/share/doc/fzf/examples/completion.zsh ]] && source /usr/share/doc/fzf/examples/completion.zsh
-    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via system script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via system script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f /usr/share/fzf/key-bindings.zsh ]]; then
     source /usr/share/fzf/key-bindings.zsh
     [[ -f /usr/share/fzf/completion.zsh ]] && source /usr/share/fzf/completion.zsh
-    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via system script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过系统脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via system script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/key-bindings.zsh" ]]; then
     source "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/key-bindings.zsh"
     [[ -f "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/completion.zsh" ]] && source "${HOMEBREW_PREFIX:-/opt/homebrew}/opt/fzf/shell/completion.zsh"
-    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过 Homebrew 脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via Homebrew script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过 Homebrew 脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via Homebrew script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f "/usr/local/opt/fzf/shell/key-bindings.zsh" ]]; then
     source "/usr/local/opt/fzf/shell/key-bindings.zsh"
     [[ -f "/usr/local/opt/fzf/shell/completion.zsh" ]] && source "/usr/local/opt/fzf/shell/completion.zsh"
-    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过 Homebrew 脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via Homebrew script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过 Homebrew 脚本加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via Homebrew script (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f "$HOME/.fzf.zsh" ]]; then
     source "$HOME/.fzf.zsh"
-    _zsh_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过用户配置加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via user config (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已通过用户配置加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded via user config (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   else
     _zsh_msg "%F{yellow}⚠ FZF 版本过低不支持 --zsh，请运行 bash install.sh 升级 FZF%f" "%F{yellow}⚠ FZF version too old, please run bash install.sh to upgrade FZF%f"
   fi
@@ -318,19 +337,19 @@ elif command -v clip.exe &>/dev/null; then
   alias clipcopy="clip.exe"
 fi
 
-if command -v eza &>/dev/null; then
+if [[ ${ZSH_PROJECT_EZA:-1} == 1 ]] && command -v eza &>/dev/null; then
   alias ls="eza --icons=always"
   alias ll="eza -lh --icons=always"
   alias la="eza -lah --icons=always"
-  _zsh_msg "%F{green}✓%f %F{cyan}eza%f 现代化 ls 已启用 (别名: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)" "%F{green}✓%f %F{cyan}eza%f modern ls enabled (aliases: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}eza%f 现代化 ls 已启用 (别名: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)" "%F{green}✓%f %F{cyan}eza%f modern ls enabled (aliases: %F{yellow}ls%f, %F{yellow}ll%f, %F{yellow}la%f)"
 fi
 
-if command -v lazydocker &>/dev/null; then
+if [[ ${ZSH_PROJECT_LAZYDOCKER:-1} == 1 ]] && command -v lazydocker &>/dev/null; then
   alias lzd="lazydocker"
-  _zsh_msg "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)" "%F{green}✓%f %F{cyan}lazydocker%f tool enabled (cmd: %F{yellow}lzd%f)"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}lazydocker%f 管理工具已启用 (命令: %F{yellow}lzd%f)" "%F{green}✓%f %F{cyan}lazydocker%f tool enabled (cmd: %F{yellow}lzd%f)"
 fi
 
-if command -v lazygit &>/dev/null; then
+if [[ ${ZSH_PROJECT_LAZYGIT:-1} == 1 ]] && command -v lazygit &>/dev/null; then
   alias lg="lazygit"
   function lazygit-widget() {
     zle && zle -I
@@ -341,7 +360,7 @@ if command -v lazygit &>/dev/null; then
   bindkey '^G' lazygit-widget
   bindkey -M emacs '^G' lazygit-widget 2>/dev/null || true
   bindkey -M viins '^G' lazygit-widget 2>/dev/null || true
-  _zsh_msg "%F{green}✓%f %F{cyan}lazygit%f Git 终端管理已启用 (命令: %F{yellow}lg%f, 快捷键: %F{yellow}Ctrl+G%f)" "%F{green}✓%f %F{cyan}lazygit%f Git TUI enabled (cmd: %F{yellow}lg%f, shortcut: %F{yellow}Ctrl+G%f)"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}lazygit%f Git 终端管理已启用 (命令: %F{yellow}lg%f, 快捷键: %F{yellow}Ctrl+G%f)" "%F{green}✓%f %F{cyan}lazygit%f Git TUI enabled (cmd: %F{yellow}lg%f, shortcut: %F{yellow}Ctrl+G%f)"
 fi
 
 if command -v tmux &>/dev/null; then
@@ -352,7 +371,7 @@ if command -v tmux &>/dev/null; then
 fi
 
 if command -v nvim &>/dev/null; then
-  _zsh_msg "%F{green}✓%f %F{cyan}neovim%f 已设置为默认编辑器" "%F{green}✓%f %F{cyan}neovim%f set as default editor"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}neovim%f 已设置为默认编辑器" "%F{green}✓%f %F{cyan}neovim%f set as default editor"
 fi
 
 alias grep="grep --color=auto"
@@ -366,19 +385,19 @@ if command -v man &>/dev/null; then
   export LESS_TERMCAP_us=$'\e[1;32m'      # 下划线/参数
   export LESS_TERMCAP_ue=$'\e[0m'         # 恢复
   export GROFF_NO_SGR=1                   # groff 颜色兼容
-  _zsh_msg "%F{green}✓%f %F{cyan}man%f 彩色手册已启用 (命令: %F{yellow}man%f)" "%F{green}✓%f %F{cyan}man%f colored man pages enabled (cmd: %F{yellow}man%f)"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}man%f 彩色手册已启用 (命令: %F{yellow}man%f)" "%F{green}✓%f %F{cyan}man%f colored man pages enabled (cmd: %F{yellow}man%f)"
 fi
 
-if command -v zoxide &>/dev/null; then
+if [[ ${ZSH_PROJECT_ZOXIDE:-1} == 1 ]] && command -v zoxide &>/dev/null; then
   eval "$(zoxide init zsh)"
-  _zsh_msg "%F{green}✓%f %F{cyan}zoxide%f 智能跳转已启用 (命令: %F{yellow}z%f)" "%F{green}✓%f %F{cyan}zoxide%f smart cd enabled (cmd: %F{yellow}z%f)"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}zoxide%f 智能跳转已启用 (命令: %F{yellow}z%f)" "%F{green}✓%f %F{cyan}zoxide%f smart cd enabled (cmd: %F{yellow}z%f)"
 fi
 
 # ========================================
 # 15. 自动显示系统信息
 # ========================================
-if command -v fastfetch &>/dev/null; then
-  _zsh_msg "%F{green}✓%f %F{cyan}fastfetch%f 系统信息工具已启动\n" "%F{green}✓%f %F{cyan}fastfetch%f system info tool started\n"
+if [[ ${ZSH_PROJECT_FASTFETCH:-1} == 1 ]] && command -v fastfetch &>/dev/null; then
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}fastfetch%f 系统信息工具已启动\n" "%F{green}✓%f %F{cyan}fastfetch%f system info tool started\n"
   if [[ -r "$HOME/.config/fastfetch/config.jsonc" ]]; then
     fastfetch -c "$HOME/.config/fastfetch/config.jsonc"
   else
@@ -420,8 +439,20 @@ if [[ ${ZSH_PROJECT_AUTO_CHECK_UPDATE:-1} == 1 && -f "$_zsh_check_script" ]]; th
   unset _now _last _interval_days _interval_sec
 fi
 
+function _zsh_project_check_script() {
+  local script="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/scripts/check_updates.sh"
+  if [[ -f "$script" ]]; then
+    print -r -- "$script"
+  elif [[ -n ${ZSH_PROJECT_DIR:-} && -f "$ZSH_PROJECT_DIR/scripts/check_updates.sh" ]]; then
+    print -r -- "$ZSH_PROJECT_DIR/scripts/check_updates.sh"
+  else
+    return 1
+  fi
+}
+
 function zsh-update() {
   local installer=""
+  local check_script=""
   if [[ -n "${ZSH_PROJECT_DIR:-}" && -f "$ZSH_PROJECT_DIR/install.sh" ]]; then
     installer="$ZSH_PROJECT_DIR/install.sh"
   elif [[ -f "$HOME/.zsh-project/install.sh" ]]; then
@@ -429,16 +460,17 @@ function zsh-update() {
   fi
   if [[ -n "$installer" ]]; then
     bash "$installer" --update --lang "${ZSH_PROJECT_LANG:-zh}"
-  elif [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
+  elif check_script=$(_zsh_project_check_script); then
+    bash "$check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
     _zsh_msg "%F{red}未找到安装器或更新脚本。%f" "%F{red}Installer or update script not found.%f"
   fi
 }
 
 function zsh-check-updates() {
-  if [[ -f "$_zsh_check_script" ]]; then
-    bash "$_zsh_check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
+  local check_script=""
+  if check_script=$(_zsh_project_check_script); then
+    bash "$check_script" --lang "${ZSH_PROJECT_LANG:-zh}"
   else
     _zsh_msg "%F{red}未找到更新检测脚本。%f" "%F{red}Update check script not found.%f"
   fi
@@ -451,19 +483,39 @@ unset _zsh_project_state_dir _zsh_updates_file _zsh_last_check_file _zsh_check_s
 # ========================================
 if [[ -o interactive ]]; then
   local _elapsed_str_zh="" _elapsed_str_en=""
-  if [[ -n "${ZSH_START_TIME:-}" ]] && zmodload zsh/datetime 2>/dev/null; then
+  if [[ ${ZSH_PROJECT_TIMER:-1} == 1 && -n "${ZSH_START_TIME:-}" ]] && zmodload zsh/datetime 2>/dev/null; then
     # 整数变量直接截取毫秒值，不依赖额外数学函数模块中的 int()。
     local -i _elapsed
     _elapsed=$(( (EPOCHREALTIME - ZSH_START_TIME) * 1000 ))
     _elapsed_str_zh=" %F{green}(用时 %F{yellow}${_elapsed}ms%F{green})%f"
     _elapsed_str_en=" %F{green}(took %F{yellow}${_elapsed}ms%F{green})%f"
   fi
-  _zsh_msg "\n%F{blue}========================================%f\n%F{green}✅ ZSH 环境加载完成！${_elapsed_str_zh}%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{green}✅ ZSH environment loaded successfully!${_elapsed_str_en}%f\n%F{blue}========================================%f\n"
+  _zsh_startup_msg "\n%F{blue}========================================%f\n%F{green}✅ ZSH 环境加载完成！${_elapsed_str_zh}%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{green}✅ ZSH environment loaded successfully!${_elapsed_str_en}%f\n%F{blue}========================================%f\n"
 fi
 
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
 
+# 独立用户扩展：安装和升级不覆盖此文件；按键及别名必须在高亮之前定义。
+[[ -r "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+
+function zsh-config() {
+  local manager="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/scripts/manage.sh"
+  [[ -r "$manager" ]] || manager="${ZSH_PROJECT_DIR:-}/scripts/manage.sh"
+  if [[ -r "$manager" ]]; then
+    if (( $# )); then bash "$manager" "$@"; else bash "$manager" --configure; fi
+  else
+    print -u2 -- '未找到配置管理器，请从项目执行 bash install.sh --configure'
+    return 1
+  fi
+}
+
 # 18. 语法高亮：只加载一次，放在所有工具和按键绑定之后。
 if [[ -r "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ]]; then
   source "$ZSH_CUSTOM/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
+fi
+
+if [[ ${ZSH_PROJECT_PROFILING:-0} == 1 ]]; then
+  _zsh_profile_mark '历史、用户扩展与高亮'
+  unfunction _zsh_profile_mark
+  unset _zsh_profile_last
 fi

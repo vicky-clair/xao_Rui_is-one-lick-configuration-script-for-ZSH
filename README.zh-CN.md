@@ -1,6 +1,6 @@
 # Linux 与 macOS Zsh 配置与更新管理器
 
-[English](README.md) · **简体中文**
+[English](README.md) · **简体中文** · [日本語](README.ja.md)
 
 为个人终端配置 Oh My Zsh、Powerlevel10k、补全、自动建议和语法高亮，并提供可选工具安装、配置开关、更新检测、停用恢复与备份管理。
 

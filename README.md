@@ -10,7 +10,7 @@ Oh My Zsh · Powerlevel10k · Smart completions · Optional CLI tools
 ![Target platforms: Linux and macOS](https://img.shields.io/badge/target-Linux%20%7C%20macOS-89b4fa?style=flat-square)
 ![Shell: Zsh](https://img.shields.io/badge/shell-Zsh-cba6f7?style=flat-square)
 
-**English** · [简体中文](README.zh-CN.md)
+**English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md)
 
 [Preview](#preview) · [Quick start](#quick-start) · [Everyday commands](#everyday-commands) · [Documentation](#documentation)
 
@@ -286,5 +286,5 @@ The detailed guides below are currently written in Chinese. This README describe
 ---
 
 <p align="center">
-  <a href="#zsh-configuration-manager">Back to top</a> · <a href="README.zh-CN.md">简体中文文档</a>
+  <a href="#zsh-configuration-manager">Back to top</a> · <a href="README.zh-CN.md">简体中文文档</a> · <a href="README.ja.md">日本語ドキュメント</a>
 </p>

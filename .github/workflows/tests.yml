@@ -1,3 +1,4 @@
+# 在多种 Linux 容器中运行隔离回归，覆盖安装器与配置管理流程。
 name: Shell regression
 on:
   push:
@@ -9,11 +10,13 @@ jobs:
   linux:
     runs-on: ubuntu-latest
     strategy:
+      # 单个平台失败后仍继续其余平台，便于发现发行版兼容差异。
       fail-fast: false
       matrix:
         image: ["debian:12", "debian:13", "ubuntu:24.04", "fedora:latest", "archlinux:latest"]
     container: ${{ matrix.image }}
     steps:
+      # 依赖只安装在本次任务的容器内，回归脚本中的下载与系统修改使用替身。
       - name: Install test prerequisites in disposable container
         shell: bash
         run: |

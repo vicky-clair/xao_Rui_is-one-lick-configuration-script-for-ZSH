@@ -1,539 +1,163 @@
-# Zsh 跨平台一键配置项目开发与架构设计文档
-
-配置管理扩展：`install.sh` 将独立管理参数转发到 `scripts/manage.sh`，失败组件重试由 `scripts/retry_tools.sh` 执行。安装时复制两个脚本到状态目录供 `zsh-config` 调用。用户操作、状态文件语义和限制见 [配置管理指南](CONFIGURATION_MANAGEMENT.md)；修改管理行为时运行 `scripts/test_management.sh`，修改模板时同时运行 `scripts/test_installer.sh`。Linux 容器测试矩阵位于 `.github/workflows/tests.yml`。
-
-更新日期：2026-09-06  
-适用范围：Linux（Debian / Ubuntu / Fedora / Arch / openSUSE）与 macOS（Darwin / Apple Silicon & Intel Mac）
-
----
-
-## 目录
-
-- [一、项目设计目标与技术选型](#一项目设计目标与技术选型)
-- [二、系统整体架构与分层设计](#二系统整体架构与分层设计)
-- [三、Zsh 加载生命周期与配置规范](#三zsh-加载生命周期与配置规范)
-- [四、跨平台兼容性工程规范 (Linux 与 macOS)](#四跨平台兼容性工程规范-linux-与-macos)
-- [五、安装器 `install.sh` 架构与实现细节](#五安装器-installsh-架构与实现细节)
-- [六、版本自动检测与更新系统设计](#六版本自动检测与更新系统设计)
-- [七、数据持久化、备份与回滚机制](#七数据持久化备份与回滚机制)
-- [八、本地测试、Mock 与调试规范](#八本地测试mock-与调试规范)
-- [九、代码风格、安全与维护约定](#九代码风格安全与维护约定)
-
----
-
-## 一、项目设计目标与技术选型
-
-### 1.1 核心设计目标
-
-1. **开箱即用，全自动化**：为不同架构（`x86_64`、`aarch64`、`arm64`）和不同操作系统（Debian/Ubuntu/Fedora/Arch 及 macOS）提供无缝的安装与交互体验。
-2. **极速与零阻塞**：
-   - 优先减少启动开销；耗时需在目标机器测量，不保证固定时间范围；
-   - 坚决杜绝在交互式终端前台启动过程中发起同步网络请求；
-   - 即使在弱网或完全离线环境下，终端打开亦不受任何影响。
-3. **安全与确定性**：
-   - 受管配置保留备份与 SHA-256 校验；软件包、插件和系统默认 Shell 不属于配置回退范围；
-   - 更新组件前检测本地 Git 工作区状态，严禁无感知覆盖用户自定义修改；
-   - 完备的语法预检（`zsh -n`）机制，防止因语法中断导致终端无法打开。
-4. **防御性编程**：各模块与工具之间彻底解耦，任何单一工具（如 vfox、fastfetch、lazydocker、lazygit）缺失或报错，绝不影响 Shell 整体加载。
-
-### 1.2 技术选型考量
-
-- **宿主语言**：纯 `Bash 4.0+`（安装器与后台检测脚本）+ `Zsh 5.0+`（终端配置与模板）。
-  - *原因*：无需预装 Python、Node.js 或 Go 等重型运行环境，任何 Linux 服务器或 macOS 开箱即可运行。
-- **框架体系**：**Oh My Zsh** 作为核心底座，**Powerlevel10k** 作为高性能提示符主题。
-- **工具生态**：统一推荐现代化 Rust 编写的轻量命令行工具链（`fzf`、`fd`、`bat`、`eza`、`zoxide`、`yazi`），提升终端工作流效率。
-
----
-
-## 二、系统整体架构与分层设计
-
-本项目采用“安装器解耦 + 模板渲染 + 状态持久化 + 后台异步守护”的模块化架构：
-
-```mermaid
-flowchart TD
-    subgraph 用户交互层
-        A[用户终端 / SSH 连接] --> B[Zsh 交互会话]
-    end
-
-    subgraph 启动与运行层 [.zshrc / templates]
-        B --> C[01. 高精度启动计时 zsh/datetime]
-        C --> D[02. 跨平台 PATH 注入]
-        D --> E[03. 补全与 OMZ 框架加载]
-        E --> F[04. P10k 主题渲染]
-        F --> G[05. 核心工具初始化 fzf, eza, yazi...]
-        G --> H[06. 历史记录与按键映射]
-        H --> I[07. 启动状态与可用更新展示]
-        I --> J[08. 异步后台更新轮询 &!]
-        J --> K[09. 语法高亮置底加载]
-    end
-
-    subgraph 维护与更新层 [install.sh & check_updates.sh]
-        L[bash install.sh] --> M[环境探测: OS/ARCH/包管理器]
-        M --> N[状态备份与选项持久化 ~/.zsh-project-options]
-        M --> O[软件包与插件安装]
-        P[zsh-update / bash install.sh --update] --> Q[安全 Git Pull / 包升级]
-        R[check_updates.sh] --> S[状态缓存 ~/.local/state/zsh-project]
-        J -.-> R
-        S -.-> I
-    end
-```
-
----
-
-## 三、Zsh 加载生命周期与配置规范
-
-为了避免常见插件冲突与启动性能劣化，`.zshrc` 与 `templates/zshrc.zsh` 严格遵循以下加载顺序规范：
-
-```
-[阶段 01] 计时器初始化 (zmodload zsh/datetime)
-   ↓
-[阶段 02] Instant Prompt 策略控制 (明确声明关闭)
-   ↓
-[阶段 03] 全局环境变量与 PATH 唯一化 (typeset -U path PATH)
-   ↓
-[阶段 04] Oh My Zsh 变量设置 (ZSH_THEME="", ZSH_CUSTOM)
-   ↓
-[阶段 05] 核心插件列表定义 (git, sudo, extract 等)
-   ↓
-[阶段 06] 额外补全目录提前注册 (fpath 注入 zsh-completions/src)
-   ↓
-[阶段 07] 加载 OMZ 主程序或备用 compinit
-   ↓
-[阶段 08] Powerlevel10k 主题及个人外观文件 (~/.p10k.zsh)
-   ↓
-[阶段 09] 启动状态横幅展示
-   ↓
-[阶段 10] vfox 激活 (带 timeout 超时保护并卸载自动钩子)
-   ↓
-[阶段 11] Yazi 目录联动函数封装 (y 命令)
-   ↓
-[阶段 12] FZF 快捷键与预览命令绑定 (集成 fd, bat, eza)
-   ↓
-[阶段 13] 历史记录行为设置 (share_history, 前缀搜索绑定)
-   ↓
-[阶段 14] 现代化命令别名与工具加载 (eza 别名, lazydocker, lazygit, zoxide)
-   ↓
-[阶段 15] 系统信息展示 (fastfetch)
-   ↓
-[阶段 16] 新版本检测本地缓存读取与后台轮询触发
-   ↓
-[阶段 17] 语法高亮插件置底加载 (必须在所有按键与别名之后)
-   ↓
-[阶段 18] precmd 触发并打印毫秒启动耗时
-```
-
-> [!IMPORTANT]
-> ### 关键加载规则约束
-> 1. **补全初始化单次原则**：`zsh-completions` 的 `src` 目录必须在加载 `oh-my-zsh.sh` **之前**加入 `fpath`；绝对不能在 OMZ 之前手动调用 `compinit`，否则会导致重复扫描补全导致启动变慢。
-> 2. **语法高亮置底原则**：`zsh-syntax-highlighting` 必须在配置文件的**绝对末尾**加载。若在其后定义按键绑定或别名，可能导致高亮状态失效或按键绑定被覆盖。
-> 3. **Instant Prompt 约束**：由于本项目包含横幅、工具状态输出及 Fastfetch 硬件信息展示，任何在前台打印文本的操作都会与 Instant Prompt 发生冲突导致警告，因此显式设置 `typeset -g POWERLEVEL9K_INSTANT_PROMPT=off`。
-
----
-
-## 四、跨平台兼容性工程规范 (Linux 与 macOS)
-
-本项目在多平台工程实现中严格遵循以下差异化规范：
-
-### 4.1 操作系统支持范围与版本边界矩阵
-
-下表是适配目标和历史参考，不是已完成的全平台兼容性认证。已有人机交互验证的环境为 Debian 13 / Zsh 5.9，其余版本需要实机测试；具体上游工具要求以当前官方说明为准。
-
-| 操作系统体系 | 硬件架构 | 最低支持版本 | 推荐版本 | 最高支持版本 | 技术决定依据与边界分析 |
-| --- | --- | --- | --- | --- | --- |
-| **macOS (Apple Silicon)** | `arm64` (M1-M4) | **macOS 11.0 (Big Sur)** | macOS 14 / 15+ | **macOS 15.x+ (最新)** | 苹果芯片硬件起步系统；Homebrew 核心原生架构；预装 Zsh 5.8 |
-| **macOS (Intel)** | `x86_64` | **macOS 10.15 (Catalina)** | macOS 13 / 14 | **macOS 15.x+ (最新)** | Apple 首次将 Zsh 设为系统默认 Shell；低于此版本（Mojave 10.14）预装古董 Bash 3.2 且无默认 Zsh |
-| **Debian** | `x86_64`, `aarch64` | **Debian 10 (Buster)** | Debian 12 / 13 | **Debian 13 (Trixie) / Sid** | 仓库附带 Zsh 5.7+ 与 Git 2.20；实测验证环境为 Debian 13 / Zsh 5.9 |
-| **Ubuntu** | `x86_64`, `aarch64` | **Ubuntu 20.04 LTS** | Ubuntu 22.04 / 24.04 | **Ubuntu 24.10 / 25.04+** | 20.04 附带稳定 Zsh 5.8 与 Glibc 2.31；18.04 因官方已结束标准支持且 Zsh 版本偏低不推荐 |
-| **Fedora** | `x86_64`, `aarch64` | **Fedora 34** | Fedora 39 / 40 / 41 | **Fedora 41 / Rawhide** | 附带现代 DNF 与 Zsh 5.8+；持续滚动支持最新 upstream |
-| **RHEL / Rocky / Alma** | `x86_64`, `aarch64` | **RHEL 8.0+** | RHEL / Rocky 9.x | **RHEL 9.x / 10.x** | RHEL 8 包含 Zsh 5.5.8 与 Bash 4.4；RHEL 7 仅有 Zsh 5.0.2（低于 P10k 5.1 门槛）且已 EOL |
-| **Arch Linux / Manjaro** | `x86_64`, `aarch64` | **Rolling (近半年更新)** | 最新滚动画卷 | **Rolling (持续向前)** | 滚动发行版模型，Pacman 自动保持核心组件为最新稳定版 |
-| **openSUSE** | `x86_64`, `aarch64` | **Leap 15.4+** | Leap 15.6 / Tumbleweed | **Tumbleweed (Rolling)** | Zypper 原生适配；Leap 15.4 具备现代 Zsh 5.8+ |
-
-#### 关键依赖底线基准 (Hard Prerequisites)
-- **Zsh >= 5.1**：Oh My Zsh 与 Powerlevel10k 运行硬性要求（低于 5.1 主题提示符与截断逻辑异常）。
-- **Bash >= 4.2**：`install.sh` 与 `check_updates.sh` 依赖严格错误陷阱 `set -Eeuo pipefail` 与关联数组支持。
-- **Git >= 2.0**：需支持深度浅克隆 `git clone --depth=1` 以及路径隔离参数 `git -C <dir>`。
-- **Glibc >= 2.28 (Linux) / Darwin >= 19.0 (macOS)**：现代预编译 CLI 工具（eza、yazi 等 Rust 二进制）运行依赖。
-
-### 4.2 跨平台包管理器与命令映射表
-
-| 维度 | Linux (Debian/Ubuntu) | Linux (Fedora/RHEL) | Linux (Arch) | macOS (Darwin) |
-| --- | --- | --- | --- | --- |
-| **系统标识 (`uname -s`)** | `Linux` | `Linux` | `Linux` | `Darwin` |
-| **包管理器** | `apt-get` | `dnf` | `pacman` | `brew` (Homebrew) |
-| **权限模型** | 普通用户 + `sudo` | 普通用户 + `sudo` | 普通用户 + `sudo` | 普通用户运行（**严禁** `sudo brew`） |
-| **包管理器架构** | `x86_64`, `aarch64` | `x86_64`, `aarch64` | `x86_64`, `aarch64` | `x86_64` (Intel), `arm64` (Apple Silicon) |
-| **Homebrew 根路径** | `/home/linuxbrew/.linuxbrew` (可选) | - | - | `/opt/homebrew` (Apple Silicon)<br>`/usr/local` (Intel) |
-| **命令名差异 (fd)** | `fdfind` (包名 `fd-find`) | `fd-find` | `fd` | `fd` |
-| **命令名差异 (bat)** | `batcat` (包名 `bat`) | `bat` | `bat` | `bat` |
-| **超时命令** | `timeout` | `timeout` | `timeout` | `gtimeout` (需 coreutils) / 降级 |
-| **哈希工具** | `sha256sum` | `sha256sum` | `sha256sum` | `shasum -a 256` / `openssl` |
-
-### 4.3 核心兼容性代码模式
-
-#### 1. 跨平台高精度计时 (避免 macOS BSD `date` 报错)
-```zsh
-# 跨平台高精度毫秒计时
-if zmodload zsh/datetime 2>/dev/null; then
-  ZSH_START_TIME=$EPOCHREALTIME
-  precmd() {
-    local end_time=$EPOCHREALTIME
-    local -i elapsed
-    elapsed=$(( (end_time - ZSH_START_TIME) * 1000 ))
-    print -P "%F{green}⚡ Zsh 启动完成，用时 %F{yellow}${elapsed}ms%f"
-    unset -f precmd
-  }
-fi
-```
-
-#### 2. 安全的超时防护封装
-```bash
-# 兼具 Linux timeout 与 macOS gtimeout 的执行器
-run_with_timeout() {
-  local sec=$1; shift
-  if command -v timeout >/dev/null 2>&1; then
-    timeout "$sec" "$@"
-  elif command -v gtimeout >/dev/null 2>&1; then
-    gtimeout "$sec" "$@"
-  else
-    "$@"
-  fi
-}
-```
-
-#### 3. 跨平台 SHA-256 计算
-```bash
-calc_sha256() {
-  local target=$1
-  if command -v sha256sum >/dev/null 2>&1; then
-    sha256sum "$target" 2>/dev/null | cut -d ' ' -f1
-  elif command -v shasum >/dev/null 2>&1; then
-    shasum -a 256 "$target" 2>/dev/null | cut -d ' ' -f1
-  elif command -v openssl >/dev/null 2>&1; then
-    openssl dgst -sha256 "$target" 2>/dev/null | awk '{print $NF}'
-  else
-    die "系统中未找到 sha256sum、shasum 或 openssl 计算工具"
-  fi
-}
-```
-
-#### 4. 终端 PTY 尺寸自适应与 Neovim 80x24 锁定自愈模式
-针对远程 SSH（特别是 Windows Terminal / CMD 连接）未能在连接初期向 Linux 内核发送 `TIOCSWINSZ` / `SIGWINCH` 信号导致 Linux PTY 默认卡在 80x24 的问题，本项目在模板层实现了双重自愈机制：
-```zsh
-# 1. 注册窗口尺寸动态监听钩子
-if [[ -t 0 ]] && command -v stty >/dev/null 2>&1; then
-  TRAPWINCH() {
-    zle && zle reset-prompt 2>/dev/null || true
-  }
-fi
-
-# 2. 包装编辑器启动逻辑，进入前先主动探寻物理屏幕真实行列
-if command -v nvim >/dev/null 2>&1; then
-  nvim() {
-    if command -v resize >/dev/null 2>&1; then
-      eval "$(resize 2>/dev/null)" || true
-    fi
-    command nvim "$@"
-  }
-  alias vim=nvim
-  alias vi=nvim
-  alias v=nvim
-fi
-```
-
-#### 5. 跨平台多架构独立二进制资产分发策略
-针对部分发行版（如 Debian 12）仓库无 `eza`、`fastfetch`、`yazi` 或自带旧版 `fzf` 与 `neovim`（< 0.10）的情况，安装器基于 `$OS`（`Linux` / `Darwin`）与 `$ARCH`（`x86_64` / `arm64`）自动动态计算资产下载 URL：
-- **Eza**：Linux 下为 `unknown-linux-gnu`，macOS 下为 `apple-darwin`；
-- **Yazi**：Linux 下采用 `unknown-linux-musl` 静态编译包（彻底避免 glibc 2.39 缺失报错），macOS 下为 `apple-darwin`；
-- **Neovim**：Linux 为 `nvim-linux-${NVIM_ARCH}.tar.gz`，macOS 为 `nvim-macos-${NVIM_ARCH}.tar.gz`，自动软链接至 `~/.local/bin/nvim`；
-- **Fastfetch**：Linux APT 优先安装 `.deb`，非 Debian 或 macOS 则拉取官方免安装归档解压。
-
----
-
-## 五、安装器 `install.sh` 架构与实现细节
-
-### 5.1 执行时序图
-
-```mermaid
-sequenceDiagram
-    participant User as 用户
-    participant Installer as install.sh
-    participant System as 操作系统/包管理器
-    participant Git as Git 远端仓库
-    participant FS as 本地文件系统
-
-    User->>Installer: bash install.sh [--profile full] [--with-tmux]
-    Installer->>Installer: 校验用户非 root、ZDOTDIR 与目录合法性
-    Installer->>System: 识别 OS、架构与包管理器
-    Installer->>User: 提示交互选项 (全套工具集 / vfox / lazydocker / lazygit / tmux)
-    User-->>Installer: 确认安装方案
-    Installer->>FS: 创建带时间戳的备份目录，计算当前 SHA-256 并生成 manifest
-    Installer->>System: 安装基础依赖 (zsh, git, curl, coreutils)
-    opt 完整模式 (full)
-        Installer->>System: 安装可选工具 (fzf, fd, bat, eza, yazi, nvim, fastfetch)
-    end
-    opt Tmux 增强 (--with-tmux)
-        Installer->>System: 安装 tmux 及剪贴板依赖 (xclip, wl-clipboard, ncurses-term)
-        Installer->>Git: 克隆 TPM (Tmux Plugin Manager) 并批量安装插件
-        Installer->>FS: 部署 ~/.tmux.conf 并计算 SHA-256
-    end
-    Installer->>Git: 克隆 Oh My Zsh, Powerlevel10k, 3 个核心插件
-    Installer->>FS: 部署 ~/.zsh-project-options 与 ~/.zshrc
-    Installer->>FS: 重新校验生成文件的 SHA-256
-    Installer->>Installer: zsh -n ~/.zshrc (语法安全检查)
-    opt 用户同意切换默认 Shell
-        Installer->>System: 验证 /etc/shells 并调用 chsh -s
-    end
-    Installer-->>User: 安装成功，输出备份目录与回退指令
-```
-
-### 5.2 状态持久化配置 (`~/.zsh-project-options`)
-
-安装器会生成轻量级的选项状态文件，供 `.zshrc` 加载时读取。格式严格遵循键值对声明：
-
-```bash
-# 安装器生成；1 为启用，0 为关闭。
-ZSH_PROJECT_FULL=1
-ZSH_PROJECT_VFOX=0
-ZSH_PROJECT_LAZYDOCKER=1
-ZSH_PROJECT_LAZYGIT=1
-ZSH_PROJECT_TMUX=1
-ZSH_PROJECT_DIR="/home/user/.zsh-project"
-ZSH_PROJECT_LANG="zh"
-ZSH_PROJECT_AUTO_CHECK_UPDATE=1
-ZSH_PROJECT_CHECK_INTERVAL_DAYS=7
-ZSH_PROJECT_BANNER=1
-ZSH_PROJECT_FASTFETCH=1
-ZSH_PROJECT_TIMER=1
-```
-
-### 5.3 增量部署与安装幂等性架构设计 (Idempotent Architecture)
-
-本项目安装器设计严格遵循**工业级 Shell 幂等性标准**。对于重复执行（例如修改项目并推送到 Git 远端，在服务器执行 `git pull` 后再次运行 `bash install.sh`），保证做到“已存在的免重装、未变动的免重复、修改过的精准热更新”：
-
-```mermaid
-flowchart TD
-    Start[运行 bash install.sh] --> Step1{依赖与工具检查}
-    Step1 -- command -v 命中 --> SkipTool["跳过工具安装/下载 (0ms)"]
-    Step1 -- 命令缺失 --> InstallTool[调用包管理器或拉取预编译 Release]
-    
-    SkipTool --> Step2{OMZ 与插件目录}
-    InstallTool --> Step2
-    Step2 -- 目录完整存在 --> SkipClone["保留已有组件 return (0ms)"]
-    Step2 -- 目录不存在 --> CloneRepo[git clone 浅克隆]
-    
-    SkipClone --> Step3["安全快照备份 (~/.local/state/zsh-project)"]
-    CloneRepo --> Step3
-    Step3 --> Step4["原子部署 templates/zshrc.zsh 至 ~/.zshrc"]
-    Step4 --> Step5["清理 ~/.zshrc.zwc 编译字节码缓存"]
-    Step5 --> Done[秒级完成，新功能即刻生效]
-```
-
-1. **第一层：包管理器与可选软件守卫**
-   - 基础系统软件交由操作系统包管理器管理，包管理器自带已安装检测。
-   - 可选工具安装入口 `optional_package` 第一行执行 `command -v "$cmd" >/dev/null 2>&1 && return 0`，命令存在即跳过。
-   - 官方独立预编译二进制下载前，严格判断 `! command -v <tool>`，杜绝重复向 GitHub 发起流量请求。
-2. **第二层：Git 仓库与插件守卫**
-   - 通过 `clone_missing()` 统一调度，目标目录存在且入口文件可读时，打印 `保留已有组件` 并直接 `return`，绝不重复拉取或覆盖。
-3. **第三层：配置文件原子增量部署**
-   - 部署前必须先建立带时间戳、manifest 及 SHA-256 校验的备份快照。
-   - 将最新修改的 `templates/zshrc.zsh` 安全拷贝到目标文件。
-   - 清理旧的编译字节码（`~/.zshrc.zwc`），确保 Zsh 进程在下次启动时重新解析最新代码，杜绝旧缓存命中。
-
----
-
-## 附录：Tmux 架构与全平台剪贴板穿透工程规范
-
-### 1. 终端剪贴板穿透核心痛点与解决方案
-
-在复杂的远程开发、虚拟机及容器场景下，传统的 `xclip` / `pbcopy` 常常因缺乏本地显示服务（`$DISPLAY` 或 `$WAYLAND_DISPLAY`）而失效。本项目采用 **OSC 52 + 智能本地多工具降级** 的双保险机制：
-
-```mermaid
-flowchart TD
-    A[用户划选 / Vi 键位复制] --> B{Tmux copy-mode}
-    B --> C[触发 OSC 52 转义码透传]
-    C --> D[外层终端: Windows Terminal / iTerm2 / WezTerm / Alacritty]
-    D --> E[物理机操作系统剪贴板]
-    
-    B --> F[并发触发智能管道降级]
-    F --> G{环境探测}
-    G -- Wayland --> H[wl-copy]
-    G -- X11 --> I[xclip -selection clipboard]
-    G -- macOS --> J[pbcopy]
-    G -- WSL --> K[clip.exe]
-    G -- 无剪贴板工具 --> L[|| true 静默容错，不抛错误蜂鸣]
-```
-
-### 2. 鼠标体验防跳跃设计
-- **经典痛点**：tmux 默认在鼠标松开（`MouseDragEnd1Pane`）后调用 `copy-pipe-and-cancel`，导致屏幕立即跳回底部并退出复制模式，极易破坏正在排查的长日志视图。
-- **工程解决**：绑定 `MouseDragEnd1Pane` 执行 `copy-pipe`（去除 `-and-cancel`）。用户划选后自动静默同步至剪贴板，同时视野锚定在当前窗格位置，极大提升调试体验。
-
----
-
-## 六、版本自动检测与更新系统设计
-
-### 6.1 模块职责划分
-
-1. **`scripts/check_updates.sh`**（检测内核）：
-   - 执行快速网络联通性检测（2 秒连接测试，避免无网阻塞）；
-   - 对 Git 仓库执行带超时的静默 `git fetch`；
-   - 比较 `HEAD` 与跟踪上游分支的哈希差异，计算落后提交数（`behind count`）；
-   - 调用系统包管理器命令（macOS `brew outdated`、Debian `apt list --upgradable`、Arch `checkupdates`）获取工具更新；
-   - 将更新汇总清单以纯文本格式原子写入 `${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/available_updates`。
-2. **`templates/zshrc.zsh`**（前端展示与后台调度）：
-   - 终端打开时读取本地缓存，有更新则以亮色横幅提醒；
-   - 根据上次检查时间戳与配置的间隔天数（默认 7 天），触发 `( check_updates.sh -q ) &!` 异步后台轮询。
-3. **`install.sh --update`**（升级执行引擎）：
-   - 展示更新清单并由用户显式确认（`[y/N]`）；
-   - 安全拉取 Git 更新（若检测到 `git status --porcelain` 存在未提交修改，则跳过并报警，防止覆盖）；
-   - 触发包管理器升级对应工具；
-   - 清理更新状态缓存，并重新校验 `zsh -n ~/.zshrc`。
-
-### 6.2 缓存与状态文件结构
-
-```
-~/.local/state/zsh-project/
-├── available_updates          # 当前检测到的可更新组件清单 (空则表示无更新)
-├── last_update_check          # 上次执行检测的时间戳 (Unix Epoch 秒)
-└── scripts/
-    └── check_updates.sh       # 检测脚本的持久化副本
-```
-
----
-
-## 七、数据持久化、备份与回滚机制
-
-### 7.1 备份目录结构
-
-每次执行 `install.sh` 安装或更新，均会在状态目录下生成隔离的备份目录：
-
-```
-~/.local/state/zsh-project/install-XXXXXXXX/
-├── manifest                   # 记录当前用户的 HOME 目录路径
-├── .zshrc                     # 原 .zshrc 副本
-├── .zshrc.state               # 原状态：present 或 absent
-├── .zshrc.sha256              # 原文件的 SHA-256 校验和
-├── .zsh-project-options       # 原选项文件副本
-├── .zsh-project-options.state # 原状态
-├── .zsh-project-options.sha256
-└── install.log                # 完整的安装执行日志
-```
-
-### 7.2 回滚校验流程 (`restore()`)
-
-1. **归属校验**：检查 `manifest` 中的家目录是否与当前 `$HOME` 一致。
-2. **状态防篡改校验**：
-   - 重新计算当前 `~/.zshrc` 的 SHA-256 哈希值；
-   - 若当前文件已被用户安装后手动修改，则中断恢复并报错：`文件在安装后发生变化，请手动比较备份再恢复`，防止意外覆盖用户最新代码。
-3. **原子还原**：根据 `.state` 记录，将原文件覆盖恢复或删除新生文件。
-
----
-
-## 八、本地测试、Mock 与调试规范
-
-### 8.1 静态语法校验
-
-修改脚本或模板后，必须通过严格的静态解析测试：
-
-```bash
-# 校验 Bash 脚本语法
-bash -n install.sh
-bash -n scripts/check_updates.sh
-
-# 校验 Zsh 配置与模板语法
-zsh -n templates/zshrc.zsh
-zsh -n .zshrc
-```
-
-### 8.2 跨平台行为 Mock 测试方法
-
-在非目标平台（如 Windows MSYS2 或单一 Linux 发行版）开发时，可通过子 Shell 函数重载进行行为模拟：
-
-#### 模拟 macOS (Darwin + arm64) Dry-run
-```bash
-bash -c '
-  uname() {
-    if [[ "$1" == "-s" ]]; then echo "Darwin"
-    elif [[ "$1" == "-m" ]]; then echo "arm64"
-    else /usr/bin/uname "$@"
-    fi
-  }
-  export -f uname
-  bash install.sh --dry-run --profile full
-'
-```
-
-#### 模拟 Debian Linux Dry-run
-```bash
-bash -c '
-  uname() {
-    if [[ "$1" == "-s" ]]; then echo "Linux"
-    elif [[ "$1" == "-m" ]]; then echo "x86_64"
-    else /usr/bin/uname "$@"
-    fi
-  }
-  export -f uname
-  bash install.sh --dry-run --profile full
-'
-```
-
-### 8.3 启动性能与卡顿定位方法
-
-若用户报告终端启动卡顿或提示符卡死，按以下步骤定位：
-
-```bash
-# 跟踪完整交互启动流程，定位具体卡顿语句
-PS4='+%N:%i> ' timeout -k 2s 20s zsh -xic 'exit'
-
-# 单独验证 vfox 激活性能
-timeout -k 1s 5s vfox activate zsh
-```
-
----
-
-## 九、代码风格、安全与维护约定
-
-1. **环境声明与严格模式**：
-   - Bash 脚本开头必须声明：`set -Eeuo pipefail` 与 `export LC_ALL=C`；
-   - 临时文件必须通过 `mktemp` 创建，权限统一设置 `chmod 700`。
-2. **字符集与换行符**：
-   - 所有文本文件、Shell 脚本必须使用 **UTF-8 无 BOM** 编码；
-   - 换行符严格采用 **LF (`\n`)**，禁止使用 Windows CRLF 换行符提交。
-3. **变量作用域**：
-   - 函数内变量统一显式声明 `local`；
-   - Zsh 中的数组必须小心处理带空格参数（推荐使用 `"${(@)...}"` 语法）。
-4. **Git 操作安全防线**：
-   - 严禁在脚本中执行 `git reset --hard` 或 `git clean -fd`；
-   - 更新仅支持 `--ff-only` 快进拉取，遇到合并冲突时提示用户手动处理。
-5. **权限严控**：
-   - 必须先判断当前用户是否为普通用户（`[[ $EUID -ne 0 ]]`）；
-   - 严禁整个安装过程以 root/sudo 全局运行。
-
----
-
-## 十、借鉴 romkatv/zsh4humans 的工业级 Shell 工程规范
-
-本项目吸收了 [romkatv/zsh4humans](https://github.com/romkatv/zsh4humans)（Powerlevel10k 作者）的核心工程实践：
-
-### 10.1 防 Sudo 踩坑防护（Anti-Sudo Check）
-- **痛点**：新手常使用 `sudo bash install.sh`，导致用户家目录生成的 `.zshrc`、`~/.local/`、插件目录属主被赋为 root，后续普通用户无法写入历史或更新。
-- **规范**：检测若当前为 root 但 `$HOME` 拥有者为非 root，立即中断并提示用户以普通身份重新运行。
-
-### 10.2 终端 TTY 保护与状态还原 Trap
-- **痛点**：若用户中途按 `Ctrl+C` 中断或发生错误，可能导致终端停留在非规范模式（无回显或键位错乱）。
-- **规范**：脚本启动时用 `command stty -g` 记录终端原始状态，并在 `trap cleanup_terminal INT TERM EXIT` 中确保无论如何都安全恢复。
-
-### 10.3 单键免回车瞬时读取（`read_key`）
-- **规范**：利用 `stty -icanon min 1 time 0` 与 `dd bs=1 count=1`，捕获用户单次敲击（`y`/`n`/`1`/`2`/`q`），按下瞬间立刻触发下一步，免去繁琐的 Enter 回车确认。
-
-### 10.4 管道免克隆远程自举（Pipe Execution Bootstrap）
-- **规范**：支持 `bash -c "$(curl -fsSL ...)"` 一行命令安装。检测若处于管道运行模式，自动将源码自举拉取至 `~/.config/zsh-project-repo`，并在原地衔接完整安装。
-
-### 10.5 底层操作防别名劫持（`command` 显式包裹）
-- **规范**：对底层文件与系统工具（`rm`, `cp`, `mv`, `mkdir`, `id`, `uname` 等）均包裹 `command` 前缀，彻底免疫系统全局或用户环境中的干扰性别名（如 `alias rm='rm -i'`）。
-
-### 10.6 过期编译字节码（`.zwc`）清理与原子替换
-- **规范**：新配置文件就绪后，主动清理历史残余的 `.zshrc.zwc` 与 `.zshenv.zwc`，确保 Zsh 启动时立刻读取最新语法树。
-
-### 10.7 安装完成自举体验（Instant Bootstrapping）
-- **规范**：配置安装成功且切换 Shell 确认后，提供一键 `exec zsh -l` 直接接管当前进程，无缝切入新环境。
+# 开发与架构说明
+
+核对日期：2026-09-13。以仓库当前实现为准；操作入口见 [README](README.md)，验证记录见[测试与验收](INSTALLER_TESTING.md)。本页区分已经实现的行为和仍需改进的事项。
+
+## 模块职责
+
+| 模块 | 输入与职责 | 主要副作用 |
+| --- | --- | --- |
+| `install.sh` | 安装选项、更新或回退参数；转发独立管理动作 | 系统包操作、网络下载、配置部署、备份、可选 chsh |
+| `scripts/manage.sh` | 一个管理动作、可选范围和确认参数 | 除只读动作外，写配置、管理快照、停用状态 |
+| `scripts/retry_tools.sh` | 指定组件或失败清单 | 安装软件、保存日志、更新失败清单 |
+| `scripts/check_updates.sh` | 语言、静默、输出位置、超时参数 | Git fetch、包查询、缓存和时间戳写入 |
+| `templates/zshrc.zsh` | 用户选项、环境变量和本地工具 | 初始化交互环境；按间隔启动后台检查 |
+| `templates/tmux.conf` | tmux 配置和 TPM 插件列表 | 配置终端；加载 TPM，缺失时尝试下载 |
+| `scripts/test_*.sh` | 当前生产脚本和模板 | 创建隔离临时目录和命令替身，保留测试证据 |
+
+`--dry-run` 在安装器中早于语言交互、平台适配和自举下载退出；管理器也在实际管理动作前退出。因此预演不验证实际安装依赖或备份内容。普通安装不接受 `--yes`；管理器每次只接受一个动作，写操作默认询问确认。
+
+## 安装执行顺序
+
+1. 保存终端状态、配置语言环境，发现管理参数时直接交给管理器。
+2. 解析安装参数，处理帮助与预演；检查停用标记。
+3. 单独处理更新检测或第三方升级，不进入普通安装流程。
+4. 普通安装/回退检查系统、架构、普通用户、HOME 和 ZDOTDIR；回退在此分流。
+5. 识别包管理器，必要时引导 Homebrew；缺少模板时下载项目资源。
+6. 收集 profile、主题和组件选项，检查最终受管文件类型，显示计划并确认。
+7. 请求 Linux sudo 权限，创建安装备份与日志，保存配置原内容和存在状态。
+8. 安装基础依赖、可选工具和 Git 组件；准备主题，按选项部署 tmux 和调用 TPM。
+9. 复制辅助脚本，生成选项与 Zsh 配置，做 `zsh -n` 检查后使用 `install -m 600` 部署。
+10. 清理相关旧字节码，记录部署后哈希，执行一次静默更新检查并写入失败包清单。
+11. 询问是否切换默认登录 Shell；按选项运行主题向导并重新记录哈希，询问是否进入 Zsh。
+
+Homebrew 准备和资源自举可能在第 6 步最终确认前发生。第 10 步首次更新检查虽静默，但实现没有放入后台，会等待执行结束。tmux 部署发生在 Zsh 模板语法检查之前。安装使用多次文件写入，不构成全流程原子事务。
+
+### 重复运行的实际行为
+
+`clone_missing()` 在入口文件可读时保留已有目录，目录不完整则停止。`optional_package()` 根据命令存在性跳过部分安装；完整模式还检查 FZF 接口、Yazi 能否运行和 Neovim 版本。基础包管理器命令每次仍执行；Arch 包含完整同步升级。
+
+重新安装会重写 `.zsh-project-options`，将横幅、Fastfetch、计时和自动检查重新设为 1、间隔设为 7 天；不会自动合并此前的选项编辑。检测到已有 vfox、lazydocker、lazygit、tmux 时会自动启用对应安装选项。不要将重复安装描述为无副作用的模板同步。
+
+## 安装模板加载顺序
+
+以下描述 `templates/zshrc.zsh`，不是根目录参考配置的逐行说明。
+
+1. 非交互会话直接返回；按显式开关准备阶段计时函数。
+2. 关闭 Instant Prompt，source `~/.zsh-project-options`，处理语言环境。
+3. 初始化普通计时器，去重 PATH/fpath，设置编辑器和可用的 bat 主题。
+4. 设置 OMZ 路径及插件列表，在 OMZ 之前注册 `zsh-completions/src`。
+5. 加载 OMZ；不存在时只运行备用 `compinit`。
+6. 加载 `~/powerlevel10k` 主题和 `~/.p10k.zsh`，再次关闭 Instant Prompt。
+7. 依选项加载 vfox、Yazi、FZF、别名、lazygit widget、zoxide、Fastfetch。
+8. 设置共享历史和前缀搜索，显示本地更新缓存，按间隔启动后台检查。
+9. 定义更新命令，打印完成横幅和普通计时。
+10. 加载 `~/.zshrc.local`，定义 `zsh-config`，最后加载语法高亮并输出最后一个诊断阶段。
+
+普通计时从语言环境处理后开始，到完成横幅前结束；不包含末尾用户扩展、高亮及首次提示符钩子。它不使用一次性 `precmd`，也不是完整终端启动耗时。`--profile-startup` 才会启用模板的阶段标记并输出 `zprof`。
+
+补全目录应先于 OMZ 注册；OMZ 存在时不额外调用 `compinit`。按键和 widget 应在高亮前定义。用户选项文件在真实 Zsh 启动时会被 source，只有管理器编辑它时采用文本读取，不执行其中代码。
+
+### 根目录参考配置的差异
+
+| 行为 | 安装模板 | 根目录 `.zshrc` |
+| --- | --- | --- |
+| FZF、Yazi、Neovim | 受 `full` 控制 | 主要按命令是否存在加载 |
+| vfox | 受 `vfox` 控制 | 命令存在即尝试激活 |
+| tmux/剪贴板别名 | 受 `tmux` 控制 | 主要按命令是否存在加载 |
+| eza / zoxide | 受 `full` 控制 | 使用 `ZSH_PROJECT_EZA` / `ZSH_PROJECT_ZOXIDE`，管理菜单不提供这两个键 |
+| Fastfetch | 同时要求 `full` 和 `fastfetch` | 只检查 `fastfetch` 开关和命令 |
+| OMZ 缺失 | 备用补全 | 另尝试直接加载自动建议 |
+| 主题路径 | `~/powerlevel10k` | 依次尝试独立、自定义和 OMZ 内置路径 |
+| `ZSH_CUSTOM` | 重设为默认路径 | 保留已有值 |
+| 内存历史条数 | 4000 | 2000；两者保存条数均为 2000 |
+| 阶段诊断 | 多个阶段标记 | 仅保留末尾标记，不提供同等分段粒度 |
+
+两份文件不是自动同步关系。新安装与管理教程以模板为准。根目录 `.zshenv` 当前为空，`.zshenv.before-fix` 等历史文件不应当作当前配置部署。
+
+## 组件安装与降级
+
+| 组件 | 普通安装器的处理 |
+| --- | --- |
+| FZF | 完整模式中优先包管理器；缺失或不支持 `--zsh` 时使用 `~/.fzf` 仓库和安装脚本 |
+| fd / bat | 使用发行版包名，必要时为 fdfind/batcat 建立用户目录链接 |
+| eza / Yazi / Fastfetch | 完整模式中有官方 Release 下载尝试；资产路径由脚本拼接 |
+| Neovim | 完整模式、非 Homebrew 分支中，缺失、版本低于脚本阈值 0.10 或显式指定参数时尝试下载 |
+| vfox | 包管理器失败后尝试官方用户安装脚本；不安装 SDK |
+| lazydocker / lazygit | 包管理器优先，下载回退行为存在差异，见下文限制 |
+| tmux | 安装软件、剪贴板依赖、TPM 和配置；TPM 的下载结果仍需实际验收 |
+
+`install_nvim_tree()` 先验证暂存二进制，再切换目录与链接，保留旧版本，并在切换失败时尝试恢复。下载成功、可执行位存在或 `--version` 成功均不能证明所有运行库和插件兼容；安装器没有统一的发布资产签名/校验文件验证流程。
+
+vfox 优先用 `timeout -k 1s 5s` 或 `gtimeout` 生成激活脚本，没有超时工具时直接运行。后续 `eval` 不在该超时保护内；成功后从 `chpwd_functions` 和 `precmd_functions` 移除 `_vfox_hook`，因此不再依靠这两个钩子自动切换 SDK。
+
+## 更新检测与第三方升级
+
+检查脚本参数为 `-q/--quiet`、`-o/--output FILE`、`-t/--timeout SEC`、`--lang zh|en`、`-h/--help`。默认单次封装超时 5 秒；没有 timeout/gtimeout 时直接执行。各次检查串行运行，总耗时可能远超过 5 秒。网络预检另使用 2 秒参数。
+
+Git 检查寻找 `.git` 目录、上游分支，必要时回退到 origin/master 或 origin/main，再 fetch origin 并统计落后提交。非标准 Git 布局、缺失跟踪分支或未覆盖的工具可能被跳过。
+
+应用检测覆盖 macOS 的 Homebrew、Linux 的 APT/DNF，以及存在 `checkupdates` 时的 Arch。APT 不在检测时刷新包索引。没有 Zypper/YUM-only 的应用检测分支，独立下载的 Release 文件也不统一比较版本。
+
+已识别的网络或包查询失败返回 2，保留旧更新清单；成功检测使用临时文件加重命名替换清单。清单非空表示发现更新，检测本身仍可返回 0。
+
+交互 `--update` 每次重新调用默认参数的检查器。Git helper 对有未提交修改的目录跳过拉取，正常路径用 `pull --ff-only`；TPM 调用自己的更新脚本，FZF 后续安装步骤也有单独行为。macOS 调用固定工具列表的 `brew upgrade`，Linux 只给部分包管理器的手动升级提示。流程最后复查缓存，但不生成配置备份，不回退已完成的第三方更新。
+
+## 状态文件与备份协议
+
+状态根目录为 `${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project`。`~/.zsh-project-options`、`~/.zshrc.local` 和 Fastfetch 的配置路径仍按代码使用 HOME，并不会全部迁移到 XDG_CONFIG_HOME。
+
+| 路径 | 含义 |
+| --- | --- |
+| `scripts/` | 安装时复制的检查、管理、重试脚本；快捷命令优先用这些副本 |
+| `available_updates` | 最近一次完整检查写入的更新清单，可能已过时 |
+| `last_update_check` | 检查成功时间，或 Zsh 启动后台检查前写入的尝试时间；不能当作最后成功时间 |
+| `failed-components` | 安装器跳过的可选包，重试时逐项更新 |
+| `disabled` | 停用时记录的管理快照目录路径 |
+| `manage.lock` / `retry.lock` | 两种管理流程各自的目录锁；不是统一安装锁 |
+| `install-XXXXXXXX/` | 随机后缀的安装备份和安装日志，不是时间戳命名 |
+| `manage-XXXXXXXX/` | 配置管理快照，包含 action 和可能的旧字节码 |
+| `retry-XXXXXXXX/` | 重试日志与下载暂存文件 |
+
+每份受管配置的备份协议：
+
+- `manifest` 第一行记录 HOME，用于归属检查。
+- 同名文件保存**操作前内容**，原本不存在时没有原内容副本。
+- `<文件>.state` 保存操作前的 `present` / `absent`。
+- `<文件>.sha256` 保存**操作后的内容哈希**，目标不存在时为 `missing`；用于拒绝覆盖用户后来的修改，不是备份原文件的完整性校验。
+
+普通安装管理 `.zshrc` 和 `.zsh-project-options`，按选项加入 `.p10k.zsh`、`.tmux.conf`。不备份个人扩展、历史、SDK、Docker、系统包或插件版本。安装备份在部署末段才写哈希，异常中断可能留下不满足自动回退条件的目录。
+
+管理器 `atomic_copy()` 在 HOME 创建临时文件再重命名，并把相关旧字节码移入快照；多文件恢复仍是逐个操作。安装器部署使用 `install`，传统 `--rollback` 使用 `cp`/删除且不创建新的回退前快照。需要范围与新快照时使用 `--restore-backup`。
+
+## 当前限制与维护清单
+
+这些是本轮代码核对所得，文档更新没有修复它们：
+
+| 项目 | 当前边界与处理建议 |
+| --- | --- |
+| 单文件资源回退 | 仅下载两个模板和检查脚本；可能缺失 install/manage/retry，使用完整克隆 |
+| lazydocker 主安装下载 | 资产名缺少版本号；独立重试入口会查询版本并拼接版本化资产 |
+| 重试平台识别 | 比安装器窄，且 DNF 分支没有 YUM 回退；衍生发行版可能无法重试 |
+| 失败清单 | 仅基于 SKIPPED 包名，不覆盖每个步骤；用 `--doctor` 和工具实际运行补充检查 |
+| TPM 安装 | 返回码被忽略后仍输出初始化完成，不能作为插件成功证据 |
+| 更新提示范围 | 未覆盖的平台/工具可能无提示；不能等同全机软件均为最新 |
+| 调整检查超时 | `check_updates.sh -t 15` 只作用本次检查；`--update` 会重新使用默认超时 |
+| 后台重试间隔 | 触发前已更新时间戳，失败后通常等待下一间隔；可手动重查 |
+| 文件事务与锁 | 没有安装/更新/管理共用锁，没有多文件原子回退，不并发执行这些写操作 |
+| Git 本地修改保护 | 只适用于对应 helper；自举/FZF 安装路径仍有普通 pull，TPM 委托第三方 |
+| `resize` 依赖 | APT 安装器尝试 x11-utils，不能据此保证有 resize；Debian 13 的 resize 在 xterm 包 |
+| 网络和性能 | 部分工具初始化及第三方插件无统一超时；没有固定启动或重装耗时保证 |
+| 旧文件与测试材料 | scratch、before-fix 和历史文件不是当前实现，勿从中复制覆盖正式脚本 |
+
+Debian 13 的包归属依据：[xterm 文件清单](https://packages.debian.org/trixie/amd64/xterm/filelist)。`TRAPWINCH` 当前只尝试重绘提示符，不能单独修复 SSH/PTY 尺寸协商。
+
+## 维护与验证约定
+
+- Shell 文件使用 UTF-8 无 BOM、LF；遵守 `.gitattributes`。中文注释解释目的、状态和失败边界，不给未经测试的绝对保证。
+- 改动前确认文件是生产入口、模板、参考配置还是历史材料。修改共同功能时同时评估两份 Zsh 配置，但不默认它们必须完全一致。
+- 配置写入需审查目标类型、备份、后续修改保护、失败返回值与字节码处理。文件权限和目录权限分别设置，不能统一写成 chmod 700。
+- 变更参数、状态格式或默认值时，同步更新 README、管理说明和适用的回归断言。
+- 隔离测试尽量直接使用生产实现；不得把 SKIP、只过语法或历史 CI 结果写成当前功能全部通过。
+- 提交前检查差异，不把 scratch 临时产物、用户历史和机器配置当作新部署内容。现存历史材料的清理应单独处理。
+
+检查命令与目标平台的实机验证步骤统一见[测试与验收](INSTALLER_TESTING.md)。

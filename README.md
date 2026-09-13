@@ -1,284 +1,224 @@
-# Linux 与 macOS Zsh 跨平台一键配置与更新管理器
+# Linux 与 macOS Zsh 配置与更新管理器
 
-安装前先阅读 [安装器修复与 Linux 测试步骤](INSTALLER_TESTING.md)，运行 `bash scripts/test_installer.sh`。支持范围是适配目标，不代表所有平台均完成实机验证。
+为个人终端配置 Oh My Zsh、Powerlevel10k、补全、自动建议和语法高亮，并提供可选工具安装、配置开关、更新检测、停用恢复与备份管理。
 
-新增停用/恢复、只读体检、配置菜单、启动诊断、失败组件重试、用户扩展和备份管理，使用方法见 [配置管理指南](CONFIGURATION_MANAGEMENT.md)。例如 `bash install.sh --disable` 可只停用项目 Zsh 配置并保留应用与 tmux；`--enable` 恢复。
+本文以当前 `install.sh`、`scripts/` 和 `templates/` 的实现为准。平台适配目标与实际验证结果分开记录；最近一次本地检查见[测试与验收](INSTALLER_TESTING.md)。
 
-本项目提供面向 **Linux**（Debian / Ubuntu / Fedora / Arch / openSUSE）与 **macOS**（Apple Silicon / Intel Mac）的现代化 Zsh 交互环境一键安装、自动配置及插件/应用版本更新管理工具。
+## 项目展示
 
-- 🍏 **全平台兼容**：原生支持 Linux 各主流发行版（APT、DNF/YUM、Pacman、Zypper、国产 UOS/Kylin/Deepin）及 macOS（Homebrew），自动识别 `x86_64`、`aarch64` 与 `arm64` 架构。
-- 📐 **终端尺寸自适应与 SSH 80x24 锁定自愈**：
-  - 内置 `TRAPWINCH` 窗口改变信号监听，实时将窗格与物理屏幕同步；
-  - 智能包装 `nvim` 启动流程，在进入 Neovim 前自动探测真实物理行列数并刷新 PTY，彻底告别远程 SSH 窗口只有 80x24 半截屏幕的痛点。
-- 📝 **Neovim 官方最新稳定版保障**：
-  - 自动检测系统 Neovim 版本，若低于 0.10.0（如 Debian 12 仍为 0.7.2）或显式指定 `--with-latest-nvim`，自动从 GitHub Release 下载官方预编译最新版部署至 `~/.local/opt/nvim`，完美驾驭现代 Lua 插件生态。
-- 🖥️ **Tmux 现代化增强与全平台剪贴板互通**：
-  - 前缀键定制为人体工学的 `Ctrl + a`，继承当前工作目录的无缝分屏（`|` 与 `-`），窗格快速缩放与连续调整；
-  - 终极解决终端复制粘贴痛点：启用 **OSC 52** 协议，不论本地桌面还是通过远程 SSH 连接（Windows Terminal、iTerm2、Alacritty），复制文本均可直通宿主机系统剪贴板；
-  - 智能多系统降级保障（提供通用 `clipcopy` / `clippaste` 别名，支持 Wayland `wl-copy`、X11 `xclip`、macOS `pbcopy`、WSL `clip.exe`）；
-  - 鼠标拖拽选中文本自动复制，**保持当前视图位置，绝不闪退滚回屏幕底部**；
-  - 集成 TPM 插件体系（Tokyo Night 极客美化主题、会话恢复、Vim 无缝导航等）。
-- 🎨 **Powerlevel10k 主题多风格开箱即用与向导支持**：
-  - 支持经典彩虹流线（Rainbow）、现代极简纯净（Lean）、传统经典箭头（Classic）；
-  - 支持一键 `--p10k-wizard` 直接无缝拉取官方 `p10k configure` 进行个性化全定制。
-- ⚡ **零阻塞后台更新检测**：
-  - 终端启动时读取本地缓存（耗时 0ms），若有插件或 CLI 工具更新，高亮显示温馨提示；
-  - 自动在后台静默轮询（默认每 7 天异步检测一次，脱离前台进程），绝不拖慢终端打开速度。
-- 🔄 **一键安全升级**：
-  - 终端内随时输入 `zsh-update` 或运行 `bash install.sh --update`，自动检测并交互式升级已安装的 Git 插件、主题与包管理器工具；
-  - 升级前自动检测本地未提交修改，避免代码覆盖与冲突；升级后自动校验 `.zshrc` 语法。
-- 🛡️ **可靠的备份与回滚**：安装或恢复时对配置文件（含 `.zshrc` 与 `.tmux.conf`）进行 SHA-256 校验与状态快照，提供 `bash install.sh --rollback <DIR>` 一键回退。
-- ⏱️ **纯 Zsh 内置高精度计时**：采用 `zmodload zsh/datetime` 毫秒级计时，彻底解决 macOS BSD `date` 不支持 `%N` 导致的算术报错。
-- 💎 **工业级 Shell 工程规范（融合 `zsh4humans` 核心写法）**：
-  - **单键免回车瞬时交互**：选项按键（`y`/`n`/`1`/`2`/`q`）瞬间生效，无需反复敲 Enter 回车键；
-  - **防 Sudo 踩坑防护（Anti-Sudo Check）**：严密检测若误用 `sudo` 运行则立即叫停，防止将普通用户家目录及插件属主污染为 root；
-  - **防命令别名干扰**：底层操作显式调用 `command` 前缀，彻底免疫系统全局别名；
-  - **.zwc 编译字节码清理与原子替换**：新配置生成后自动清理过期缓存，杜绝命中旧字节码；
-  - **安装完成自举接管**：安装完成后可一键 `exec zsh -l` 直接无缝接入新环境。
+下图为 Debian GNU/Linux 13、Zsh 5.9 环境中的终端启动截图。
 
----
+![Zsh 项目启动截图：中文工具加载提示、Fastfetch 系统信息、插件更新提醒与启动耗时](assets/Ashampoo_Snap_12h48m48s.png)
 
-## 系统支持与版本兼容性矩阵
+- **顶部工具状态**：显示 Yazi、FZF、eza、lazygit、Neovim、zoxide 等集成信息，以及常用命令和快捷键。
+- **中部系统信息**：Fastfetch 展示 Debian 标识、系统、内核、桌面环境和硬件资源。
+- **底部更新提醒**：展示缓存中的插件更新清单，可运行 `zsh-update` 进入更新流程。
+- **加载计时**：`5441ms` 是这一次配置内计时的结果，不包括完整的终端连接过程，也不包含随后加载的用户扩展、高亮和首次提示符钩子。
 
-本项目经过系统性兼容审计，支持的操作系统最低、推荐及最高版本如下表所示：
+图中的 `vfox 初始化失败或超时，本次已跳过` 表示该次激活未成功，其余工具继续加载。排查方法见[故障排查](ZSH_TROUBLESHOOTING.md)。截图中的机器信息、更新数量和耗时均是当时记录。
 
-### 1. 操作系统版本支持范围
+## 文档导航
 
-| 操作系统体系 | 硬件架构 | 最低支持版本 | 推荐使用版本 | 最高支持版本 | 说明与依赖 |
-| --- | --- | --- | --- | --- | --- |
-| **macOS (Apple Silicon)** | `arm64` (M1/M2/M3/M4) | **macOS 11.0 (Big Sur)** | macOS 14 / 15+ | **macOS 15.x+ (最新)** | 苹果芯片硬件起跑版本，预装 Zsh 5.8+，Homebrew 原生支持 |
-| **macOS (Intel)** | `x86_64` | **macOS 10.15 (Catalina)** | macOS 13 / 14 | **macOS 15.x+ (最新)** | Catalina 首次将 Zsh 设为系统默认 Shell |
-| **Debian** | `x86_64`, `arm64` | **Debian 10 (Buster)** | Debian 12 / 13 | **Debian 13 (Trixie) / Sid** | 包含 Zsh 5.7+、Bash 5.0，实测环境 Debian 13 |
-| **Ubuntu / Mint / Pop!_OS** | `x86_64`, `arm64` | **Ubuntu 20.04 LTS** | Ubuntu 22.04 / 24.04 | **Ubuntu 24.10 / 25.04+** | 20.04 起附带完整 Zsh 5.8 与现代 glibc |
-| **Fedora** | `x86_64`, `arm64` | **Fedora 34** | Fedora 39 / 40 / 41 | **Fedora 41 / Rawhide** | 原生 DNF 包管理器支持 |
-| **RHEL / Rocky / Alma / Amazon Linux** | `x86_64`, `arm64` | **RHEL 8.0+ / AL2023** | Rocky 9.x / RHEL 9.x | **RHEL 9.x / 10.x** | DNF / YUM 双双平滑兼容支持 |
-| **Arch Linux / Manjaro / EndeavourOS** | `x86_64`, `arm64` | **Rolling (近期)** | 最新同步版本 | **Rolling (持续更新)** | Pacman 全量同步，始终提供最新 Zsh 5.9+ |
-| **openSUSE** | `x86_64`, `arm64` | **Leap 15.4+** | Leap 15.6 / Tumbleweed | **Tumbleweed (Rolling)** | 原生 Zypper 包管理器支持 |
-| **统信 UOS / 深度 Deepin / 麒麟 Kylin** | `x86_64`, `arm64` | **UOS V20 / Kylin V10** | 最新企业/社区版 | **持续支持** | 原生 APT 识别与多架构预编译二进制支持 |
-
-### 2. 软件运行依赖基准
-
-| 核心组件 | 最低版本要求 | 推荐版本 | 关键功能说明 |
-| --- | --- | --- | --- |
-| **Zsh** | **>= 5.1** | **>= 5.8** (推荐 5.9) | Powerlevel10k 与 Oh My Zsh 运行底座；内置 `zsh/datetime` 计时模块 |
-| **Tmux** | **>= 3.0** | **>= 3.2+** | 终端复用与多任务分屏；3.2+ 原生完整支持 OSC 52 剪贴板透传 |
-| **Bash** | **>= 4.2** | **>= 5.0** | `install.sh` 与 `check_updates.sh` 需支持安全错误拦截与关联数组 |
-| **Git** | **>= 2.0** | **>= 2.25+** | 支持 `git clone --depth=1` 极速拉取与 `git -C` 路径隔离 |
-| **FZF** | **>= 0.20** | **>= 0.48.0** | 0.48+ 原生启用 `--zsh` 极速集成，低版本自动安全降级 |
-
-## 文件结构说明
-
-| 文件 / 目录 | 用途说明 |
+| 需求 | 文档 |
 | --- | --- |
-| `install.sh` | 跨平台一键交互式安装器、配置管理与版本更新升级总入口 |
-| `scripts/manage.sh` | 配置管理底层脚本（支持停用/恢复、配置选项修改、只读体检与备份恢复） |
-| `scripts/retry_tools.sh` | 失败组件独立重试安装脚本 |
-| `scripts/check_updates.sh` | 独立的轻量级插件与应用版本检测脚本（供后台轮询与命令调用） |
-| `scripts/test_installer.sh` | 安装器隔离自动化回归测试套件 |
-| `scripts/test_management.sh` | 配置管理器隔离自动化回归测试套件 |
-| `templates/zshrc.zsh` | 经过多平台适配的 `.zshrc` 安装模板文件 |
-| `templates/tmux.conf` | 支持全平台剪贴板互通与美化主题的 `.tmux.conf` 模板文件 |
-| `.tmux.conf` | 项目内已就绪的现代化 Tmux 参考配置文件 |
-| `.zshrc` | 交互式 Zsh 完整参考配置（已分节并包含详尽中文注释） |
-| `.zshenv` | 跨平台环境变量配置（按需加载 Cargo 等环境） |
-| `CONFIGURATION_MANAGEMENT.md` | 配置管理指南（停用恢复、选项修改、体检诊断与备份恢复） |
-| `INSTALLER_TESTING.md` | 安装器审计修复、隔离测试与平台验证规范 |
-| `LINUX_ZSH_SETUP_GUIDE.md` | 从零开始的手动部署、跨平台配置与分步验收指南 |
-| `DEVELOPMENT.md` | 架构设计、加载生命周期、开发维护与跨平台工程规范 |
-| `ZSH_TROUBLESHOOTING.md` | 常见问题根因、排查命令与最终测试矩阵记录 |
+| 首次安装、手动部署与新会话验收 | [安装指南](LINUX_ZSH_SETUP_GUIDE.md) |
+| 开关、停用恢复、失败组件重试、备份 | [配置管理](CONFIGURATION_MANAGEMENT.md) |
+| 启动报错、工具缺失、更新失败、终端显示异常 | [故障排查](ZSH_TROUBLESHOOTING.md) |
+| 模块职责、加载顺序、状态文件与维护约定 | [开发文档](DEVELOPMENT.md) |
+| 隔离回归、实机验收与已验证范围 | [测试与验收](INSTALLER_TESTING.md) |
 
----
+## 功能与适用范围
 
-## 快速安装与使用
+- **基础环境**：Oh My Zsh、Powerlevel10k，以及自动建议、额外补全和语法高亮三个外部插件。
+- **完整工具集**：尝试安装并集成 FZF、fd、bat、eza、zoxide、Yazi、Neovim、Fastfetch。
+- **可选组件**：vfox、lazydocker、lazygit、tmux；安装 SDK、配置 Docker 服务和权限需另外处理。
+- **主题选择**：Rainbow、Lean、Classic、官方向导，或保留现有 `.p10k.zsh`。
+- **日常管理**：开关设置、只读体检、显式启动诊断、停用/恢复和失败组件重试。
+- **更新维护**：启动时展示本地缓存，达到间隔后启动后台检测；升级通过单独命令确认执行。
+- **配置备份**：受管文件保存原内容、原存在状态和操作后哈希，恢复时检查后续修改。
 
-### 1. 一键远程极速安装（推荐，无需事先克隆，借鉴 zsh4humans 设计）
+### 平台与依赖
 
-在全新的 Linux 或 macOS 终端中直接复制运行以下指令即可：
-
-```bash
-if command -v curl >/dev/null 2>&1; then
-  bash -c "$(curl -fsSL https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/install.sh)"
-else
-  bash -c "$(wget -O- https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/install.sh)"
-fi
-```
-
-### 2. 传统本地克隆安装方式
-
-若习惯先克隆仓库再执行：
-
-```bash
-git clone https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git ~/.zsh-project
-cd ~/.zsh-project
-bash install.sh
-```
-
-- **安装类型**：
-  - `basic`（基础版）：安装 Oh My Zsh、Powerlevel10k 主题，以及 `zsh-autosuggestions`、`zsh-completions`、`zsh-syntax-highlighting` 三大核心插件。
-  - `full`（完整版）：在基础版之上，自动检测并安装 `fzf`、`fd`、`bat`、`eza`、`zoxide`、`yazi`、`neovim`、`fastfetch`。
-- **可选组件**：按需提示安装 `vfox`（SDK 版本管理）、`lazydocker`（容器终端界面）与 `lazygit`（Git 终端面板）。
-
-### 2. 命令行参数与常用场景
-
-```bash
-bash install.sh [选项]
-```
-
-| 参数 | 说明 |
+| 平台或组件 | 当前实现与边界 |
 | --- | --- |
-| `--dry-run` | 预演执行计划，不修改文件、不联网、不调用权限提升 |
-| `--profile basic\|full` | 指定基础模式（核心插件）或完整工具集模式（现代 CLI 全套） |
-| `--p10k-style STYLE` | 指定 P10k 提示符风格：`rainbow`（经典彩虹，默认）、`lean`（极简纯净）、`classic`（传统流线）、`wizard`（向导配置）、`skip`（跳过/保持现有） |
-| `--p10k-wizard` | 快捷参数，等同于 `--p10k-style wizard`，安装后立即拉起官方配置向导 |
-| `--with-latest-nvim` | 从 GitHub Release 直接拉取并安装最新官方稳定版 Neovim（>= 0.10.x） |
-| `--with-vfox` | 请求安装 vfox（若仓库或脚本可用） |
-| `--with-lazydocker` | 请求安装 lazydocker 容器终端管理 |
-| `--with-lazygit` | 请求安装 lazygit Git 终端管理面板 |
-| `--with-tmux` | 请求安装并配置 tmux（含终端剪贴板互通与美化主题） |
-| `--lang zh\|en` | 指定界面语言（中文 `zh` 或英文 `en`） |
-| `--check-updates` | 检测已安装的插件、主题与应用是否有新版本 |
-| `--update` | 交互式更新所有有新版本的组件，并重新校验配置语法 |
-| `--rollback <DIR>` | 恢复指定备份目录中的配置，安全回退 |
-| `--help` | 查看帮助文档与参数说明 |
+| Linux | 安装器识别 APT、DNF/YUM、Pacman、Zypper 及部分衍生发行版；识别成功不代表所有可选软件都有可用包 |
+| macOS | 安装路径使用 Homebrew；未发现 Homebrew 时可交互引导安装；本轮未做 macOS 实机验证 |
+| 架构 | 安装器接受 `x86_64`/`amd64`、`aarch64`/`arm64`；每个上游二进制仍有自己的系统要求 |
+| Windows | 可在 MSYS/Cygwin 中运行部分隔离测试；真实安装入口不支持 Windows 原生环境 |
+| Bash | 安装和管理脚本必须用 Bash 运行，不使用 `sh install.sh`；本次测试版本为 Bash 5.2.37，未建立更早版本的兼容性结论 |
+| Zsh | 交互配置运行依赖；仓库历史记录包含 Debian 13 / Zsh 5.9 的部分用户验证，当前版本仍需目标机验收 |
+| tmux | 原样使用模板需至少 3.2，因为配置直接使用 `terminal-features` 和 `display-popup`；插件可能有额外要求 |
+| FZF | 优先使用 `fzf --zsh`，旧版本尝试加载发行版/Homebrew/用户集成脚本；没有可用集成脚本时提示升级 |
+| 超时工具 | 优先 `timeout`，其次 `gtimeout`；缺失时部分初始化和检查会直接运行，启动诊断则拒绝执行 |
 
-#### 常用安装命令示例
+tmux 的相关功能从 3.2 引入，参见[官方发布说明](https://github.com/tmux/tmux/issues/2737)。FZF 的 `--zsh` 从 0.48.0 提供，参见[官方集成说明](https://github.com/junegunn/fzf#setting-up-shell-integration)。本项目没有验证各发行版的最低/最高版本，不以过时的系统版本表承诺兼容。
+
+## 快速开始
+
+在目标 Linux 或 macOS 的普通用户终端中执行。Linux 安装系统包时会调用 sudo；不要用 `sudo bash install.sh`。
+
+### 1. 获取完整项目并验证
 
 ```bash
-# 场景 1：完全交互式安装（终端引导单键选择语言、工具集与主题风格）
-bash install.sh
-
-# 场景 2：完整工具集 + 经典彩虹高颜值主题（开箱即用，双行丰富图标）
-bash install.sh --profile full --p10k-style rainbow
-
-# 场景 3：完整工具集 + 立即进入官方配置向导（自由定制单双行、时间、图标等）
-bash install.sh --profile full --p10k-wizard
-
-# 场景 4：轻量基础模式 + 极简纯净主题（Lean）
-bash install.sh --profile basic --p10k-style lean
-
-# 场景 5：完整工具集 + 极简主题 + 启用 Tmux 终端复用增强
-bash install.sh --profile full --p10k-style lean --with-tmux
+git clone https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git "$HOME/.zsh-project"
+cd "$HOME/.zsh-project"
+bash scripts/test_installer.sh
+bash scripts/test_management.sh
+bash install.sh --dry-run --profile basic --p10k-style skip --lang zh
 ```
 
----
+已有仓库时进入现有目录，不重复克隆。测试失败先检查日志；`SKIP` 表示对应功能没有验证。预演不联网、不写项目状态、不安装软件，但也不会验证软件包可用性或备份完整性。
 
-## 插件与应用版本检测与更新
+### 2. 按需求安装
 
-### 自动检测与启动提示
-- 安装完成后，终端默认开启自动检测机制（保存在 `~/.zsh-project-options` 中）。
-- 当有插件（如 Oh My Zsh、Powerlevel10k、autosuggestions、Tmux 插件）或系统应用有新版本时，新打开终端将看到高亮提示：
+```bash
+# 基础配置，保留已有个人主题
+bash install.sh --profile basic --p10k-style skip --lang zh
 
-```text
-💡 [Zsh 更新提示] 检测到以下插件/应用有可用更新：
-  • [插件/主题] zsh-autosuggestions (落后 2 个提交)
-  • [插件/主题] tmux/tmux-tokyo-night (落后 1 个提交)
-  • [应用工具] eza (Homebrew 有新版本)
-  提示：可在终端输入 zsh-update 执行升级
+# 或：完整工具集与彩虹主题
+bash install.sh --profile full --p10k-style rainbow --lang zh
+
+# 或：完整工具集、tmux 与主题向导
+bash install.sh --profile full --with-tmux --p10k-wizard --lang zh
 ```
 
-### 快捷交互命令
-在已安装配置的 Zsh 终端中，你可以直接使用以下快捷命令：
+以上是三种选择，不需要依次执行。安装前会显示计划并确认；是否修改默认登录 Shell、是否进入新 Zsh 会话会另外询问。检测到已安装的 vfox、lazydocker、lazygit 或 tmux 时会自动纳入安装选项，因此即使选择 `basic`，也要检查最终计划，尤其是 `.tmux.conf` 是否将被替换。
 
-- **`zsh-check-updates`**：立即手动检测所有插件与工具的更新状态。
-- **`zsh-update`**：呼出交互式更新流程，确认后一键升级最新版本。
+安装器部署的是 **`templates/zshrc.zsh`**。根目录 `.zshrc` 是行为不同的参考配置，不要把直接复制它当作等价的安装或升级步骤。个人别名通常放入 `~/.zshrc.local`。
 
----
+### 3. 新会话验收
 
-## Tmux 终端增强与跨平台复制粘贴指南
+```bash
+zsh -n "$HOME/.zshrc"
+zsh
+```
 
-本项目内置了经过深度打磨的 `.tmux.conf`，将前缀键设为人体工学的 **`Ctrl + a`**，并彻底打通了终端复制粘贴。
+先用子 Shell 验证，异常时可以退出回到原终端。功能开关需新会话验证；反复 `source ~/.zshrc` 不能可靠清除旧别名和钩子。
 
-### 1. 终端复制与粘贴的 3 种完美方式
+### 单文件远程入口
 
-| 操作场景 | 推荐操作姿势 | 背后实现机制与特点 |
-| :--- | :--- | :--- |
-| **方式一：极简鼠标拖选** | 用鼠标直接框选所需文本，**松开鼠标即自动复制到系统剪贴板** | 选区完成后**保持在当前视图**，绝不退出复制模式，绝不跳回屏幕底部！ |
-| **方式二：Vim 键盘流复制** | 按 **`Ctrl+a` 紧接着按 `[`** 进入复制模式；<br>按 **`v`** 开始选区（或按 **`Ctrl+v`** 切换矩形块选）；<br>按 **`y`** 复制并退出 | 完美支持 Vim 键位（`h/j/k/l`、`w/b`、`0/$`），复制内容自动同步到操作系统剪贴板。 |
-| **方式三：终端原生穿透复制** | **按住 `Shift` 键的同时使用鼠标拖动选择** | 临时绕过 tmux 的鼠标事件截获，直接使用外层终端（Windows Terminal、iTerm2 等）原生划选，右键或 `Ctrl+C` 复制。 |
-| **终端粘贴到 Tmux** | **常规粘贴**：直接按终端原生粘贴键（Linux/Windows Terminal 按 `Ctrl+Shift+V`，macOS 按 `Cmd+V`）；<br>**Tmux 粘贴**：按 `Ctrl+a` 紧接着按 `p` 或 `]` | 任何文本均可安全粘贴进当前终端窗格，并受 Zsh 安全粘贴保护。 |
+完整仓库方式更便于检查、管理和重试。也可以先下载入口脚本、阅读后运行：
 
-> [!TIP]
-> **关于远程 SSH 与跨系统剪贴板（OSC 52）**：
-> 本项目已开启 `set -s set-clipboard on`。只要你使用的本地终端（如 Windows Terminal、iTerm2、Alacritty、Kitty、WezTerm 等）支持 OSC 52，哪怕通过多层 SSH 跳板机连接远程服务器，在 tmux 中复制时，文本都会直接送达你面前这台物理机的系统剪贴板！
+```bash
+bootstrap_dir=$(mktemp -d)
+curl -fSL https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/install.sh -o "$bootstrap_dir/install.sh"
+less "$bootstrap_dir/install.sh"
+bash "$bootstrap_dir/install.sh" --dry-run --lang zh
+bash "$bootstrap_dir/install.sh" --lang zh
+```
 
-### 2. Tmux 常用高频快捷键 (前缀键 `Ctrl + a`)
+逐条执行，下载失败不要继续。缺少模板时，实际安装会尝试下载项目到 `${XDG_CONFIG_HOME:-$HOME/.config}/zsh-project-repo`。如果 Git 克隆失败而进入原始文件下载分支，只下载 Zsh/tmux 模板与更新检测脚本，可能缺少安装器和管理/重试脚本；此时应改用完整仓库。自举下载及 Homebrew 准备可能发生在最终配置替换确认之前，只有 `--dry-run` 明确提前退出。
 
-| 快捷键 | 功能效果 | 备注与优化点 |
-| :--- | :--- | :--- |
-| **`Ctrl+a` 然后 `\|`** | **水平分屏**（左右两栏） | **自动继承当前工作目录**（不会跳回家目录） |
-| **`Ctrl+a` 然后 `-`** | **垂直分屏**（上下两栏） | **自动继承当前工作目录** |
-| **`Ctrl+a` 然后 `c`** | 新建窗口 | 继承当前工作目录 |
-| **`Ctrl+a` 然后 `m`** | 最大化 / 还原当前窗格 | 快速专注调试，再按一次还原分屏 |
-| **`Ctrl+a` 然后 `j / k / l / h`** | 调整窗格大小（下/上/右/左 5格） | **支持连续按键**（按一次 `Ctrl+a` 即可连击 `j/k/l/h`） |
-| **`Ctrl+a` 然后 `r`** | 重新加载 `~/.tmux.conf` | 状态栏会弹出绿色重载成功提示 |
-| **`Ctrl+a` 然后 `g`** | 快速唤出 lazygit 居中悬浮窗（支持 Tmux >= 3.2，按 `q` 或 `Esc` 退出返回） |
-| **`Ctrl+a` 然后 `G`** | 在新 Tmux 窗口中打开 lazygit 并继承当前目录 |
-| **`Ctrl+a` 然后 `Shift + I`** | 自动下载并安装新增的 TPM 插件 | 首次使用 TPM 或添加插件时使用 |
+## 命令参考
 
----
+每次选择一个主操作。管理操作的参数、确认规则和范围详见[配置管理](CONFIGURATION_MANAGEMENT.md)。
 
-## 常用按键与功能
-
-| 按键 / 命令 | 功能效果 |
+| 参数 | 作用 |
 | --- | --- |
-| **`t` / `ta` / `tls`** | Tmux 便捷命令（分别对应 `tmux`、`tmux attach -t`、`tmux ls`） |
-| **右方向键 (`→`)** | 光标在末尾时接受自动建议（灰色文字） |
-| **Tab** | 智能路径与命令补全 |
-| **Ctrl + R** | FZF 历史命令模糊查找（支持多终端实时共享历史） |
-| **Ctrl + T** | FZF 文件选择（集成 `bat` 代码实时预览） |
-| **Alt + C** | FZF 目录选择（集成 `eza` 目录树预览） |
-| **Ctrl + G** | 快速唤出 lazygit Git 终端面板（退出后自动重绘提示符，保留当前输入行） |
-| **上 / 下方向键** | 按已输入前缀搜索历史命令 |
-| **双击 Esc** | OMZ sudo 插件：为当前正在输入的命令添加 `sudo` 前缀 |
-| **`y`** | 启动 Yazi 终端文件管理器，退出时自动跳转至所选目录 |
-| **`z <关键词>`** | zoxide 智能目录跳转 |
-| **`ll` / `la`** | eza 现代化彩色列表（带图标、文件大小与详细权限） |
-| **`gst`** | OMZ Git 状态别名（等同于 `git status`） |
-| **`lg`** | 启动 lazygit Git 终端面板 |
-| **`lzd`** | 启动 lazydocker 容器终端面板 |
-| **`man <命令>`** | 打开彩色手册页（带语法高亮与 TokyoNight 样式配色） |
+| `--help` / `-h` | 查看安装器帮助 |
+| `--dry-run` | 只展示计划 |
+| `--profile basic` / `--profile full` | 选择基础环境或完整工具集 |
+| `--p10k-style STYLE` | `rainbow`、`lean`、`classic`、`wizard`、`skip`；默认值为 `rainbow` |
+| `--p10k-wizard` | 等同于 `--p10k-style wizard` |
+| `--with-latest-nvim` | 在 `full` 且非 Homebrew 分支请求下载 Neovim 官方 Release；不在 `basic` 中独立生效 |
+| `--with-vfox` / `--with-lazydocker` / `--with-lazygit` / `--with-tmux` | 启用对应可选组件 |
+| `--lang zh` / `--lang en` | 安装、更新界面语言；管理脚本当前主要为中文 |
+| `--check-updates` | 检测更新，联网并写缓存，不升级软件 |
+| `--update` | 检测、确认后更新第三方组件；Linux 系统包仍需手动升级 |
+| `--rollback DIR` | 从安装备份恢复受管配置；需交互确认 |
+| `--disable` / `--enable` | 停用/恢复项目 Zsh 配置 |
+| `--configure` / `--set KEY=0或1` | 配置菜单或单项开关 |
+| `--doctor` / `--profile-startup` | 只读体检 / 真实执行配置的启动诊断 |
+| `--retry-failed [TOOL]` | 重试失败清单或指定组件 |
+| `--list-backups` / `--diff-backup DIR` | 查看备份或差异 |
+| `--restore-backup DIR --scope zsh` | 按范围恢复；范围可为 `zsh`、`tmux`、`all` |
+| `--yes` | 仅管理与重试入口接受，显式跳过确认；普通安装/更新/回退不接受 |
 
----
+主题还支持 `--p10k-rainbow`、`--p10k-lean`、`--p10k-classic`、`--p10k-skip` 简写。
 
-## 二次运行与增量部署机制（幂等性）
+## 常用功能
 
-当你第一次运行 `bash install.sh` 完成安装后，如果后续修改了项目（如调整了模板、更新了别名、新增了函数），并推送到 Git 远端后在各台机器执行 `git pull`，再次运行 `bash install.sh` **绝不会从头到尾重新下载或重装一遍**，而是具备完整的**幂等性（Idempotence）**：
+以下以安装模板为准，要求对应工具存在且开关开启。
 
-1. **软件与 CLI 工具（0 秒跳过）**：
-   - 核心系统包管理器（APT/DNF/Pacman/Brew）检测到软件包已是最新时，直接报告 `already installed`，不重复下载。
-   - 现代化 CLI 工具（`fzf`、`eza`、`bat`、`zoxide`、`yazi`、`fastfetch`、`nvim` 等）以及可选工具（`vfox`、`lazydocker`、`lazygit` 等），均由安装器前置检查 `command -v <tool>`，已存在时**立刻跳过**。
-2. **Git 仓库与插件（完整保留）**：
-   - Oh My Zsh、Powerlevel10k、各大插件及 TPM 目录若已存在且结构完整，安装器直接提示 `保留已有组件` 并立即返回，**绝不重新克隆**。
-3. **配置文件精准增量更新**：
-   - 自动为现有 `~/.zshrc` 生成带时间戳与 SHA-256 校验的快照备份（保存在 `~/.local/state/zsh-project/`）。
-   - 将项目中最新修改的 `templates/zshrc.zsh` 原子部署至 `~/.zshrc`，并刷新选项配置。
-   - 自动清理旧的编译字节码缓存（`~/.zshrc.zwc`），杜绝因旧缓存命中导致新配置不生效。
+| 按键或命令 | 用途 |
+| --- | --- |
+| Tab / 右方向键 | 补全 / 在行尾接受自动建议 |
+| Ctrl+R / Ctrl+T / Alt+C | FZF 历史搜索 / 文件选择 / 目录选择（`full=1`） |
+| 上下方向键 | 按已输入前缀搜索历史 |
+| 双击 Esc | OMZ sudo 插件为当前输入添加 sudo 前缀 |
+| `y` / `z 关键词` | Yazi 退出后切换目录 / zoxide 跳转（`full=1`） |
+| `ll` / `la` | eza 详细列表 / 含隐藏项列表（`full=1`） |
+| `v` / `vim` / `vi` | 运行 Neovim 包装函数（`full=1` 且存在 nvim） |
+| `lg` / Ctrl+G | lazygit Git 面板 |
+| `lzd` | lazydocker 容器面板 |
+| `gst` / `man 命令` | OMZ Git 状态别名 / 手册；颜色取决于分页器和终端 |
+| `t` / `ta 名称` / `tls` / `tn 名称` | tmux / 连接会话 / 列出会话 / 新建会话 |
+| `zsh-config` | 配置菜单；可附加 `--doctor`、`--set banner=0` 等管理参数 |
+| `zsh-check-updates` / `zsh-update` | 手动检测 / 更新第三方组件 |
 
-> [!TIP]
-> **日常更新工作流区分**：
-> 1. **同步项目配置修改**：在仓库修改并 `git push` → 目标机器 `git pull` → 运行 `bash install.sh`（或直接 `cp .zshrc ~/.zshrc && source ~/.zshrc`）。全过程仅需 **2~5 秒** 即可将最新改动安全生效，绝不重复下载或重装工具。
-> 2. **升级第三方插件与系统工具**：运行 `bash install.sh --update`（或终端运行 `zsh-update`），专门用于在线升级 Oh My Zsh、Powerlevel10k 及 CLI 软件包。
+### tmux 操作
 
----
+前缀键为 `Ctrl+a`：先按前缀，再按表中的键。
 
-## 配置回退与安全恢复
+| 后续按键 | 作用 |
+| --- | --- |
+| `\|` / `-` | 左右分屏 / 上下分屏，继承当前目录 |
+| `c` / `m` | 新建窗口 / 最大化或还原窗格 |
+| `h` / `j` / `k` / `l` | 向左/下/上/右调整窗格 5 格，可连续按键 |
+| `r` | 重新加载 `.tmux.conf`，其中的命令与插件也会执行 |
+| `g` / `G` | lazygit 弹窗 / 在新窗口打开 lazygit |
+| `[` | 进入复制模式，`v` 开始选区，`Ctrl+v` 切换矩形选区，`y` 复制并退出 |
+| `p` / `]` | 粘贴 tmux 缓冲区 |
+| `I`（Shift+i） | TPM 安装插件 |
 
-如果需要回退到之前的某次安装状态：
+鼠标拖选使用 `copy-pipe`，复制后保留复制模式；键盘 `y` 使用 `copy-pipe-and-cancel`。配置启用 OSC 52，并尝试本地剪贴板工具；是否能复制到 SSH 客户端取决于终端支持、设置和中间层，参见[tmux 官方剪贴板说明](https://github.com/tmux/tmux/wiki/Clipboard)。外层终端的原生选择/粘贴键也可使用，具体按键以该终端设置为准。
 
-1. 查看安装时提示的备份路径（通常位于 `~/.local/state/zsh-project/install-XXXXXXXX/`）。
-2. 执行回滚命令：
+## 更新与重新部署
+
+| 目标 | 操作 | 影响 |
+| --- | --- | --- |
+| 查看第三方更新 | `bash install.sh --check-updates` | Git fetch、包信息查询和缓存写入 |
+| 更新第三方组件 | `bash install.sh --update` | Git 插件、TPM、FZF 仓库及 macOS Homebrew 工具；不部署模板 |
+| 同步项目新配置 | 仓库中检查本地改动、`git pull --ff-only` 后重新运行安装器 | 重新选择安装项、备份并部署模板和选项 |
+| 修改个人别名 | 编辑 `~/.zshrc.local` | 新会话加载，安装器不覆盖 |
+| 仅修复缺失组件 | `bash install.sh --retry-failed TOOL` | 重试软件，不重写配置 |
+
+重新安装会保留完整的已有 OMZ/主题/插件目录，并跳过部分已存在的可选命令；但基础依赖仍调用包管理器，Arch 分支包含 `pacman -Syu`，旧版 FZF/Neovim 可能触发下载。选项文件会重新生成，主题和 tmux 可能重新部署，不能保证固定耗时，也不是仅复制发生变化的行。
+
+默认后台检测间隔为 7 天，在打开交互式 Zsh 时判断是否到期，并非独立定时服务。关闭 `auto-update` 不会隐藏已有缓存。APT 结果依赖本地软件包索引；Zypper/YUM-only、没有 `checkupdates` 的 Arch，以及独立 Release 二进制没有完整的应用版本检测覆盖。“没有更新”只适用于实际检查的范围。
+
+## 配置回退与当前限制
 
 ```bash
-bash install.sh --rollback ~/.local/state/zsh-project/install-XXXXXXXX
+bash install.sh --list-backups
+bash install.sh --diff-backup /实际安装备份目录 --scope all
+bash install.sh --rollback /实际安装备份目录
 ```
 
-3. 恢复工具会对当前的配置文件哈希进行校验，确认未被意外修改后安全覆盖回原状态。
+将示例路径替换为安装输出的 `install-XXXXXXXX` 目录。恢复只覆盖备份中记录的配置，不卸载软件、不回退插件版本或登录 Shell。后续修改导致哈希不一致时会拒绝覆盖；更灵活的范围恢复见[配置管理](CONFIGURATION_MANAGEMENT.md)。
 
----
+使用前还需了解：
 
-## 进阶与排查
+- 安装器不支持自定义 `ZDOTDIR`，受管文件为符号链接或目录时拒绝自动替换。
+- 主安装器的 lazydocker 下载回退仍使用不含版本号的资产名，失败后可尝试 `--retry-failed lazydocker` 的版本化下载入口。
+- `failed-components` 是跳过包的记录，不是所有安装步骤和插件的完整健康报告；TPM 插件安装失败可能被忽略。
+- `--update` 没有统一配置快照或完整事务回退，TPM 和 FZF 的行为也不能概括为全部受本地修改保护。
+- 安装日志位于备份目录；安装失败时备份可能尚未生成完整哈希，不保证可直接自动回退。
 
-详细的手动配置教程、各发行版软件差异和日常故障排查方法，请参阅：
-- [Linux 与 macOS Zsh 完整配置教程](LINUX_ZSH_SETUP_GUIDE.md)
-- [架构设计与开发规范文档](DEVELOPMENT.md)
-- [问题原因、修复过程与排查命令](ZSH_TROUBLESHOOTING.md)
+更多具体边界及后续维护事项见[开发文档](DEVELOPMENT.md)。
+
+## 文件结构
+
+| 文件 / 目录 | 用途 |
+| --- | --- |
+| `install.sh` | 安装、第三方更新、安装备份回退和管理分发入口 |
+| `scripts/manage.sh` / `scripts/retry_tools.sh` | 配置管理 / 失败组件重试 |
+| `scripts/check_updates.sh` | 更新检测与缓存写入 |
+| `scripts/test_installer.sh` / `scripts/test_management.sh` | 当前隔离回归入口 |
+| `templates/zshrc.zsh` / `templates/tmux.conf` | 安装器实际部署的模板 |
+| `templates/zshrc.local.example` | 用户扩展示例 |
+| `.zshrc` / `.tmux.conf` | 根目录参考配置；`.zshrc` 与安装模板行为不同 |
+| `.zshenv` | 当前为空文件，安装器不部署它 |
+| `.github/workflows/tests.yml` | Linux 容器回归配置，结果以对应运行记录为准 |
+| `assets/` | 项目展示截图 |
+| `scratch/`、`*.before-fix`、`.zhistory`、`.zsh_history` | 历史审计材料、备份和命令记录，不用于新机器部署 |

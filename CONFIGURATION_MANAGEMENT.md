@@ -1,5 +1,7 @@
 # Zsh 配置管理
 
+核对日期：2026-09-13。本文描述安装器部署的 `templates/zshrc.zsh`；根目录 `.zshrc` 的部分工具不受同样的开关控制，差异见[开发文档](DEVELOPMENT.md)。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)。
+
 在完整项目目录中运行下列命令。涉及配置写入或组件安装时会询问确认。加 `--dry-run` 仅展示操作，不写文件、不联网、不执行用户配置。`--yes` 可显式跳过管理操作的确认，不适用于普通安装流程。
 
 ## 停用与恢复
@@ -88,7 +90,36 @@ bash install.sh --restore-backup /实际备份目录 --scope zsh
 
 状态目录默认为 `~/.local/state/zsh-project`，设置 `XDG_STATE_HOME` 时改用其下的 `zsh-project`。`install-*` 为安装备份，`manage-*` 为管理快照；`.state` 记录原文件是否存在，`.sha256` 记录该操作结束后内容的校验值。过期 `.zwc` 会移入管理快照，恢复后重新读取源文件。
 
+`--rollback DIR` 适用于安装器生成的完整安装备份，不应指向只保存单个开关的管理快照。它不创建新的恢复前快照；`--restore-backup DIR` 会先备份当前受管文件，并支持上述范围筛选。两者都不卸载软件或还原插件版本。安装中断时可能尚未生成完整哈希，此时不要手工伪造哈希绕过保护，应比较原文件和当前文件后恢复。
+
 管理器拒绝链接或目录形式的受管文件，暂不管理自定义 `ZDOTDIR`。磁盘故障或强制终止时，多文件恢复可能只完成一部分，快照保留供检查。遇到残留 `manage.lock` 或 `retry.lock`，先确认没有操作正在运行再处理，不要并发执行安装、恢复和重试。
+
+## 更新检测、脚本副本与语言
+
+```bash
+bash install.sh --check-updates
+bash scripts/check_updates.sh --timeout 15 --lang zh
+bash install.sh --update --lang zh
+```
+
+前两条只检测，但会联网、执行 Git fetch 和写缓存；第三条检测后交互升级第三方组件。Linux 系统包需要用相应包管理器另行更新，`--update` 不部署模板，也不创建安装备份。
+
+`--timeout 15` 只改变这一次独立检测；随后 `--update` 会再次以默认参数检测。`zsh-check-updates` 和 `zsh-update` 当前不会转发额外参数，所以不要用 `zsh-check-updates -t 15` 调整超时。
+
+默认在新会话检查是否距离 `last_update_check` 超过 7 天，再启动后台进程。该文件也可能记录一次失败检查的发起时间，不是可靠的最后成功时间；失败后可以手动检测。`auto-update=0` 只停止周期性检测，旧缓存仍会展示。
+
+`zsh-config` 和检查命令优先使用状态目录 `scripts/` 中的安装副本，缺失时才尝试项目目录。仅在仓库 `git pull` 不会刷新这些副本。需要确认当前行为时可从完整仓库直接调用相应脚本；重新安装会复制新版脚本，但也会重新生成选项，详见 [README](README.md)。找不到完整安装器时，`zsh-update` 可能退化为只执行检测。
+
+管理脚本接受 `--lang` 参数以兼容入口转发，但当前管理提示主要是中文，并未实现完整双语界面。非交互执行写操作需显式 `--yes`；在只有文本替换的操作中它跳过确认，不代表脚本会自动满足缺少的依赖。
+
+## 使用边界
+
+- 管理器读取选项时不执行代码，但真实 Zsh 启动会 source `~/.zsh-project-options`；不要将不可信脚本内容放入其中。
+- 重试入口的发行版识别比安装器窄，DNF 分支没有 YUM 回退，部分衍生系统可能需手动安装。
+- `failed-components` 只保存跳过的可选包，不包含完整插件健康状态，也不一定记录所有下载或运行失败。
+- `--doctor` 不 source 配置，但会执行本机工具的 `--version`；它也不会验证所有按键、TPM 插件、Docker 连接或 SDK 切换。
+- `--profile-startup` 会真正执行配置和目录钩子，输出的诊断阶段只适用于相应模板，不代表完整终端连接耗时。
+- 主安装器、管理和重试没有统一互斥锁，应顺序运行。状态路径变更后旧备份不会自动迁移。
 
 ## 验证
 
@@ -97,4 +128,4 @@ bash scripts/test_installer.sh
 bash scripts/test_management.sh
 ```
 
-测试使用临时 HOME 和本地桩，不做真实安装，保留测试目录便于排查。GitHub Actions 配置覆盖 Debian 12/13、Ubuntu 24.04、Fedora、Arch 容器；写入配置不代表这些平台已经通过。验证边界见 `INSTALLER_TESTING.md`。
+测试使用临时 HOME 和本地桩，不做真实安装，保留测试目录便于排查。GitHub Actions 配置覆盖 Debian 12/13、Ubuntu 24.04、Fedora、Arch 容器；写入配置不代表这些平台已经通过。当前验证结果和跳过项见[测试与验收](INSTALLER_TESTING.md)。

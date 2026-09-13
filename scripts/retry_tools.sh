@@ -8,6 +8,7 @@ while (($#)); do
   case "$1" in --yes) YES=1 ;; --dry-run) DRY=1 ;; --*) echo '未知参数' >&2; exit 1 ;; *) [[ -z "$TOOL" ]] || exit 1; TOOL=$1 ;; esac
   shift
 done
+# 统一发行版包名与命令别名，并拒绝不在支持列表中的组件。
 normalize() {
   case "$1" in
     fd-find|fd) echo fd ;; batcat|bat) echo bat ;; neovim|nvim) echo neovim ;;
@@ -16,6 +17,7 @@ normalize() {
     *) printf '不支持的组件：%s\n' "$1" >&2; return 1 ;;
   esac
 }
+# 显式指定组件时只重试该项，否则读取上次安装留下的失败清单。
 REQUESTED=()
 if [[ -n "$TOOL" ]]; then
   component=$(normalize "$TOOL") || exit 1
@@ -36,6 +38,7 @@ if ((YES == 0)); then
   read -r -p '继续安装以上组件？[y/N] ' answer
   [[ "$answer" == y || "$answer" == Y ]] || exit 0
 fi
+# 确认后才创建状态目录与互斥锁；每次运行保留独立日志便于排查。
 mkdir -p "$STATE"
 mkdir "$STATE/retry.lock" 2>/dev/null || { echo '已有重试正在运行，请先检查 retry.lock'; exit 1; }
 trap 'rmdir "$STATE/retry.lock" 2>/dev/null || true' EXIT
@@ -51,6 +54,7 @@ elif [[ -r /etc/os-release ]]; then
   case "${ID:-} ${ID_LIKE:-}" in *debian*|*ubuntu*) FAMILY=apt ;; *fedora*|*rhel*) FAMILY=dnf ;; *arch*) FAMILY=pacman ;; *suse*) FAMILY=zypper ;; esac
 fi
 [[ -n "$FAMILY" ]] || { echo '不支持此发行版的自动重试'; exit 1; }
+# 按实际命令判断可用性；ncurses-term 是终端数据包，交由包管理器确认。
 available() {
   local component=$1 cmd=$1
   case "$component" in neovim) cmd=nvim ;; wl-clipboard) cmd=wl-copy ;; ncurses-term) return 1 ;; esac
@@ -59,6 +63,7 @@ available() {
   if [[ "$component" == bat ]] && command -v batcat >/dev/null; then return 0; fi
   return 1
 }
+# 将统一组件名转换为对应发行版的包名，优先使用系统包管理器。
 package_install() {
   local component=$1 package=$1
   if [[ "$component" == fd && ( "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == zypper ) ]]; then package=fd-find; fi
@@ -70,6 +75,7 @@ package_install() {
     brew) brew install "$package" ;;
   esac
 }
+# 包管理器安装失败时下载官方二进制；验证可执行性后才写入用户命令目录。
 lazydocker_release() {
   local url tag version arch os asset stage
   command -v curl >/dev/null || return 1
@@ -91,6 +97,7 @@ lazydocker_release() {
   "$stage/lazydocker" --version || return 1
   install -m 755 "$stage/lazydocker" "$HOME/.local/bin/lazydocker"
 }
+# 根据版本、系统和架构拼接官方资产名；已有目标文件时拒绝覆盖。
 lazygit_release() {
   local url tag version arch os asset stage
   command -v curl >/dev/null || return 1
@@ -112,6 +119,7 @@ lazygit_release() {
   install -m 755 "$stage/lazygit" "$HOME/.local/bin/lazygit"
 }
 
+# 保留未参与本次重试的失败项，仅根据本次结果更新对应组件。
 PENDING=()
 if [[ -f "$STATE/failed-components" ]]; then
   while IFS= read -r component || [[ -n "$component" ]]; do
@@ -139,6 +147,7 @@ for component in "${REQUESTED[@]}"; do
   if ((ok)); then printf 'PASS: %s 可用\n' "$component"
   else PENDING+=("$component"); failed=1; printf 'FAIL: %s；查看 %s/%s.log\n' "$component" "$RUN" "$component"; fi
 done
+# 先写去重后的完整清单再替换旧文件；全部成功时写入空清单。
 tmp=$(mktemp "$STATE/failed-components.XXXXXXXX")
 if ((${#PENDING[@]})); then printf '%s\n' "${PENDING[@]}" | sort -u > "$tmp"; fi
 mv "$tmp" "$STATE/failed-components"

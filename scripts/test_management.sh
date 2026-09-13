@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# 配置管理隔离回归：使用临时 HOME 与命令替身，退出后保留现场供排查。
 set -Eeuo pipefail
 case ${OSTYPE:-} in msys*|cygwin*) export PATH="/usr/bin:$PATH" ;; esac
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
@@ -7,6 +8,7 @@ export HOME="$STAGE/home" XDG_STATE_HOME="$STAGE/state" XDG_CONFIG_HOME="$STAGE/
 unset ZDOTDIR
 mkdir -p "$HOME" "$STAGE/bin"
 export AUDIT_MARKER="$STAGE/forbidden-call"
+# 联网、提权和安装命令一旦被调用便留下标记并失败，防止测试触及真实系统。
 for tool in curl wget git sudo brew apt-get dnf pacman zypper; do
   printf '#!/usr/bin/env bash\necho "$0" >> "$AUDIT_MARKER"\nexit 1\n' > "$STAGE/bin/$tool"
   chmod +x "$STAGE/bin/$tool"
@@ -18,6 +20,7 @@ pass() { echo "PASS: $*"; }
 manage() { bash "$ROOT/scripts/manage.sh" "$@"; }
 bash -n "$ROOT/scripts/manage.sh"
 bash -n "$ROOT/scripts/retry_tools.sh"
+# 验证安装入口能够分发管理预演，且不会创建状态或调用外部安装工具。
 for action in --disable --enable --doctor --configure --profile-startup --retry-failed --list-backups; do
   bash "$ROOT/install.sh" "$action" --dry-run > "$STAGE/dry.log"
 done
@@ -28,6 +31,7 @@ for action in --set --diff-backup --restore-backup; do
 done
 pass 'management dry-run dispatch has no state writes'
 
+# 验证停用/恢复的幂等性、字节码退役，以及对用户后续修改的覆盖保护。
 printf '# zsh-project\necho ORIGINAL\n' > "$HOME/.zshrc"
 echo TMUX > "$HOME/.tmux.conf"
 echo ENV > "$HOME/.zshenv"

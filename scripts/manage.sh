@@ -13,6 +13,7 @@ confirm() {
   read -r -p "$1 [y/N] " answer
   [[ "$answer" == y || "$answer" == Y ]]
 }
+# 每次仅接受一个管理动作；范围与确认选项由后续动作共同使用。
 while (($#)); do
   case "$1" in
     --disable|--enable|--doctor|--configure|--profile-startup|--list-backups)
@@ -36,12 +37,15 @@ done
 [[ -d "$HOME" && "$HOME" == /* ]] || fail '无效 HOME'
 if ((DRY)); then printf '[DRY RUN] %s %s scope=%s；不写文件、不联网、不执行配置。\n' "$ACTION" "$ARG" "$SCOPE"; exit 0; fi
 
+# 缺失文件用固定标记参与比较，以区分“原本不存在”和“内容已修改”。
 hash() {
   if [[ ! -e "$1" ]]; then printf 'missing\n'
   elif command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d ' ' -f1
   else shasum -a 256 "$1" | cut -d ' ' -f1; fi
 }
+# 写入前拒绝符号链接与特殊文件，避免配置操作落到意外目标。
 regular() { [[ ! -L "$1" && ( ! -e "$1" || -f "$1" ) ]] || fail "拒绝链接或非普通文件：$1"; }
+# 用目录创建的原子性阻止并发管理操作；退出时仅释放本进程取得的锁。
 lock() {
   mkdir -p "$STATE"
   mkdir "$STATE/manage.lock" 2>/dev/null || fail '已有管理操作运行，或上次异常留下 manage.lock，请先检查'
@@ -51,6 +55,7 @@ cleanup() { if ((LOCKED)); then rmdir "$STATE/manage.lock" 2>/dev/null || true; 
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+# 保存操作前内容、存在状态与所属 HOME；操作后由 record 更新冲突检测哈希。
 snapshot() {
   local file
   SNAP=$(mktemp -d "$STATE/manage-XXXXXXXX")
@@ -66,7 +71,9 @@ snapshot() {
     hash "$HOME/$file" > "$SNAP/$file.sha256"
   done
 }
+# 哈希记录操作后的状态，恢复时据此识别用户在操作之后做出的修改。
 record() { local file; for file in "$@"; do hash "$HOME/$file" > "$SNAP/$file.sha256"; done; printf '备份：%s\n' "$SNAP"; }
+# 将旧字节码移入快照，避免新配置仍命中旧的 Zsh 编译缓存。
 retire_bytecode() {
   local target=$1
   if [[ -e "$target.zwc" || -L "$target.zwc" ]]; then
@@ -74,6 +81,7 @@ retire_bytecode() {
     mv "$target.zwc" "$SNAP/retired.${target##*/}.zwc"
   fi
 }
+# 在 HOME 内准备受限权限的临时文件，再通过重命名替换目标配置。
 atomic_copy() {
   local source=$1 target=$2 tmp
   regular "$target"
@@ -83,6 +91,7 @@ atomic_copy() {
   retire_bytecode "$target"
   mv -f "$tmp" "$target"
 }
+# 校验备份归属，并按 zsh/tmux/all 范围筛选有明确存在状态的配置文件。
 load_backup() {
   [[ -d "$ARG" && ! -L "$ARG" && -f "$ARG/manifest" ]] || fail '无效备份目录'
   [[ $(head -n 1 "$ARG/manifest") == "$HOME" ]] || fail '备份属于其它 HOME'
@@ -103,6 +112,7 @@ load_backup() {
   done
   ((${#FILES[@]})) || fail '此备份没有选定范围的文件'
 }
+# 只读取严格的布尔赋值；重复键取最后一项，不执行用户选项文件。
 get_option() {
   local key=$1 default=$2 value=''
   if [[ -f "$HOME/.zsh-project-options" ]]; then
@@ -110,6 +120,7 @@ get_option() {
   fi
   printf '%s\n' "${value:-$default}"
 }
+# 将菜单名称映射到固定变量名，限制可修改的选项集合。
 option_key() {
   case "$1" in
     full) echo ZSH_PROJECT_FULL ;; vfox) echo ZSH_PROJECT_VFOX ;;
@@ -119,6 +130,7 @@ option_key() {
     *) fail '可选项：full vfox lazydocker lazygit tmux banner fastfetch timer auto-update' ;;
   esac
 }
+# 确认后先加锁和备份，再替换单项设置；选项在新会话中生效。
 set_option() {
   local name=${1%%=*} value=${1#*=} key tmp
   [[ "$1" == *=* && ( "$value" == 0 || "$value" == 1 ) ]] || fail '格式应为选项=0或1'
@@ -137,6 +149,7 @@ set_option() {
   record .zsh-project-options
 }
 
+# 各管理动作共享上述备份与写入规则；只读动作不取得写锁。
 case "$ACTION" in
   --disable)
     [[ ! -e "$STATE/disabled" ]] || { echo '已经停用，无需重复操作。'; exit 0; }

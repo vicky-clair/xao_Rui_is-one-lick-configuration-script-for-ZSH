@@ -3,6 +3,8 @@
 # 兼容 Linux 与 macOS，支持双语（中/英）交互与静默后台缓存写入。
 set -Eeuo pipefail
 export LC_ALL=C
+# 补全用户本地命令目录与 macOS Apple Silicon / Intel 下的 Homebrew 路径
+export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"
 
 TIMEOUT_SEC=5
 QUIET=0
@@ -149,7 +151,7 @@ check_apps() {
   if [[ "$os" == Darwin ]] && command -v brew >/dev/null 2>&1; then
     # macOS Homebrew 检测
     local outdated
-    outdated=$(run_with_timeout "$TIMEOUT_SEC" brew outdated --formula --quiet 2>/dev/null) || { CHECK_FAILED=1; return 0; }
+    outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 run_with_timeout "$TIMEOUT_SEC" brew outdated --formula --quiet 2>/dev/null) || { CHECK_FAILED=1; return 0; }
     if [[ -n "$outdated" ]]; then
       local tools=(fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux)
       for t in "${tools[@]}"; do

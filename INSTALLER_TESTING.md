@@ -4,21 +4,21 @@
 
 ## 最近一次本地验证
 
-日期：2026-09-13。基于提交 `b889723` 的工作区，包含本轮中文注释和文档编辑。环境为 Windows 下的 Bash 5.2.37（版本输出目标为 `x86_64-pc-cygwin`）；当前无可用 Zsh 命令。
+日期：2026-10-17。基于提交 `66c4bc3` 的工作区，包含 macOS 兼容性全面修复（Bash 3.2 数组展开、Homebrew 包与路径适配、Release 回退修复与测试隔离）。测试环境为 macOS Golden Gate 27.0.1 (arm64 Apple M1)，系统原生 Bash 3.2.57 与 Zsh 5.9，Homebrew 管理器环境。
 
 | 检查 | 本次结果 | 解释 |
 | --- | --- | --- |
-| 六个正式 Bash 脚本语法 | 通过 | 解析检查，不执行安装 |
-| 六份 Markdown 文档检查 | 通过 | 34 个本地链接有效、43 段 Bash 示例语法通过、代码围栏配对；外部资料仅针对引用的关键事实核查 |
-| `bash scripts/test_installer.sh` | 退出码 0，可运行用例通过 | 原生悬空符号链接切换、Zsh 运行用例跳过 |
-| `bash scripts/test_management.sh` | 退出码 0，可运行用例通过 | Zsh 开关、扩展顺序、分段诊断及 Linux PTY 用例未验证 |
-| Linux / macOS 实际安装 | 未执行 | 不从模拟结果推断安装成功 |
+| 六个正式 Bash 脚本语法 | 通过 | 解析检查，全数通过 |
+| Zsh 模板与配置语法检查 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
+| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、原生悬空符号链接、回退保护用例均通过 |
+| `bash scripts/test_management.sh` | 退出码 0，全量通过 | Zsh 开关、差异恢复、失败重试隔离、macOS PTY `script` 终端启动诊断全数通过 |
+| macOS 实际安装部署 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh` 实机部署成功，受管配置与备份完整生效 |
+| 终端交互与组件验收 | 通过 | 新开终端会话启动正常（~740ms - 2300ms），11 款 CLI 工具挂载正常，Fastfetch 渲染正常，Tmux 插件生态就绪 |
 | 当前版本远端 CI | 本轮未查询或触发 | 工作流存在不等于当前代码已通过 |
-| 终端交互、tmux 剪贴板、实际 Release 下载 | 本轮未执行 | 需要目标机验证 |
 
-本次测试现场保留在 Bash 的 `/tmp/zsh-installer-tests.8oiwnWCN` 和 `/tmp/zsh-management-tests.qH5kSme6`。这些是当前测试环境的临时路径，不是需要部署的仓库资源。
+本次测试现场保留在 `/var/folders/.../zsh-installer-tests.*` 和 `zsh-management-tests.*`。这些是测试运行的临时路径，不是需要部署的仓库资源。
 
-测试中故意制造的拒绝覆盖、非法参数和失败下载会输出“错误”或 `FAIL: lazydocker`，随后应由测试断言确认预期失败。判断套件结果要同时看最终退出码、完成标记和 SKIP，不能只搜索日志中的一个单词。
+测试中故意制造的拒绝覆盖、非法参数和失败下载会输出“错误”或 `FAIL: lazydocker`，随后由测试断言确认预期失败。判断套件结果要同时看最终退出码、完成标记和 SKIP，不能只搜索日志中的一个单词。
 
 ## 第一层：静态语法检查
 

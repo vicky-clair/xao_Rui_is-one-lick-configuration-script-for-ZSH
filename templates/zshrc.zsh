@@ -18,17 +18,18 @@ typeset -g POWERLEVEL9K_INSTANT_PROMPT=off
 [[ ${ZSH_PROJECT_PROFILING:-0} != 1 ]] || ZSH_PROJECT_AUTO_CHECK_UPDATE=0
 
 # ------------------------------------------------------------------------------
-# 字符编码与语言环境保障（确保 UTF-8，彻底杜绝 Neovim、Tmux 与终端符号乱码）
+# 字符编码与语言环境保障（确保 UTF-8，兼容 Linux .utf8 与 macOS .UTF-8 命名差异）
 # ------------------------------------------------------------------------------
+# 探测系统支持的 UTF-8 语言环境并配置，彻底杜绝 Neovim、Tmux 与终端符号乱码
 if [[ -z "$LANG" || "$LANG" == "C" || "$LANG" == "POSIX" ]]; then
-  if locale -a 2>/dev/null | grep -qi "^C\.utf8$"; then
+  if locale -a 2>/dev/null | grep -qiE "^C\.utf-?8$"; then
     export LANG="C.UTF-8"
-  elif locale -a 2>/dev/null | grep -qi "en_US\.utf8"; then
+  elif locale -a 2>/dev/null | grep -qiE "^en_US\.utf-?8$"; then
     export LANG="en_US.UTF-8"
-  elif locale -a 2>/dev/null | grep -qi "zh_CN\.utf8"; then
+  elif locale -a 2>/dev/null | grep -qiE "^zh_CN\.utf-?8$"; then
     export LANG="zh_CN.UTF-8"
   else
-    export LANG="C.UTF-8"
+    export LANG="en_US.UTF-8"
   fi
 fi
 [[ "$LC_ALL" == "C" || "$LC_ALL" == "POSIX" ]] && unset LC_ALL

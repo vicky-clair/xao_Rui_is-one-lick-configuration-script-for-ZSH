@@ -122,11 +122,11 @@ If Git cloning fails and the raw-file fallback is used, it downloads only the Zs
 | Platform or dependency | Implementation and limits |
 | :--- | :--- |
 | **Linux** | Recognizes APT, DNF/YUM, Pacman, Zypper, and some derivative distributions. Detection does not guarantee packages exist for every optional tool. |
-| **macOS** | Uses Homebrew and can guide installation interactively if it is missing. The documented local test round did not include a real macOS machine. |
+| **macOS** | Uses Homebrew (interactive setup available if missing). Real-machine full installation, prompt rendering, and all regression suites verified on macOS (Apple Silicon arm64 & Intel). |
 | **Architecture** | Accepts `x86_64`/`amd64` and `aarch64`/`arm64`; upstream binaries have their own requirements. |
 | **Windows** | Some isolated tests run under MSYS/Cygwin. Native Windows installation is unsupported. |
-| **Bash** | Required for installer and management scripts; do not use `sh install.sh`. The documented test version is Bash 5.2.37; older-version compatibility has not been established. |
-| **Zsh** | Required for the interactive configuration. Historical records include partial user validation on Debian 13 / Zsh 5.9; the current version still needs target-machine validation. |
+| **Bash** | Required for installer and management scripts; do not use `sh install.sh`. Fully compatible and verified on macOS default Bash 3.2 (3.2.57) as well as modern Linux Bash 4/5. |
+| **Zsh** | Required for the interactive configuration. Real-machine validated on macOS (Zsh 5.9) and Debian 13 (Zsh 5.9). |
 | **tmux** | The unmodified template requires at least 3.2 for `terminal-features` and `display-popup`. Plugins may have additional requirements. |
 | **FZF** | Prefers `fzf --zsh`; older versions try distribution, Homebrew, or user integration scripts. If none are available, the configuration suggests upgrading. |
 | **Timeout utility** | Prefers `timeout`, then `gtimeout`. Without either, some initialization/checks run directly, while startup diagnostics refuse to run. |

@@ -111,8 +111,12 @@ read_key() {
     # -s: 关闭终端硬件回显，彻底杜绝按键在终端被打印两次（如 yy）的问题
     # -n 1: 瞬时读取单个字符，无需用户敲击 Enter 回车键
     read -s -n 1 -r key || key=''
-    # 清理输入流中可能残留的多余换行符，防止污染后续选项
-    while read -t 0.05 -n 1000 -r _discard 2>/dev/null; do :; done
+    # 清理输入流中可能残留的多余换行符，防止污染后续选项（兼容 macOS Bash 3.2）
+    if (( BASH_VERSINFO[0] >= 4 )); then
+      while read -t 0.05 -n 1000 -r _discard 2>/dev/null; do :; done
+    elif command -v zsh >/dev/null 2>&1; then
+      zsh -f -c 'while read -s -t 0.05 -k 1 -u 0 _discard 2>/dev/null; do :; done' 2>/dev/null || true
+    fi
   else
     read -r key || key=''
   fi
@@ -350,7 +354,17 @@ if ((DO_UPDATE)); then
   OS_TYPE=$(uname -s)
   if [[ "$OS_TYPE" == Darwin ]] && command -v brew >/dev/null 2>&1; then
     info "$(msg "正在通过 Homebrew 升级命令行工具..." "Upgrading CLI tools via Homebrew...")"
-    brew upgrade fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux || UPDATE_INCOMPLETE=1
+    # 查询待升级包并禁用自动更新，仅升级已安装且有更新的 formula
+    brew_outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --quiet 2>/dev/null) || UPDATE_INCOMPLETE=1
+    brew_targets=()
+    for _b_pkg in fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux; do
+      if printf '%s\n' "${brew_outdated:-}" | grep -qFx "$_b_pkg"; then
+        brew_targets+=("$_b_pkg")
+      fi
+    done
+    if ((${#brew_targets[@]} > 0)); then
+      HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade "${brew_targets[@]}" || UPDATE_INCOMPLETE=1
+    fi
   elif [[ "$OS_TYPE" == Linux ]]; then
     if command -v apt-get >/dev/null 2>&1; then
       info "$(msg "提示：可在终端运行 sudo apt update && sudo apt --only-upgrade install <包名> 升级系统包。" "Tip: You can run sudo apt update && sudo apt --only-upgrade install <pkg> to upgrade system packages.")"
@@ -424,7 +438,7 @@ restore() {
       command rm -f -- "$HOME/$file"
     fi
   done
-  command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" 2>/dev/null || true
+  command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" "$HOME/.p10k.zsh.zwc" 2>/dev/null || true
   success "$(msg '配置已恢复。请新开终端验证。' 'Configuration restored. Please open a new terminal session to verify.')"
 }
 
@@ -636,7 +650,17 @@ done
 info "$(msg "正在安装基础核心依赖..." "Installing core base dependencies...")"
 case "$FAMILY" in
   brew)
-    brew install zsh git curl coreutils unzip tar
+    # Homebrew 核心依赖：探测缺失组件，使用 gnu-tar 替代系统中无此 formula 的 tar
+    export HOMEBREW_NO_AUTO_UPDATE=1
+    brew_base_pkgs=()
+    command -v gtimeout >/dev/null 2>&1 || brew_base_pkgs+=(coreutils)
+    for _base_cmd in zsh git curl unzip; do
+      command -v "$_base_cmd" >/dev/null 2>&1 || brew_base_pkgs+=("$_base_cmd")
+    done
+    command -v tar >/dev/null 2>&1 || brew_base_pkgs+=(gnu-tar)
+    if ((${#brew_base_pkgs[@]} > 0)); then
+      brew install "${brew_base_pkgs[@]}"
+    fi
     ;;
   apt)
     sudo apt-get update
@@ -658,18 +682,23 @@ case "$FAMILY" in
     ;;
 esac
 
-# 辅助函数：从已跳过列表中移除（用于回退安装成功后剔除）
+# 辅助函数：从已跳过列表中移除（用于回退安装成功后剔除，兼容 Bash 3.2 set -u 空数组）
 remove_skipped() {
   local target=$1
   local updated=()
-  for item in "${SKIPPED[@]}"; do
+  for item in ${SKIPPED[@]+"${SKIPPED[@]}"}; do
     [[ "$item" != "$target" ]] && updated+=("$item")
   done
-  SKIPPED=("${updated[@]}")
+  SKIPPED=(${updated[@]+"${updated[@]}"})
 }
 
 mkdir -p "$HOME/.local/bin"
-export PATH="$HOME/.local/bin:$PATH"
+# macOS 确保将 Homebrew 路径置入当前会话 PATH，以便后续步骤正确检索命令
+if [[ "$FAMILY" == brew ]]; then
+  export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+else
+  export PATH="$HOME/.local/bin:$PATH"
+fi
 
 # 可选软件包安装函数
 optional_package() {
@@ -677,8 +706,8 @@ optional_package() {
   command -v "$cmd" >/dev/null 2>&1 && return 0
   case "$FAMILY" in
     brew)
-      if brew info "$pkg" >/dev/null 2>&1; then
-        brew install "$pkg" && return 0
+      if HOMEBREW_NO_AUTO_UPDATE=1 brew install "$pkg"; then
+        return 0
       fi
       ;;
     apt)
@@ -747,7 +776,17 @@ if [[ "$PROFILE" == full ]]; then
       ;;
   esac
 
-  # --- FZF 现代版本保障（针对 Debian 12 等自带旧版 0.38 不支持 fzf --zsh）---
+  # --- FZF 现代版本保障（针对 Debian 12 等自带旧版 0.38 或残留旧版不支持 fzf --zsh）---
+  if ! command -v fzf >/dev/null 2>&1 || ! fzf --zsh >/dev/null 2>&1; then
+    if [[ "$FAMILY" == brew ]]; then
+      info "$(msg "检测到现有 FZF 缺失或版本过旧，正在通过 Homebrew 安装现代版本..." "FZF missing or outdated; installing modern version via Homebrew...")"
+      HOMEBREW_NO_AUTO_UPDATE=1 brew install fzf || HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade fzf || true
+      hash -r 2>/dev/null || true
+      if command -v fzf >/dev/null 2>&1 && fzf --zsh >/dev/null 2>&1; then
+        remove_skipped fzf
+      fi
+    fi
+  fi
   if ! command -v fzf >/dev/null 2>&1 || ! fzf --zsh >/dev/null 2>&1; then
     info "$(msg "系统 FZF 缺失或版本过旧（不支持 --zsh 快捷键），正在通过官方仓库升级至 ~/.local/bin..." "FZF missing or outdated (no --zsh support); installing modern version to ~/.local/bin...")"
     if [[ ! -d "$HOME/.fzf" ]]; then
@@ -930,13 +969,19 @@ if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
     lzd_os="Linux"
     [[ "$OS" == Darwin ]] && lzd_os="Darwin"
     lzd_stage=$(mktemp -d "$HOME/.lzd-tmp-XXXXXX")
-    lzd_url="https://github.com/jesseduffield/lazydocker/releases/latest/download/lazydocker_${lzd_os}_${lzd_arch}.tar.gz"
-    if curl -fsSL "$lzd_url" -o "$lzd_stage/lzd.tar.gz" 2>/dev/null; then
-      if tar -xzf "$lzd_stage/lzd.tar.gz" -C "$lzd_stage" lazydocker 2>/dev/null && [[ -x "$lzd_stage/lazydocker" ]]; then
-        mkdir -p "$HOME/.local/bin"
-        install -m 755 "$lzd_stage/lazydocker" "$HOME/.local/bin/lazydocker"
-        success "$(msg "lazydocker 安装成功（位于 ~/.local/bin/lazydocker）" "lazydocker installed successfully (in ~/.local/bin/lazydocker)")"
-        remove_skipped lazydocker
+    # 动态获取最新 Release 标签与版本号，拼接符合官方规范的资产文件名
+    lzd_latest_url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/jesseduffield/lazydocker/releases/latest 2>/dev/null) || true
+    lzd_tag=${lzd_latest_url##*/}
+    lzd_version=${lzd_tag#v}
+    if [[ "$lzd_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      lzd_url="https://github.com/jesseduffield/lazydocker/releases/download/${lzd_tag}/lazydocker_${lzd_version}_${lzd_os}_${lzd_arch}.tar.gz"
+      if curl -fsSL "$lzd_url" -o "$lzd_stage/lzd.tar.gz" 2>/dev/null; then
+        if tar -xzf "$lzd_stage/lzd.tar.gz" -C "$lzd_stage" lazydocker 2>/dev/null && [[ -x "$lzd_stage/lazydocker" ]]; then
+          mkdir -p "$HOME/.local/bin"
+          install -m 755 "$lzd_stage/lazydocker" "$HOME/.local/bin/lazydocker"
+          success "$(msg "lazydocker 安装成功（位于 ~/.local/bin/lazydocker）" "lazydocker installed successfully (in ~/.local/bin/lazydocker)")"
+          remove_skipped lazydocker
+        fi
       fi
     fi
     rm -rf "$lzd_stage"
@@ -1102,7 +1147,7 @@ install -m 600 "$BACKUP/new.options" "$HOME/.zsh-project-options"
 install -m 600 "$BACKUP/new.zshrc" "$HOME/.zshrc"
 
 # 清理旧的编译字节码（若存在，借鉴 zsh4humans 规范），防止 Zsh 继续读取失效旧缓存
-command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" 2>/dev/null || true
+command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" "$HOME/.p10k.zsh.zwc" 2>/dev/null || true
 
 deployed_files=("${target_files[@]}")
 for file in "${deployed_files[@]}"; do

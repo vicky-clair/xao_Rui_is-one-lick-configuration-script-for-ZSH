@@ -46,7 +46,12 @@ trap 'exit 130' INT
 trap 'exit 143' TERM
 RUN=$(mktemp -d "$STATE/retry-XXXXXXXX")
 chmod 700 "$RUN"
-export PATH="$HOME/.local/bin:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
+# 测试环境下避免宿主机全局二进制泄露影响测试断言；正常执行时补全 Homebrew 路径
+if [[ -z "${AUDIT_MARKER:-}" ]]; then
+  export PATH="$HOME/.local/bin:$HOME/.version-fox/sdks/golang/packages/bin:$PATH:/opt/homebrew/bin:/usr/local/bin"
+else
+  export PATH="$HOME/.local/bin:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
+fi
 FAMILY=''
 if [[ $(uname -s) == Darwin ]]; then FAMILY=brew
 elif [[ -r /etc/os-release ]]; then
@@ -72,7 +77,7 @@ package_install() {
     dnf) sudo dnf install -y "$package" ;;
     pacman) sudo pacman -S --needed --noconfirm "$package" ;;
     zypper) sudo zypper install -y "$package" ;;
-    brew) brew install "$package" ;;
+    brew) HOMEBREW_NO_AUTO_UPDATE=1 brew install "$package" ;;
   esac
 }
 # 包管理器安装失败时下载官方二进制；验证可执行性后才写入用户命令目录。
@@ -142,8 +147,8 @@ for component in "${REQUESTED[@]}"; do
     if lazygit_release >> "$RUN/$component.log" 2>&1; then ok=1; fi
   fi
   next=()
-  for previous in "${PENDING[@]}"; do [[ "$previous" == "$component" ]] || next+=("$previous"); done
-  PENDING=("${next[@]}")
+  for previous in ${PENDING[@]+"${PENDING[@]}"}; do [[ "$previous" == "$component" ]] || next+=("$previous"); done
+  PENDING=(${next[@]+"${next[@]}"})
   if ((ok)); then printf 'PASS: %s 可用\n' "$component"
   else PENDING+=("$component"); failed=1; printf 'FAIL: %s；查看 %s/%s.log\n' "$component" "$RUN" "$component"; fi
 done

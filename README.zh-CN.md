@@ -44,11 +44,11 @@
 | 平台或组件 | 当前实现与边界 |
 | --- | --- |
 | Linux | 安装器识别 APT、DNF/YUM、Pacman、Zypper 及部分衍生发行版；识别成功不代表所有可选软件都有可用包 |
-| macOS | 安装路径使用 Homebrew；未发现 Homebrew 时可交互引导安装；本轮未做 macOS 实机验证 |
+| macOS | 安装路径使用 Homebrew（未安装时可交互引导）；已在 macOS (Apple Silicon arm64 / Intel) 上完成实机安装部署与全套回归测试验证 |
 | 架构 | 安装器接受 `x86_64`/`amd64`、`aarch64`/`arm64`；每个上游二进制仍有自己的系统要求 |
 | Windows | 可在 MSYS/Cygwin 中运行部分隔离测试；真实安装入口不支持 Windows 原生环境 |
-| Bash | 安装和管理脚本必须用 Bash 运行，不使用 `sh install.sh`；本次测试版本为 Bash 5.2.37，未建立更早版本的兼容性结论 |
-| Zsh | 交互配置运行依赖；仓库历史记录包含 Debian 13 / Zsh 5.9 的部分用户验证，当前版本仍需目标机验收 |
+| Bash | 安装和管理脚本必须用 Bash 运行，不使用 `sh install.sh`；已全面适配并验证 macOS 原生 Bash 3.2 (3.2.57) 以及 Linux 的 Bash 4/5 |
+| Zsh | 交互配置运行依赖；已在 macOS (Zsh 5.9) 与 Debian 13 (Zsh 5.9) 上完成实机全流程验证 |
 | tmux | 原样使用模板需至少 3.2，因为配置直接使用 `terminal-features` 和 `display-popup`；插件可能有额外要求 |
 | FZF | 优先使用 `fzf --zsh`，旧版本尝试加载发行版/Homebrew/用户集成脚本；没有可用集成脚本时提示升级 |
 | 超时工具 | 优先 `timeout`，其次 `gtimeout`；缺失时部分初始化和检查会直接运行，启动诊断则拒绝执行 |

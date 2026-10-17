@@ -100,12 +100,16 @@ printf '#!/usr/bin/env bash\necho Darwin\n' > "$STAGE/bin/uname"
 printf '#!/usr/bin/env bash\nexit 0\n' > "$STAGE/bin/fzf"
 for tool in brew sudo curl; do printf '#!/usr/bin/env bash\nexit 1\n' > "$STAGE/bin/$tool"; done
 chmod +x "$STAGE/bin/"*
-case ${OSTYPE:-} in msys*|cygwin*) export PATH="$STAGE/bin:/usr/bin:/bin" ;; *) export PATH="$STAGE/bin:$PATH" ;; esac
+# macOS 与 Windows/Cygwin 环境隔离 PATH，避免宿主机全局安装的外部工具泄漏干扰断言
+case ${OSTYPE:-} in msys*|cygwin*|darwin*) export PATH="$STAGE/bin:/usr/bin:/bin" ;; *) export PATH="$STAGE/bin:$PATH" ;; esac
 printf 'fzf\nlazydocker\n' > "$XDG_STATE_HOME/zsh-project/failed-components"
 cp "$HOME/.zshrc" "$STAGE/pre-retry"
 manage --retry-failed fzf --yes
 grep -qx lazydocker "$XDG_STATE_HOME/zsh-project/failed-components" || fail 'retry erased unrelated failure'
 cmp "$HOME/.zshrc" "$STAGE/pre-retry" || fail 'retry redeployed config'
+printf 'fzf\n' > "$XDG_STATE_HOME/zsh-project/failed-components"
+manage --retry-failed --yes
+[[ ! -s "$XDG_STATE_HOME/zsh-project/failed-components" ]] || fail 'single item retry did not clear failed-components'
 if manage --retry-failed '../../bad' --yes; then fail 'invalid component accepted'; fi
 if bash "$ROOT/scripts/retry_tools.sh" '../../bad' --dry-run; then fail 'invalid retry dry run accepted'; fi
 printf 'fzf\nlazydocker\n' > "$XDG_STATE_HOME/zsh-project/failed-components"
@@ -116,6 +120,21 @@ cmp "$HOME/.zshrc" "$STAGE/pre-retry" || fail 'failed retry modified configurati
 pass 'component retry leaves configuration and unrelated failures intact'
 
 if command -v zsh >/dev/null 2>&1; then
+  # 环境缺少 timeout/gtimeout 命令时构建微型透传兼容替身
+  if ! command -v timeout >/dev/null 2>&1 && ! command -v gtimeout >/dev/null 2>&1; then
+    cat <<'EOF' > "$STAGE/bin/timeout"
+#!/usr/bin/env bash
+while (($#)); do
+  case "$1" in
+    -k) shift 2 ;;
+    [0-9]*s|[0-9]*) shift; break ;;
+    *) break ;;
+  esac
+done
+exec "$@"
+EOF
+    chmod +x "$STAGE/bin/timeout"
+  fi
   mkdir -p "$HOME/powerlevel10k" "$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting"
   : > "$HOME/.oh-my-zsh/oh-my-zsh.sh"
   : > "$HOME/powerlevel10k/powerlevel10k.zsh-theme"
@@ -153,8 +172,19 @@ if command -v zsh >/dev/null 2>&1; then
     fi
     grep -q -- '--- zprof ---' "$STAGE/profile.tty.stdout" || fail 'PTY profiling did not reach zprof'
     pass 'startup profiling with a controlling terminal'
+  elif [[ ${OSTYPE:-} == darwin* ]] && command -v script >/dev/null; then
+    # macOS 原生 BSD script 进程伪装支持（参数语法与 Linux util-linux 不同）
+    export PROFILE_MANAGER="$ROOT/scripts/manage.sh"
+    if script -q "$STAGE/profile.tty.log" bash "$PROFILE_MANAGER" --profile-startup --yes </dev/null > "$STAGE/profile.tty.stdout" 2> "$STAGE/profile.tty.stderr"; then :
+    else
+      profile_status=$?
+      cat "$STAGE/profile.tty.stderr" "$STAGE/profile.tty.stdout" >&2
+      fail "startup profiling under PTY failed (exit $profile_status)"
+    fi
+    grep -q -- '--- zprof ---' "$STAGE/profile.tty.stdout" || fail 'PTY profiling did not reach zprof'
+    pass 'startup profiling with a controlling terminal'
   else
-    echo 'SKIP: Linux util-linux script unavailable; PTY profiling test not run'
+    echo 'SKIP: Linux/macOS script unavailable; PTY profiling test not run'
   fi
   pass 'Zsh switches, local extension ordering and opt-in profiling'
 else

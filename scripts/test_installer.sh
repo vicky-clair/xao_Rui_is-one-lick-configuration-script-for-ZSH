@@ -57,7 +57,15 @@ else
   printf 'SKIP: native dangling symlinks unavailable; run Neovim swap cases on Linux\n'
 fi
 
-# 回退函数直接使用生产实现；模拟安装前后状态，包括个人主题。
+# 回退函数与跳过列表函数直接使用生产实现；验证 Bash 3.2 空数组展开安全性与回退保护。
+eval "$(extract_function remove_skipped)"
+SKIPPED=()
+remove_skipped fzf
+SKIPPED=(fzf)
+remove_skipped fzf
+((${#SKIPPED[@]} == 0)) || fail 'remove_skipped did not clear single item'
+pass 'remove_skipped handles empty arrays under nounset'
+
 eval "$(extract_function calc_sha256)"
 eval "$(extract_function restore)"
 msg() { printf '%s' "$1"; }

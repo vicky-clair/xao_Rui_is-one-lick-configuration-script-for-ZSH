@@ -352,8 +352,14 @@ if ((DO_UPDATE)); then
   }
 
   update_git_repo "Oh My Zsh" "$HOME/.oh-my-zsh"
-  [[ -d "$HOME/powerlevel10k" ]] && update_git_repo "Powerlevel10k" "$HOME/powerlevel10k"
-  [[ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k" ]] && update_git_repo "Powerlevel10k" "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
+  [[ -d "$HOME/powerlevel10k/.git" ]] && update_git_repo "Powerlevel10k" "$HOME/powerlevel10k"
+  if [[ -d "$HOME/.oh-my-zsh/custom/themes/powerlevel10k/.git" ]]; then
+    if [[ ! -d "$HOME/powerlevel10k/.git" ]]; then
+      update_git_repo "Powerlevel10k" "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
+    else
+      update_git_repo "Powerlevel10k (OMZ)" "$HOME/.oh-my-zsh/custom/themes/powerlevel10k"
+    fi
+  fi
 
   CUSTOM_PLUGINS_DIR="${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/plugins"
   if [[ -d "$CUSTOM_PLUGINS_DIR" ]]; then
@@ -364,19 +370,16 @@ if ((DO_UPDATE)); then
     done
   fi
 
-  # Tmux 插件升级
-  if [[ -x "$HOME/.tmux/plugins/tpm/bin/update_plugins" ]]; then
+  # Tmux 插件升级（逐个 Git 仓库升级以保证与检测脚本完全对应并精准剔除缓存）
+  TMUX_PLUGINS_DIR="$HOME/.tmux/plugins"
+  if [[ -d "$TMUX_PLUGINS_DIR" ]]; then
     info "$(msg "正在更新 Tmux 插件..." "Updating Tmux plugins...")"
-    tpm_err=""
-    if tpm_err=$(bash "$HOME/.tmux/plugins/tpm/bin/update_plugins" all 2>&1); then
-      UPDATED_OK+=("Tmux 插件 (TPM)")
-      success "$(msg "Tmux 插件更新完成" "Tmux plugins updated successfully")"
-    else
-      UPDATE_INCOMPLETE=1
-      tpm_short=$(printf '%s\n' "$tpm_err" | command grep -v '^[[:space:]]*$' | head -n 1)
-      UPDATED_FAIL+=("Tmux 插件 (TPM) | ${tpm_short:-$(msg "更新失败" "Update failed")} | bash \"$HOME/.tmux/plugins/tpm/bin/update_plugins\" all 或进入 tmux 按 prefix + U")
-      warn "$(msg "Tmux 插件更新遇到错误，已保留待处理状态。" "Tmux plugin update encountered errors.")"
-    fi
+    for pdir in "$TMUX_PLUGINS_DIR"/*; do
+      if [[ -d "$pdir/.git" ]]; then
+        pname=$(basename "$pdir")
+        update_git_repo "tmux/$pname" "$pdir"
+      fi
+    done
   fi
 
   # FZF 官方仓库升级

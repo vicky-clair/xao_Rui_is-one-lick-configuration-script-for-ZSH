@@ -3,6 +3,7 @@
 set -Eeuo pipefail
 export LC_ALL=C
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
+[[ -z "${AUDIT_MARKER:-}" ]] && export PATH="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
 YES=0 DRY=0 TOOL=''
 while (($#)); do
   case "$1" in --yes) YES=1 ;; --dry-run) DRY=1 ;; --*) echo '未知参数' >&2; exit 1 ;; *) [[ -z "$TOOL" ]] || exit 1; TOOL=$1 ;; esac

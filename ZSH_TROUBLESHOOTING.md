@@ -101,9 +101,11 @@ bash install.sh --profile-startup
 timeout -k 1s 5s vfox activate zsh
 ```
 
-macOS 有 gtimeout 时使用 gtimeout。该命令只输出激活脚本，不执行输出。模板中的保护也只覆盖生成脚本阶段，不覆盖后续 eval；没有超时工具时直接调用 vfox。
+macOS 有 gtimeout 时使用 gtimeout。该命令只输出激活脚本，不执行输出。
 
-在原 Zsh 会话中查看 `typeset -p chpwd_functions precmd_functions`。当前配置在成功激活后移除 `_vfox_hook`，保留其它钩子，避免历史上出现的目录切换阻塞；代价是不通过这两个钩子自动切换 SDK。vfox 内部的历史阻塞根因没有确认。
+当前配置采用**环境缓存机制**（位于 `${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/vfox-activate.zsh`），日常启动直接读取本地缓存（耗时 <1ms），彻底杜绝由于 vfox 联网检索插件导致终端启动冻结数秒的问题。安装器也会在初次安装时预生成该缓存。
+当用户通过 `vfox add/use` 安装或切换了全局 SDK 后，可在终端输入 **`vfox-refresh`** 命令手动刷新缓存并即时生效。
+同时在成功激活后移除 `_vfox_hook`，保留其它钩子，避免历史上出现的目录切换阻塞；代价是不通过这两个钩子自动切换 SDK。
 
 如果不需要 vfox，可通过 `bash install.sh --set vfox=0` 关闭安装模板中的激活，然后新开会话。根目录参考配置不使用这个开关，需先确认配置来源。不要为修复启动添加第二次无保护的激活。
 

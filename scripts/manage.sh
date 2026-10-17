@@ -2,8 +2,8 @@
 # 配置管理：不卸载插件或应用，不读取/执行用户选项文件中的代码。
 set -Eeuo pipefail
 export LC_ALL=C
-# 仅在非测试环境下补全 Homebrew 默认执行路径，避免子进程缺失 brew 命令
-[[ -z "${AUDIT_MARKER:-}" ]] && export PATH="$PATH:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin"
+# 仅在非测试环境下补全常用执行路径，避免子进程缺失命令
+[[ -z "${AUDIT_MARKER:-}" ]] && export PATH="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
 ACTION='' ARG='' SCOPE=zsh DRY=0 YES=0 LOCKED=0

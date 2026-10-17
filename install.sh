@@ -43,6 +43,12 @@ for _management_arg in "$@"; do
   esac
 done
 unset _management_arg
+# 统一补充常用包管理器与语言工具链 bin 目录（Homebrew/Go/Cargo/pnpm/vfox），确保检测与安装一致
+if [[ -z "${AUDIT_MARKER:-}" ]]; then
+  _EXTRA_PATHS="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin"
+  export PATH="$_EXTRA_PATHS:$PATH"
+  unset _EXTRA_PATHS
+fi
 DRY_RUN=0
 PROFILE=basic
 PROFILE_SET=0
@@ -693,9 +699,11 @@ remove_skipped() {
 }
 
 mkdir -p "$HOME/.local/bin"
-# macOS 确保将 Homebrew 路径置入当前会话 PATH，以便后续步骤正确检索命令
-if [[ "$FAMILY" == brew ]]; then
-  export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+# 确保常用路径与 Homebrew 在 PATH 中
+if [[ -z "${AUDIT_MARKER:-}" ]]; then
+  _EXTRA_PATHS="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin"
+  export PATH="$_EXTRA_PATHS:$PATH"
+  unset _EXTRA_PATHS
 else
   export PATH="$HOME/.local/bin:$PATH"
 fi
@@ -1223,6 +1231,13 @@ install -m 600 "$BACKUP/new.zshrc" "$HOME/.zshrc"
 
 # 清理旧的编译字节码（若存在，借鉴 zsh4humans 规范），防止 Zsh 继续读取失效旧缓存
 command rm -f -- "$HOME/.zshrc.zwc" "$HOME/.zshenv.zwc" "$HOME/.zprofile.zwc" "$HOME/.p10k.zsh.zwc" 2>/dev/null || true
+
+# 若启用 vfox，预先生成环境缓存以避免首次启动超时
+if ((WITH_VFOX)) && command -v vfox >/dev/null 2>&1; then
+  local_state_dir="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
+  mkdir -p "$local_state_dir"
+  vfox activate zsh > "$local_state_dir/vfox-activate.zsh" 2>/dev/null || true
+fi
 
 deployed_files=("${target_files[@]}")
 for file in "${deployed_files[@]}"; do

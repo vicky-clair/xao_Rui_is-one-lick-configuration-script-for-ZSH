@@ -195,31 +195,58 @@ if [[ -o interactive ]]; then
 fi
 
 # ========================================
-# 10. vfox 版本管理初始化
+# 10. vfox 版本管理初始化 (缓存优先，避免网络检测导致终端启动冻结)
 # ========================================
 if command -v vfox &>/dev/null; then
-  local _vfox_cmd=""
-  if command -v timeout >/dev/null 2>&1; then
-    _vfox_cmd="timeout -k 1s 5s vfox activate zsh"
-  elif command -v gtimeout >/dev/null 2>&1; then
-    _vfox_cmd="gtimeout -k 1s 5s vfox activate zsh"
+  local _vfox_cache="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/vfox-activate.zsh"
+  if [[ -s "$_vfox_cache" ]]; then
+    source "$_vfox_cache" 2>/dev/null || true
+    chpwd_functions=("${(@)chpwd_functions:#_vfox_hook}")
+    precmd_functions=("${(@)precmd_functions:#_vfox_hook}")
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}vfox%f 已加载 (版本管理, 缓存加速)" "%F{green}✓%f %F{cyan}vfox%f loaded (version manager, cached)"
   else
-    _vfox_cmd="vfox activate zsh"
+    local _vfox_cmd=""
+    if command -v timeout >/dev/null 2>&1; then
+      _vfox_cmd="timeout -k 1s 5s vfox activate zsh"
+    elif command -v gtimeout >/dev/null 2>&1; then
+      _vfox_cmd="gtimeout -k 1s 5s vfox activate zsh"
+    else
+      _vfox_cmd="vfox activate zsh"
+    fi
+
+    if _vfox_init=$(eval "$_vfox_cmd" 2>/dev/null) && [[ -n "$_vfox_init" ]]; then
+      mkdir -p "${_vfox_cache:h}" 2>/dev/null || true
+      print -r -- "$_vfox_init" > "$_vfox_cache" 2>/dev/null || true
+      if eval "$_vfox_init" 2>/dev/null; then
+        chpwd_functions=("${(@)chpwd_functions:#_vfox_hook}")
+        precmd_functions=("${(@)precmd_functions:#_vfox_hook}")
+        _zsh_startup_msg "%F{green}✓%f %F{cyan}vfox%f 已加载 (版本管理)" "%F{green}✓%f %F{cyan}vfox%f loaded (version manager)"
+      else
+        _zsh_msg "%F{yellow}⚠ vfox 初始化脚本执行失败%f" "%F{yellow}⚠ vfox init script execution failed%f"
+      fi
+    else
+      _zsh_msg "%F{yellow}⚠ vfox 初始化超时或需联网，已跳过。可运行 %F{cyan}vfox-refresh%F{yellow} 手动生成缓存%f" "%F{yellow}⚠ vfox init timed out. Run %F{cyan}vfox-refresh%F{yellow} to generate cache%f"
+    fi
+    unset _vfox_init _vfox_cmd
   fi
 
-  if _vfox_init=$(eval "$_vfox_cmd" 2>/dev/null); then
-    if eval "$_vfox_init"; then
-      # 保留启动环境，移除可能引起目录切换耗时的自动钩子
+  function vfox-refresh() {
+    local cache="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/vfox-activate.zsh"
+    mkdir -p "${cache:h}" 2>/dev/null || true
+    _zsh_msg "%F{blue}正在刷新 vfox 环境配置缓存 (可能耗时数秒)...%f" "%F{blue}Refreshing vfox environment cache...%f"
+    if vfox activate zsh > "$cache.tmp" 2>/dev/null && [[ -s "$cache.tmp" ]]; then
+      mv -f "$cache.tmp" "$cache"
+      source "$cache" 2>/dev/null || true
       chpwd_functions=("${(@)chpwd_functions:#_vfox_hook}")
       precmd_functions=("${(@)precmd_functions:#_vfox_hook}")
-      _zsh_startup_msg "%F{green}✓%f %F{cyan}vfox%f 已加载 (版本管理)" "%F{green}✓%f %F{cyan}vfox%f loaded (version manager)"
+      _zsh_msg "%F{green}✓ vfox 缓存刷新成功！已生效于当前终端。%f" "%F{green}✓ vfox cache refreshed successfully!%f"
     else
-      _zsh_msg "%F{yellow}⚠ vfox 初始化脚本执行失败%f" "%F{yellow}⚠ vfox init script execution failed%f"
+      rm -f "$cache.tmp"
+      _zsh_msg "%F{red}✗ vfox 缓存刷新失败。%f" "%F{red}✗ Failed to refresh vfox cache.%f"
+      return 1
     fi
-  else
-    _zsh_msg "%F{yellow}⚠ vfox 初始化失败或超时，本次已跳过%f" "%F{yellow}⚠ vfox init failed or timed out, skipped%f"
-  fi
-  unset _vfox_init _vfox_cmd
+  }
+  unset _vfox_cache
 fi
 
 # ========================================
@@ -276,7 +303,7 @@ if command -v fzf &>/dev/null; then
   fi
 
   if _zsh_fzf_init=$(fzf --zsh 2>/dev/null); then
-    eval "$_zsh_fzf_init"
+    eval "$_zsh_fzf_init" 2>/dev/null || true
     _zsh_startup_msg "%F{green}✓%f %F{cyan}fzf%f 模糊查找已加载 (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)" "%F{green}✓%f %F{cyan}fzf%f fuzzy finder loaded (%F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f / %F{yellow}Alt+C%f)"
   elif [[ -f /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
     source /usr/share/doc/fzf/examples/key-bindings.zsh
@@ -316,8 +343,8 @@ if [[ ${ZSH_PROJECT_TELEVISION:-1} == 1 ]] && command -v tv &>/dev/null; then
       tv
       zle && zle reset-prompt
     }
-    zle -N television-widget
-    bindkey '^P' television-widget
+    zle -N television-widget 2>/dev/null || true
+    bindkey '^P' television-widget 2>/dev/null || true
     bindkey -M emacs '^P' television-widget 2>/dev/null || true
     bindkey -M viins '^P' television-widget 2>/dev/null || true
     _zsh_startup_msg "%F{green}✓%f %F{cyan}television%f 模糊查找已集成 (命令: %F{yellow}tv%f, 快捷键: %F{yellow}Ctrl+P%f)" "%F{green}✓%f %F{cyan}television%f fuzzy finder integrated (cmd: %F{yellow}tv%f, shortcut: %F{yellow}Ctrl+P%f)"
@@ -356,8 +383,8 @@ setopt hist_reduce_blanks
 unsetopt inc_append_history inc_append_history_time
 
 # 保持前缀历史搜索
-bindkey '^[[A' history-search-backward
-bindkey '^[[B' history-search-forward
+bindkey '^[[A' history-search-backward 2>/dev/null || true
+bindkey '^[[B' history-search-forward 2>/dev/null || true
 
 # ========================================
 # 14. 命令别名与工具集成
@@ -395,8 +422,8 @@ if [[ ${ZSH_PROJECT_LAZYGIT:-1} == 1 ]] && command -v lazygit &>/dev/null; then
     lazygit
     zle && zle reset-prompt
   }
-  zle -N lazygit-widget
-  bindkey '^G' lazygit-widget
+  zle -N lazygit-widget 2>/dev/null || true
+  bindkey '^G' lazygit-widget 2>/dev/null || true
   bindkey -M emacs '^G' lazygit-widget 2>/dev/null || true
   bindkey -M viins '^G' lazygit-widget 2>/dev/null || true
   _zsh_startup_msg "%F{green}✓%f %F{cyan}lazygit%f Git 终端管理已启用 (命令: %F{yellow}lg%f, 快捷键: %F{yellow}Ctrl+G%f)" "%F{green}✓%f %F{cyan}lazygit%f Git TUI enabled (cmd: %F{yellow}lg%f, shortcut: %F{yellow}Ctrl+G%f)"

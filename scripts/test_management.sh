@@ -61,6 +61,12 @@ pass 'disable/enable, repeated disable and modification protection'
 printf '# keep comment\nZSH_PROJECT_BANNER=1\nprintf MALICIOUS > "$HOME/executed-options"\n' > "$HOME/.zsh-project-options"
 manage --set banner=0 --yes
 grep -qx ZSH_PROJECT_BANNER=0 "$HOME/.zsh-project-options" || fail 'option not set'
+manage --set television=0 --yes
+grep -qx ZSH_PROJECT_TELEVISION=0 "$HOME/.zsh-project-options" || fail 'television option not set'
+manage --set tv-keys=1 --yes
+grep -qx ZSH_PROJECT_TV_KEYBINDINGS=1 "$HOME/.zsh-project-options" || fail 'tv-keys option not set'
+manage --set tre=0 --yes
+grep -qx ZSH_PROJECT_TRE=0 "$HOME/.zsh-project-options" || fail 'tre option not set'
 grep -qx '# keep comment' "$HOME/.zsh-project-options" || fail 'comment lost'
 [[ ! -f "$HOME/executed-options" ]] || fail 'manager executed options'
 if manage --set 'banner=$(touch bad)' --yes; then fail 'invalid option accepted'; fi

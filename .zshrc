@@ -304,6 +304,44 @@ if command -v fzf &>/dev/null; then
 fi
 
 # ========================================
+# Television (tv) 终端模糊查找器
+# ========================================
+if [[ ${ZSH_PROJECT_TELEVISION:-1} == 1 ]] && command -v tv &>/dev/null; then
+  if [[ ${ZSH_PROJECT_TV_KEYBINDINGS:-0} == 1 ]]; then
+    eval "$(tv init zsh 2>/dev/null)" || true
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}television%f 模糊查找已启用 (接管 %F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f)" "%F{green}✓%f %F{cyan}television%f fuzzy finder enabled (overriding %F{yellow}Ctrl+R%f / %F{yellow}Ctrl+T%f)"
+  else
+    function television-widget() {
+      zle && zle -I
+      tv
+      zle && zle reset-prompt
+    }
+    zle -N television-widget
+    bindkey '^P' television-widget
+    bindkey -M emacs '^P' television-widget 2>/dev/null || true
+    bindkey -M viins '^P' television-widget 2>/dev/null || true
+    _zsh_startup_msg "%F{green}✓%f %F{cyan}television%f 模糊查找已集成 (命令: %F{yellow}tv%f, 快捷键: %F{yellow}Ctrl+P%f)" "%F{green}✓%f %F{cyan}television%f fuzzy finder integrated (cmd: %F{yellow}tv%f, shortcut: %F{yellow}Ctrl+P%f)"
+  fi
+fi
+
+# ========================================
+# Tre 现代化目录树 (dduan/tre) 与 Agrep 模糊匹配 (laurikari/tre)
+# ========================================
+if [[ ${ZSH_PROJECT_TRE:-1} == 1 ]] && command -v tre &>/dev/null; then
+  tre() {
+    command tre "$@" -e && [[ -f "/tmp/tre_aliases_$USER" ]] && source "/tmp/tre_aliases_$USER" 2>/dev/null
+  }
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}tre%f 现代化目录树已集成 (命令: %F{yellow}tre%f, 支持 %F{yellow}-e%f 编号跳转)" "%F{green}✓%f %F{cyan}tre%f modern directory tree integrated (cmd: %F{yellow}tre%f, supports %F{yellow}-e%f editor jump)"
+fi
+
+if command -v agrep &>/dev/null; then
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}agrep%f 模糊正则表达式匹配工具已就绪 (命令: %F{yellow}agrep%f)" "%F{green}✓%f %F{cyan}agrep%f approximate regex tool ready (cmd: %F{yellow}agrep%f)"
+elif command -v tre-agrep &>/dev/null; then
+  alias agrep="tre-agrep"
+  _zsh_startup_msg "%F{green}✓%f %F{cyan}tre-agrep%f 模糊正则工具已就绪 (别名: %F{yellow}agrep%f)" "%F{green}✓%f %F{cyan}tre-agrep%f approximate regex tool ready (alias: %F{yellow}agrep%f)"
+fi
+
+# ========================================
 # 13. 历史记录与方向键
 # ========================================
 HISTFILE="$HOME/.zhistory"

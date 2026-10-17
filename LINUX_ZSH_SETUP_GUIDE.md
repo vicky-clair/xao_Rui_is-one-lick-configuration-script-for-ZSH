@@ -222,6 +222,8 @@ bash install.sh --set lazygit=1
 | 工具或设置 | 迁移时检查 |
 | --- | --- |
 | FZF | `fzf --zsh` 是否支持；模板有系统脚本回退，不要重复 source 多套集成 |
+| television | 模糊查找器（`tv`）；默认提供独立小部件 `Ctrl+P`，可通过 `tv-keys=1` 切换接管 `Ctrl+R`/`Ctrl+T` |
+| tre | 现代化目录树（`tre`）；包装函数默认追加 `-e` 编号并加载快捷别名文件 `/tmp/tre_aliases_$USER` |
 | bat | 模板只在主题存在时设置 `tokyonight_night`；自定义 BAT_THEME 需自行确认 |
 | Fastfetch | 有 `~/.config/fastfetch/config.jsonc` 时使用该文件，否则运行默认配置；项目未提供个人配置 |
 | vfox | 安装后还需 SDK 配置；模板移除 `_vfox_hook` 自动目录/提示符钩子 |

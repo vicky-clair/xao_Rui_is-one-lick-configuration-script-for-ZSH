@@ -33,7 +33,7 @@ Linux または macOS に、テーマ、補完、入力候補の自動提案、�
 <details>
 <summary><strong>スクリーンショットの補足</strong></summary>
 
-- **ツールの状態:** Yazi、FZF、eza、lazygit、Neovim、zoxide などの連携状況と、コマンドやショートカットを表示します。
+- **ツールの状態:** Yazi、FZF、television、eza、tre、lazygit、Neovim、zoxide などの連携状況と、コマンドやショートカットを表示します。
 - **システム情報:** Fastfetch が Debian のロゴ、OS、カーネル、デスクトップ環境、ハードウェア情報を表示します。
 - **更新通知:** キャッシュされたプラグインの更新一覧です。`zsh-update` で更新処理に進めます。
 - **起動時間:** `5441ms` は、このときの設定読み込みに対する計測値です。ターミナル接続全体の時間や、その後に読み込まれるユーザー拡張、ハイライト、最初のプロンプトのフックは含みません。
@@ -112,7 +112,7 @@ Git のクローンに失敗して個別ファイルのダウンロードに切�
 | 分類 | 内容と動作 |
 | :--- | :--- |
 | **基本のシェル環境** | Oh My Zsh、Powerlevel10k、入力候補の自動提案、追加の補完、シンタックスハイライト |
-| **フルプロファイル** | FZF、fd、bat、eza、zoxide、Yazi、Neovim、Fastfetch のインストールと連携を試行 |
+| **フルプロファイル** | FZF、fd、bat、eza、zoxide、Yazi、Neovim、Fastfetch、television、tre、agrep のインストールと連携を試行 |
 | **追加ツール** | vfox、lazydocker、lazygit、tmux。SDK の導入、Docker サービスや権限の設定は別途必要 |
 | **プロンプトのスタイル** | Rainbow、Lean、Classic、公式ウィザード、または既存の `.p10k.zsh` を維持 |
 | **設定管理** | 機能の切り替え、読み取り専用の状態確認、明示的な起動診断、無効化・有効化、失敗したコンポーネントの再試行 |
@@ -146,6 +146,9 @@ Git のクローンに失敗して個別ファイルのダウンロードに切�
 | `↑` / `↓` | 入力済みの文字列を前方一致で履歴検索 |
 | `Esc` を 2 回 | OMZ の sudo プラグインで入力の先頭に sudo を追加 |
 | `y` / `z keyword` | Yazi 終了後にディレクトリを移動 / zoxide で移動（`full=1`） |
+| `tv` / `Ctrl+P` | television 曖昧ファインダー（`full=1`、`tv-keys=1` で Ctrl+T/Ctrl+R を置き換え可能） |
+| `tre` | モダンなディレクトリツリー表示（`full=1`、`.gitignore` 対応および `-e` 番号ジャンプ連携） |
+| `agrep` | TRE 近似正規表現検索 CLI ツール（`full=1`） |
 | `ll` / `la` | eza の詳細一覧 / 隠し項目を含む一覧（`full=1`） |
 | `v` / `vim` / `vi` | Neovim のラッパー関数を実行（`full=1` かつ `nvim` が存在） |
 | `lg` / `Ctrl+G` | lazygit を開く |

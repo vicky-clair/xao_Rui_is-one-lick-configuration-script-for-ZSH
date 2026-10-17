@@ -13,6 +13,9 @@ normalize() {
   case "$1" in
     fd-find|fd) echo fd ;; batcat|bat) echo bat ;; neovim|nvim) echo neovim ;;
     wl-copy|wl-clipboard) echo wl-clipboard ;;
+    television|tv) echo television ;;
+    tre-command|tre) echo tre-command ;;
+    tre-agrep|agrep) echo agrep ;;
     fzf|eza|zoxide|yazi|fastfetch|lazydocker|lazygit|vfox|tmux|xclip|ncurses-term) echo "$1" ;;
     *) printf '不支持的组件：%s\n' "$1" >&2; return 1 ;;
   esac
@@ -31,7 +34,7 @@ elif [[ -f "$STATE/failed-components" ]]; then
 fi
 if ((${#REQUESTED[@]} == 0)); then echo '没有失败项记录；旧安装可指定 --retry-failed lazydocker 或 lazygit。'; exit 0; fi
 printf '仅重试组件：%s\n' "${REQUESTED[*]}"
-echo '使用系统包管理器；lazydocker/lazygit 缺包时下载官方 Release。不会重写 Zsh 配置。'
+echo '使用系统包管理器；lazydocker/lazygit/television/tre 缺包时下载官方 Release。不会重写 Zsh 配置。'
 ((DRY == 0)) || exit 0
 if ((YES == 0)); then
   [[ -t 0 ]] || { echo '请交互确认，或显式使用 --yes'; exit 1; }
@@ -62,7 +65,18 @@ fi
 # 按实际命令判断可用性；ncurses-term 是终端数据包，交由包管理器确认。
 available() {
   local component=$1 cmd=$1
-  case "$component" in neovim) cmd=nvim ;; wl-clipboard) cmd=wl-copy ;; ncurses-term) return 1 ;; esac
+  case "$component" in
+    neovim) cmd=nvim ;;
+    wl-clipboard) cmd=wl-copy ;;
+    ncurses-term) return 1 ;;
+    television) cmd=tv ;;
+    tre-command) cmd=tre ;;
+    agrep)
+      command -v agrep >/dev/null && return 0
+      command -v tre-agrep >/dev/null && return 0
+      return 1
+      ;;
+  esac
   command -v "$cmd" >/dev/null && return 0
   if [[ "$component" == fd ]] && command -v fdfind >/dev/null; then return 0; fi
   if [[ "$component" == bat ]] && command -v batcat >/dev/null; then return 0; fi
@@ -72,6 +86,8 @@ available() {
 package_install() {
   local component=$1 package=$1
   if [[ "$component" == fd && ( "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == zypper ) ]]; then package=fd-find; fi
+  if [[ "$component" == agrep && "$FAMILY" == apt ]]; then package=tre-agrep; fi
+  if [[ "$component" == agrep && "$FAMILY" != apt ]]; then package=tre; fi
   case "$FAMILY" in
     apt) sudo apt-get install -y "$package" ;;
     dnf) sudo dnf install -y "$package" ;;
@@ -123,6 +139,65 @@ lazygit_release() {
   "$stage/lazygit" --version || return 1
   install -m 755 "$stage/lazygit" "$HOME/.local/bin/lazygit"
 }
+# television 官方 Release 自动下载：支持 macOS 与 Linux (musl/gnu 降级)，验证后部署至 ~/.local/bin/tv。
+television_release() {
+  local url tag version arch os asset stage bin
+  command -v curl >/dev/null || return 1
+  arch=$(uname -m); os=$(uname -s)
+  case "$arch" in x86_64) ;; aarch64|arm64) arch=aarch64 ;; *) return 1 ;; esac
+  [[ "$os" == Linux || "$os" == Darwin ]] || return 1
+  url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/alexpasmantier/television/releases/latest) || return 1
+  tag=${url##*/}
+  [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  version=${tag#v}
+  if [[ "$os" == Darwin ]]; then
+    asset="tv-${version}-${arch}-apple-darwin.tar.gz"
+  else
+    asset="tv-${version}-${arch}-unknown-linux-musl.tar.gz"
+  fi
+  stage="$RUN/television"
+  mkdir -p "$stage" "$HOME/.local/bin"
+  [[ ! -e "$HOME/.local/bin/tv" && ! -L "$HOME/.local/bin/tv" ]] || return 1
+  if ! curl -fSL --connect-timeout 10 --max-time 90 "https://github.com/alexpasmantier/television/releases/download/$tag/$asset" -o "$stage/archive.tar.gz" 2>/dev/null; then
+    if [[ "$os" == Linux ]]; then
+      asset="tv-${version}-${arch}-unknown-linux-gnu.tar.gz"
+      curl -fSL --connect-timeout 10 --max-time 90 "https://github.com/alexpasmantier/television/releases/download/$tag/$asset" -o "$stage/archive.tar.gz" || return 1
+    else
+      return 1
+    fi
+  fi
+  tar -xzf "$stage/archive.tar.gz" -C "$stage" tv 2>/dev/null || tar -xzf "$stage/archive.tar.gz" -C "$stage" 2>/dev/null || return 1
+  bin=$(find "$stage" -type f -name tv -perm -111 2>/dev/null | head -n 1)
+  [[ -n "$bin" && -x "$bin" ]] || return 1
+  "$bin" --version || return 1
+  install -m 755 "$bin" "$HOME/.local/bin/tv"
+}
+# tre-command 官方 Release 自动下载：获取最新版本并根据系统与架构解压验证，部署至 ~/.local/bin/tre。
+tre_release() {
+  local url tag version arch os asset stage bin
+  command -v curl >/dev/null || return 1
+  arch=$(uname -m); os=$(uname -s)
+  case "$arch" in x86_64) ;; aarch64|arm64) arch=aarch64 ;; *) return 1 ;; esac
+  [[ "$os" == Linux || "$os" == Darwin ]] || return 1
+  url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/dduan/tre/releases/latest) || return 1
+  tag=${url##*/}
+  [[ "$tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]] || return 1
+  version=${tag#v}
+  if [[ "$os" == Darwin ]]; then
+    asset="tre-v${version}-${arch}-apple-darwin.tar.gz"
+  else
+    asset="tre-v${version}-${arch}-unknown-linux-musl.tar.gz"
+  fi
+  stage="$RUN/tre"
+  mkdir -p "$stage" "$HOME/.local/bin"
+  [[ ! -e "$HOME/.local/bin/tre" && ! -L "$HOME/.local/bin/tre" ]] || return 1
+  curl -fSL --connect-timeout 10 --max-time 90 "https://github.com/dduan/tre/releases/download/$tag/$asset" -o "$stage/archive.tar.gz" || return 1
+  tar -xzf "$stage/archive.tar.gz" -C "$stage" tre 2>/dev/null || tar -xzf "$stage/archive.tar.gz" -C "$stage" 2>/dev/null || return 1
+  bin=$(find "$stage" -type f -name tre -perm -111 2>/dev/null | head -n 1)
+  [[ -n "$bin" && -x "$bin" ]] || return 1
+  "$bin" --version || return 1
+  install -m 755 "$bin" "$HOME/.local/bin/tre"
+}
 
 # 保留未参与本次重试的失败项，仅根据本次结果更新对应组件。
 PENDING=()
@@ -145,6 +220,12 @@ for component in "${REQUESTED[@]}"; do
   fi
   if ((ok == 0)) && [[ "$component" == lazygit ]]; then
     if lazygit_release >> "$RUN/$component.log" 2>&1; then ok=1; fi
+  fi
+  if ((ok == 0)) && [[ "$component" == television ]]; then
+    if television_release >> "$RUN/$component.log" 2>&1; then ok=1; fi
+  fi
+  if ((ok == 0)) && [[ "$component" == tre-command ]]; then
+    if tre_release >> "$RUN/$component.log" 2>&1; then ok=1; fi
   fi
   next=()
   for previous in ${PENDING[@]+"${PENDING[@]}"}; do [[ "$previous" == "$component" ]] || next+=("$previous"); done

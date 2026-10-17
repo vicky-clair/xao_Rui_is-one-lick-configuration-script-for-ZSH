@@ -357,7 +357,7 @@ if ((DO_UPDATE)); then
     # 查询待升级包并禁用自动更新，仅升级已安装且有更新的 formula
     brew_outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --quiet 2>/dev/null) || UPDATE_INCOMPLETE=1
     brew_targets=()
-    for _b_pkg in fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux; do
+    for _b_pkg in fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux television tre-command tre; do
       if printf '%s\n' "${brew_outdated:-}" | grep -qFx "$_b_pkg"; then
         brew_targets+=("$_b_pkg")
       fi
@@ -609,7 +609,7 @@ case "$P10K_STYLE" in
   skip) printf '%s\n' "$(msg '主题配置：保持原有设置，不覆盖 ~/.p10k.zsh。' 'Prompt config: Keep existing setup, do not touch ~/.p10k.zsh.')" ;;
 esac
 printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils unzip tar；OMZ、Powerlevel10k、三个 Zsh 核心插件。' 'Base dependencies: zsh, git, curl, ca-certificates, coreutils, unzip, tar; OMZ, Powerlevel10k, 3 core plugins.')"
-[[ "$PROFILE" == full ]] && printf '%s\n' "$(msg '完整工具：fzf fd bat eza zoxide yazi neovim fastfetch（仓库没有则跳过并记录）。' 'Full tools: fzf, fd, bat, eza, zoxide, yazi, neovim, fastfetch (skipped if unavailable in repository).')"
+[[ "$PROFILE" == full ]] && printf '%s\n' "$(msg '完整工具：fzf fd bat eza zoxide yazi neovim fastfetch television tre agrep（仓库没有则跳过并记录）。' 'Full tools: fzf, fd, bat, eza, zoxide, yazi, neovim, fastfetch, television, tre, agrep (skipped if unavailable in repository).')"
 ((WITH_TMUX)) && printf '%s\n' "$(msg 'Tmux 增强：安装 tmux、终端剪贴板工具、TPM 插件生态并部署 ~/.tmux.conf。' 'Tmux enhancement: install tmux, clipboard tools, TPM plugins, and ~/.tmux.conf.')"
 printf '%s\n' "$(msg '备份并更新受管配置；选定主题样式会备份并替换 .p10k.zsh，skip 则保留。保留 .zshenv、custom 和历史。' 'Back up managed configs; theme selection replaces .p10k.zsh after backup; skip preserves it. Keep .zshenv, custom and history.')"
 printf '%s\n' "$(msg '默认 Shell 将在配置安装成功后单独询问。' 'Default login shell will be prompted separately after configuration.')"
@@ -754,6 +754,11 @@ if [[ "$PROFILE" == full ]]; then
     optional_package "$pkg" "$pkg"
   done
   optional_package nvim neovim
+  optional_package tv television
+  optional_package tre tre-command
+  agrep_pkg=tre
+  [[ "$FAMILY" == apt ]] && agrep_pkg=tre-agrep
+  optional_package agrep "$agrep_pkg"
 
   # 架构匹配定义
   ARCH_UNAME=$(uname -m 2>/dev/null || echo "$ARCH")
@@ -761,18 +766,24 @@ if [[ "$PROFILE" == full ]]; then
   FF_ARCH=""
   YAZI_ARCH=""
   NVIM_ARCH=""
+  TV_ARCH=""
+  TRE_ARCH=""
   case "$ARCH_UNAME" in
     x86_64|amd64)
       EZA_ARCH="x86_64"
       FF_ARCH="amd64"
       YAZI_ARCH="x86_64"
       NVIM_ARCH="x86_64"
+      TV_ARCH="x86_64"
+      TRE_ARCH="x86_64"
       ;;
     aarch64|arm64)
       EZA_ARCH="aarch64"
       FF_ARCH="aarch64"
       YAZI_ARCH="aarch64"
       NVIM_ARCH="arm64"
+      TV_ARCH="aarch64"
+      TRE_ARCH="aarch64"
       ;;
   esac
 
@@ -897,6 +908,63 @@ if [[ "$PROFILE" == full ]]; then
       fi
     fi
     rm -rf "$yazi_stage"
+  fi
+
+  # --- TELEVISION 官方预编译发布包自动回退 ---
+  if ! command -v tv >/dev/null 2>&1 && [[ -n "$TV_ARCH" ]]; then
+    info "$(msg "系统仓库无 television，正在从 GitHub Release 下载官方发布版至 ~/.local/bin..." "television not in repo; downloading official release to ~/.local/bin...")"
+    tv_stage=$(mktemp -d "$HOME/.tv-tmp-XXXXXX")
+    tv_url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/alexpasmantier/television/releases/latest 2>/dev/null) || true
+    tv_tag=${tv_url##*/}
+    tv_version=${tv_tag#v}
+    if [[ "$tv_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      if [[ "$OS" == Darwin ]]; then
+        tv_asset_url="https://github.com/alexpasmantier/television/releases/download/${tv_tag}/tv-${tv_version}-${TV_ARCH}-apple-darwin.tar.gz"
+      else
+        tv_asset_url="https://github.com/alexpasmantier/television/releases/download/${tv_tag}/tv-${tv_version}-${TV_ARCH}-unknown-linux-musl.tar.gz"
+      fi
+      if curl -fsSL --connect-timeout 10 -m 60 "$tv_asset_url" -o "$tv_stage/tv.tar.gz" 2>/dev/null || \
+         ([[ "$OS" != Darwin ]] && curl -fsSL --connect-timeout 10 -m 60 "https://github.com/alexpasmantier/television/releases/download/${tv_tag}/tv-${tv_version}-${TV_ARCH}-unknown-linux-gnu.tar.gz" -o "$tv_stage/tv.tar.gz" 2>/dev/null); then
+        tar -xzf "$tv_stage/tv.tar.gz" -C "$tv_stage" 2>/dev/null || true
+        tv_bin=$(find "$tv_stage" -type f -name tv -perm -111 2>/dev/null | head -n 1)
+        if [[ -n "$tv_bin" && -x "$tv_bin" ]]; then
+          mkdir -p "$HOME/.local/bin"
+          install -m 755 "$tv_bin" "$HOME/.local/bin/tv"
+          success "$(msg "television (tv) 安装成功（位于 ~/.local/bin/tv）" "television (tv) installed successfully (in ~/.local/bin/tv)")"
+          remove_skipped television
+          remove_skipped tv
+        fi
+      fi
+    fi
+    rm -rf "$tv_stage"
+  fi
+
+  # --- TRE (tre-command) 官方预编译发布包自动回退 ---
+  if ! command -v tre >/dev/null 2>&1 && [[ -n "$TRE_ARCH" ]]; then
+    info "$(msg "系统仓库无 tre-command，正在从 GitHub Release 下载官方发布版至 ~/.local/bin..." "tre-command not in repo; downloading official release to ~/.local/bin...")"
+    tre_stage=$(mktemp -d "$HOME/.tre-tmp-XXXXXX")
+    tre_url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/dduan/tre/releases/latest 2>/dev/null) || true
+    tre_tag=${tre_url##*/}
+    tre_version=${tre_tag#v}
+    if [[ "$tre_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+      if [[ "$OS" == Darwin ]]; then
+        tre_asset_url="https://github.com/dduan/tre/releases/download/${tre_tag}/tre-v${tre_version}-${TRE_ARCH}-apple-darwin.tar.gz"
+      else
+        tre_asset_url="https://github.com/dduan/tre/releases/download/${tre_tag}/tre-v${tre_version}-${TRE_ARCH}-unknown-linux-musl.tar.gz"
+      fi
+      if curl -fsSL --connect-timeout 10 -m 60 "$tre_asset_url" -o "$tre_stage/tre.tar.gz" 2>/dev/null; then
+        tar -xzf "$tre_stage/tre.tar.gz" -C "$tre_stage" 2>/dev/null || true
+        tre_bin=$(find "$tre_stage" -type f -name tre -perm -111 2>/dev/null | head -n 1)
+        if [[ -n "$tre_bin" && -x "$tre_bin" ]]; then
+          mkdir -p "$HOME/.local/bin"
+          install -m 755 "$tre_bin" "$HOME/.local/bin/tre"
+          success "$(msg "tre 安装成功（位于 ~/.local/bin/tre）" "tre installed successfully (in ~/.local/bin/tre)")"
+          remove_skipped tre-command
+          remove_skipped tre
+        fi
+      fi
+    fi
+    rm -rf "$tre_stage"
   fi
 
   # --- NEOVIM 现代版本保障与官方预编译包自动拉取（解决 Debian 12 等官方仓库版本过旧仅为 0.7 的问题）---
@@ -1123,6 +1191,9 @@ cp "$SCRIPT_DIR/templates/zshrc.zsh" "$BACKUP/new.zshrc"
 cat <<EOF > "$BACKUP/new.options"
 # 安装器生成；1 为启用，0 为关闭。
 ZSH_PROJECT_FULL=$([[ "$PROFILE" == full ]] && echo 1 || echo 0)
+ZSH_PROJECT_TELEVISION=1
+ZSH_PROJECT_TV_KEYBINDINGS=0
+ZSH_PROJECT_TRE=1
 ZSH_PROJECT_VFOX=$WITH_VFOX
 ZSH_PROJECT_LAZYDOCKER=$WITH_LAZYDOCKER
 ZSH_PROJECT_LAZYGIT=$WITH_LAZYGIT

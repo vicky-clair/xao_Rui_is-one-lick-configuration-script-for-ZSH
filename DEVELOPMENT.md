@@ -81,6 +81,8 @@ Homebrew 准备和资源自举可能在第 6 步最终确认前发生。第 10 �
 | FZF | 完整模式中优先包管理器；缺失或不支持 `--zsh` 时使用 `~/.fzf` 仓库和安装脚本 |
 | fd / bat | 使用发行版包名，必要时为 fdfind/batcat 建立用户目录链接 |
 | eza / Yazi / Fastfetch | 完整模式中有官方 Release 下载尝试；资产路径由脚本拼接 |
+| television / tre | 完整模式优先包管理器（Homebrew / Pacman / APT）；缺失时从 GitHub Release 下载官方二进制 |
+| agrep | 完整模式安装系统包（APT: tre-agrep，其余: tre），仓库缺失时跳过并记录 |
 | Neovim | 完整模式、非 Homebrew 分支中，缺失、版本低于脚本阈值 0.10 或显式指定参数时尝试下载 |
 | vfox | 包管理器失败后尝试官方用户安装脚本；不安装 SDK |
 | lazydocker / lazygit | 包管理器优先，下载回退行为存在差异，见下文限制 |

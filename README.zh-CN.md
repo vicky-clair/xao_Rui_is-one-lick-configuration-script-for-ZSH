@@ -12,7 +12,7 @@
 
 ![Zsh 项目启动截图：中文工具加载提示、Fastfetch 系统信息、插件更新提醒与启动耗时](assets/Ashampoo_Snap_12h48m48s.png)
 
-- **顶部工具状态**：显示 Yazi、FZF、eza、lazygit、Neovim、zoxide 等集成信息，以及常用命令和快捷键。
+- **顶部工具状态**：显示 Yazi、FZF、television、eza、tre、lazygit、Neovim、zoxide 等集成信息，以及常用命令和快捷键。
 - **中部系统信息**：Fastfetch 展示 Debian 标识、系统、内核、桌面环境和硬件资源。
 - **底部更新提醒**：展示缓存中的插件更新清单，可运行 `zsh-update` 进入更新流程。
 - **加载计时**：`5441ms` 是这一次配置内计时的结果，不包括完整的终端连接过程，也不包含随后加载的用户扩展、高亮和首次提示符钩子。
@@ -32,7 +32,7 @@
 ## 功能与适用范围
 
 - **基础环境**：Oh My Zsh、Powerlevel10k，以及自动建议、额外补全和语法高亮三个外部插件。
-- **完整工具集**：尝试安装并集成 FZF、fd、bat、eza、zoxide、Yazi、Neovim、Fastfetch。
+- **完整工具集**：尝试安装并集成 FZF、fd、bat、eza、zoxide、Yazi、Neovim、Fastfetch、television、tre、agrep。
 - **可选组件**：vfox、lazydocker、lazygit、tmux；安装 SDK、配置 Docker 服务和权限需另外处理。
 - **主题选择**：Rainbow、Lean、Classic、官方向导，或保留现有 `.p10k.zsh`。
 - **日常管理**：开关设置、只读体检、显式启动诊断、停用/恢复和失败组件重试。
@@ -149,6 +149,9 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | 上下方向键 | 按已输入前缀搜索历史 |
 | 双击 Esc | OMZ sudo 插件为当前输入添加 sudo 前缀 |
 | `y` / `z 关键词` | Yazi 退出后切换目录 / zoxide 跳转（`full=1`） |
+| `tv` / Ctrl+P | television 智能模糊查找器（`full=1`，可通过 `tv-keys=1` 接管 Ctrl+T/Ctrl+R） |
+| `tre` | 现代化目录树（`full=1`，带 `.gitignore` 过滤与 `-e` 编号跳转联动） |
+| `agrep` | TRE 模糊正则表达式匹配工具（`full=1`） |
 | `ll` / `la` | eza 详细列表 / 含隐藏项列表（`full=1`） |
 | `v` / `vim` / `vi` | 运行 Neovim 包装函数（`full=1` 且存在 nvim） |
 | `lg` / Ctrl+G | lazygit Git 面板 |

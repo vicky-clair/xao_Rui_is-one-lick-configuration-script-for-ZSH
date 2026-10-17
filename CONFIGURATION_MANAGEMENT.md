@@ -51,6 +51,9 @@ bash install.sh --set auto-update=0
 | `fastfetch` | 启动时显示系统信息，同时要求 `full=1` | 开启 |
 | `timer` | 横幅中的启动计时，同时要求 `banner=1` | 开启 |
 | `auto-update` | 周期性后台版本检测；已有缓存提示仍可显示 | 开启 |
+| `television` | television 终端模糊查找器集成（命令: `tv`，快捷键: Ctrl+P） | 开启（`full=1` 且检测到命令时生效） |
+| `tv-keys` | television 快捷键接管（开启时接管 Ctrl+T / Ctrl+R） | 关闭（默认保留 FZF 快捷键） |
+| `tre` | tre 现代化目录树集成（命令: `tre`，带 `-e` 编号跳转联动） | 开启（`full=1` 且检测到命令时生效） |
 
 开关不安装或卸载软件；`tmux=0` 不修改 `.tmux.conf`。更改后新开终端验证，不根据旧会话残留的别名判断。横幅、Fastfetch、计时开关以及下述扩展和快捷命令需要新版 `templates/zshrc.zsh`。旧安装仅更新项目源码不会自动替换家目录中的模板；普通 `--update` 也不重新部署模板。使用安装器重新部署时会备份配置，并按安装选项重写选项文件。
 

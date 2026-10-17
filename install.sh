@@ -284,23 +284,48 @@ fi
 if ((DO_UPDATE)); then
   [[ -t 0 ]] || die 'Update requires an interactive terminal'
   UPDATE_INCOMPLETE=0
-  info "$(msg "正在检测已安装插件与工具的更新状态..." "Checking update status for installed plugins and tools...")"
-  if [[ -f "$SCRIPT_DIR/scripts/check_updates.sh" ]]; then
-    bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE" || die '更新检测未完整完成，保留缓存，本次不自动升级。'
-  fi
-
   STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
   AVAILABLE_FILE="$STATE_ROOT/available_updates"
-  if [[ ! -s "$AVAILABLE_FILE" ]]; then
-    success "$(msg "所有组件已是最新，无需更新！" "All components are already up to date!")"
-    exit 0
+
+  info "$(msg "正在检测已安装插件与工具的更新状态..." "Checking update status for installed plugins and tools...")"
+  check_status=0
+  if [[ -f "$SCRIPT_DIR/scripts/check_updates.sh" ]]; then
+    if ! bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE"; then
+      check_status=$?
+    fi
   fi
 
-  echo ""
-  if ! ask "$(msg "是否确认现在更新以上有新版本的组件？" "Confirm updating the above components now?")"; then
-    echo "$(msg "已取消更新。" "Update cancelled.")"
-    exit 0
+  if ((check_status != 0)); then
+    if [[ -s "$AVAILABLE_FILE" ]]; then
+      echo ""
+      warn "$(msg "在线检测遇到网络延迟，但检测到本地此前记录的可用更新清单：" "Online check encountered network delay, but cached update list found:")"
+      while IFS= read -r _u_item || [[ -n "$_u_item" ]]; do
+        [[ -n "$_u_item" ]] && printf '  \033[1;36m•\033[0m %s\n' "$_u_item"
+      done < "$AVAILABLE_FILE"
+      echo ""
+      if ! ask "$(msg "是否基于已有缓存清单继续尝试升级？" "Proceed with update using cached list?")"; then
+        echo "$(msg "已取消更新。" "Update cancelled.")"
+        exit 0
+      fi
+    else
+      die "$(msg "更新检测未完成（网络连接超时），且无本地缓存。请检查网络后重试。" "Update check failed (connection timed out) and no local cache available.")"
+    fi
+  else
+    if [[ ! -s "$AVAILABLE_FILE" ]]; then
+      success "$(msg "所有组件已是最新，无需更新！" "All components are already up to date!")"
+      exit 0
+    fi
+
+    echo ""
+    if ! ask "$(msg "是否确认现在更新以上有新版本的组件？" "Confirm updating the above components now?")"; then
+      echo "$(msg "已取消更新。" "Update cancelled.")"
+      exit 0
+    fi
   fi
+
+  UPDATED_OK=()
+  UPDATED_FAIL=()
+  UPDATED_SKIP=()
 
   info "$(msg "开始更新 Git 插件与主题..." "Updating Git plugins and themes...")"
   update_git_repo() {
@@ -308,15 +333,21 @@ if ((DO_UPDATE)); then
     [[ -d "$dir/.git" ]] || return 0
     if [[ -n $(git -C "$dir" status --porcelain 2>/dev/null) ]]; then
       UPDATE_INCOMPLETE=1
+      UPDATED_SKIP+=("$name | $(msg "存在未提交的本地修改，已跳过自动拉取以防止代码冲突" "has local changes, skipped auto-pull to prevent conflict") | cd \"$dir\" && git status")
       warn "$(msg "$name 存在未提交的本地修改，跳过自动拉取以防止冲突。" "$name has uncommitted local changes; skipping pull to prevent conflicts.")"
       return 0
     fi
     info "$(msg "正在拉取 $name 最新代码..." "Pulling latest code for $name...")"
-    if git -C "$dir" pull --ff-only --quiet 2>/dev/null; then
+    local pull_out
+    if pull_out=$(git -C "$dir" pull --ff-only 2>&1); then
+      UPDATED_OK+=("$name")
       success "$(msg "$name 更新完成" "$name updated successfully")"
     else
       UPDATE_INCOMPLETE=1
-      warn "$(msg "$name 自动更新失败，请稍后手动检查 git status" "$name update failed; please check git status manually")"
+      local first_err
+      first_err=$(printf '%s\n' "$pull_out" | command grep -v '^[[:space:]]*$' | head -n 1)
+      UPDATED_FAIL+=("$name | ${first_err:-$(msg "拉取超时或网络连接失败" "Pull timed out or network failed")} | cd \"$dir\" && git pull")
+      warn "$(msg "$name 自动更新失败 (${first_err:-网络超时})" "$name update failed (${first_err:-network timeout})")"
     fi
   }
 
@@ -336,11 +367,16 @@ if ((DO_UPDATE)); then
   # Tmux 插件升级
   if [[ -x "$HOME/.tmux/plugins/tpm/bin/update_plugins" ]]; then
     info "$(msg "正在更新 Tmux 插件..." "Updating Tmux plugins...")"
-    if bash "$HOME/.tmux/plugins/tpm/bin/update_plugins" all; then
+    local tpm_err=""
+    if tpm_err=$(bash "$HOME/.tmux/plugins/tpm/bin/update_plugins" all 2>&1); then
+      UPDATED_OK+=("Tmux 插件 (TPM)")
       success "$(msg "Tmux 插件更新完成" "Tmux plugins updated successfully")"
     else
       UPDATE_INCOMPLETE=1
-      warn 'Tmux 插件更新失败，保留待处理状态。'
+      local tpm_short
+      tpm_short=$(printf '%s\n' "$tpm_err" | command grep -v '^[[:space:]]*$' | head -n 1)
+      UPDATED_FAIL+=("Tmux 插件 (TPM) | ${tpm_short:-$(msg "更新失败" "Update failed")} | bash \"$HOME/.tmux/plugins/tpm/bin/update_plugins\" all 或进入 tmux 按 prefix + U")
+      warn "$(msg "Tmux 插件更新遇到错误，已保留待处理状态。" "Tmux plugin update encountered errors.")"
     fi
   fi
 
@@ -348,10 +384,11 @@ if ((DO_UPDATE)); then
   if [[ -d "$HOME/.fzf/.git" ]]; then
     update_git_repo "FZF" "$HOME/.fzf"
     if [[ -x "$HOME/.fzf/install" ]]; then
-      if bash "$HOME/.fzf/install" --bin --no-update-rc; then
-        ln -sf "$HOME/.fzf/bin/fzf" "$HOME/.local/bin/fzf" || UPDATE_INCOMPLETE=1
+      if bash "$HOME/.fzf/install" --bin --no-update-rc 2>/dev/null; then
+        ln -sf "$HOME/.fzf/bin/fzf" "$HOME/.local/bin/fzf" 2>/dev/null || true
       else
         UPDATE_INCOMPLETE=1
+        UPDATED_FAIL+=("FZF 二进制安装 | $(msg "install 脚本执行失败" "install script failed") | cd \"$HOME/.fzf\" && ./install --bin")
       fi
     fi
   fi
@@ -360,37 +397,100 @@ if ((DO_UPDATE)); then
   OS_TYPE=$(uname -s)
   if [[ "$OS_TYPE" == Darwin ]] && command -v brew >/dev/null 2>&1; then
     info "$(msg "正在通过 Homebrew 升级命令行工具..." "Upgrading CLI tools via Homebrew...")"
-    # 查询待升级包并禁用自动更新，仅升级已安装且有更新的 formula
-    brew_outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --quiet 2>/dev/null) || UPDATE_INCOMPLETE=1
+    brew_outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --quiet 2>/dev/null) || true
     brew_targets=()
     for _b_pkg in fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux television tre-command tre; do
       if printf '%s\n' "${brew_outdated:-}" | grep -qFx "$_b_pkg"; then
         brew_targets+=("$_b_pkg")
       fi
     done
-    if ((${#brew_targets[@]} > 0)); then
-      HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade "${brew_targets[@]}" || UPDATE_INCOMPLETE=1
-    fi
+    for _b_target in ${brew_targets[@]+"${brew_targets[@]}"}; do
+      info "$(msg "正在升级 Homebrew 软件包: $_b_target ..." "Upgrading Homebrew package: $_b_target ...")"
+      if HOMEBREW_NO_AUTO_UPDATE=1 brew upgrade "$_b_target" 2>/dev/null; then
+        UPDATED_OK+=("Homebrew: $_b_target")
+        success "$(msg "$_b_target 升级成功" "$_b_target upgraded successfully")"
+      else
+        UPDATE_INCOMPLETE=1
+        UPDATED_FAIL+=("Homebrew: $_b_target | $(msg "升级失败" "Upgrade failed") | brew upgrade $_b_target")
+        warn "$(msg "$_b_target 升级失败" "$_b_target upgrade failed")"
+      fi
+    done
   elif [[ "$OS_TYPE" == Linux ]]; then
     if command -v apt-get >/dev/null 2>&1; then
-      info "$(msg "提示：可在终端运行 sudo apt update && sudo apt --only-upgrade install <包名> 升级系统包。" "Tip: You can run sudo apt update && sudo apt --only-upgrade install <pkg> to upgrade system packages.")"
+      info "$(msg "提示：如需升级 Linux 系统包，可运行: sudo apt update && sudo apt --only-upgrade install <包名>" "Tip: To upgrade Linux system packages, run: sudo apt update && sudo apt --only-upgrade install <pkg>")"
     elif command -v dnf >/dev/null 2>&1; then
-      info "$(msg "提示：可在终端运行 sudo dnf upgrade <包名> 升级系统包。" "Tip: You can run sudo dnf upgrade <pkg> to upgrade system packages.")"
+      info "$(msg "提示：如需升级 Linux 系统包，可运行: sudo dnf upgrade <包名>" "Tip: To upgrade Linux system packages, run: sudo dnf upgrade <pkg>")"
     fi
   fi
 
-  # 成功后重新检测；失败时保留旧缓存，不能把失败或待手动升级误报为完成。
-  if ((UPDATE_INCOMPLETE == 0)); then
-    bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE" || UPDATE_INCOMPLETE=1
+  # 智能同步缓存：将成功更新的组件从 available_updates 清单中剔除
+  if [[ -f "$AVAILABLE_FILE" ]] && ((${#UPDATED_OK[@]} > 0)); then
+    local tmp_avail
+    tmp_avail=$(mktemp "$AVAILABLE_FILE.tmp.XXXXXX")
+    while IFS= read -r a_line || [[ -n "$a_line" ]]; do
+      local matched=0
+      for ok_item in "${UPDATED_OK[@]}"; do
+        if [[ "$a_line" == *"$ok_item"* ]]; then
+          matched=1
+          break
+        fi
+      done
+      ((matched == 0)) && printf '%s\n' "$a_line" >> "$tmp_avail"
+    done < "$AVAILABLE_FILE"
+    mv "$tmp_avail" "$AVAILABLE_FILE"
   fi
+
   if [[ -f "$HOME/.zshrc" ]]; then
     zsh -n "$HOME/.zshrc" && success "$(msg "配置语法检查通过。" "Configuration syntax check passed.")"
   fi
+
+  # 输出格式化升级结果汇总卡
+  echo ""
+  echo "============================================================"
+  printf '        \033[1;34m%s\033[0m\n' "$(msg "📋 组件升级结果汇总" "📋 Component Update Summary")"
+  echo "============================================================"
+  if ((${#UPDATED_OK[@]} > 0)); then
+    printf '\033[1;32m%s (%d):\033[0m\n' "$(msg "✅ 升级成功" "✅ Successfully Updated")" "${#UPDATED_OK[@]}"
+    for item in "${UPDATED_OK[@]}"; do
+      printf '  \033[32m✔\033[0m %s\n' "$item"
+    done
+    echo ""
+  fi
+
+  if ((${#UPDATED_SKIP[@]} > 0)); then
+    printf '\033[1;33m%s (%d):\033[0m\n' "$(msg "⚠ 跳过升级" "⚠ Skipped Updates")" "${#UPDATED_SKIP[@]}"
+    for item in "${UPDATED_SKIP[@]}"; do
+      local s_name="${item%% | *}"
+      local s_act="${item#* | }"
+      printf '  \033[33m•\033[0m %s\n' "$s_name"
+      [[ "$s_act" != "$item" ]] && printf '    \033[36m👉 %s\033[0m\n' "$s_act"
+    done
+    echo ""
+  fi
+
+  if ((${#UPDATED_FAIL[@]} > 0)); then
+    printf '\033[1;31m%s (%d):\033[0m\n' "$(msg "❌ 升级失败 (可单独处理)" "❌ Failed Updates (Action Required)")" "${#UPDATED_FAIL[@]}"
+    for item in "${UPDATED_FAIL[@]}"; do
+      local f_name="${item%% | *}"
+      local rest="${item#* | }"
+      local f_reason="${rest%% | *}"
+      local f_act="${rest#* | }"
+      printf '  \033[31m✖\033[0m \033[1m%s\033[0m (%s)\n' "$f_name" "$f_reason"
+      [[ "$f_act" != "$rest" ]] && printf '    \033[36m👉 %s\033[0m\n' "$f_act"
+    done
+    echo ""
+  fi
+
+  printf '\033[1;35m%s\033[0m\n' "$(msg "💡 单独处理与重试指引:" "💡 Individual Component Action Guide:")"
+  printf '  • %s: \033[33mbash install.sh --retry-failed [组件名]\033[0m\n' "$(msg "独立包重试安装" "Retry individual package")"
+  printf '  • %s: \033[33mbash install.sh --doctor\033[0m\n' "$(msg "环境只读健康体检" "Read-only health check")"
+  echo "============================================================"
+
   if ((UPDATE_INCOMPLETE)) || [[ -s "$AVAILABLE_FILE" ]]; then
-    warn '更新仍有失败、跳过或待手动处理的组件，缓存已保留。'
+    warn "$(msg "部分组件未完成更新，未成功的项目已保留在提醒列表中，可通过上述提示单独处理。" "Some components were not updated; pending items remain in notice list.")"
     exit 1
   fi
-  success "$(msg "更新并复查完成。请新开终端验证。" "Update and recheck completed. Open a new terminal to verify.")"
+  success "$(msg "所有待更新组件均已完成更新！请新开终端验证。" "All components updated successfully! Please open a new terminal to verify.")"
   exit 0
 fi
 

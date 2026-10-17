@@ -62,9 +62,14 @@ run_with_timeout() {
 }
 
 # 快速网络连通性测试（若离线则直接退出，不阻塞）
-if ! run_with_timeout 2 curl -fsI --connect-timeout 2 https://github.com >/dev/null 2>&1; then
-  ((QUIET)) || echo "$(msg "网络不可用或连接 GitHub 超时，跳过更新检测。" "Network unavailable or GitHub connection timed out, skipping update check.")"
-  exit 2
+_probe_sec=2
+((QUIET)) || _probe_sec=5
+if ! run_with_timeout "$_probe_sec" curl -fsI --connect-timeout "$_probe_sec" https://github.com >/dev/null 2>&1; then
+  if ((QUIET)); then
+    exit 2
+  else
+    echo "$(msg "提示：GitHub 网络探测响应较慢，正在尝试直接通过 Git 协议继续检测..." "Notice: GitHub connection slow; attempting to check updates via Git...")"
+  fi
 fi
 
 UPDATES=()

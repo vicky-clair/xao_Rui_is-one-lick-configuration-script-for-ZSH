@@ -62,22 +62,27 @@ test -r "$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-high
 
 在新 Zsh 中用 `whence -v compdef _zsh_autosuggest_start _zsh_highlight` 检查函数。根目录参考配置有 OMZ 缺失时的自动建议备用加载，安装模板只有备用补全，这一差异不能忽略。
 
-## 4. 工具已安装但 y、lg、lzd 或其它命令缺失
+## 4. 工具已安装但 y、lg、lzd、tv、tre、agrep 或其它命令缺失
 
-先在目标会话确认 `command -v yazi`、`command -v lazygit` 或 `command -v lazydocker`。二进制不在 PATH 时先找到实际安装目录；旧机器上的 `~/.version-fox/sdks/golang/packages/bin` 不一定适用于新机器。
+先在目标会话确认 `command -v yazi`、`command -v lazygit`、`command -v lazydocker`、`command -v tv`、`command -v tre` 或 `command -v agrep`。二进制不在 PATH 时先找到实际安装目录；旧机器上的 `~/.version-fox/sdks/golang/packages/bin` 不一定适用于新机器。
 
 使用安装模板时：
 
 ```bash
 bash install.sh --configure
 bash install.sh --set full=1
+bash install.sh --set television=1
+bash install.sh --set tre=1
 bash install.sh --set lazydocker=1
 bash install.sh --set lazygit=1
 ```
 
-只选择需要的设置，然后新开 Zsh。`full=1` 控制 Yazi/FZF/eza/zoxide/Neovim 等集成；lazydocker 和 lazygit 有独立开关。开关不会安装软件，普通安装器会按本次选项重写开关。
+只选择需要的设置，然后新开 Zsh。`full=1` 控制 Yazi/FZF/eza/zoxide/Neovim/television/tre 等集成；lazydocker 和 lazygit 有独立开关。开关不会安装软件，普通安装器会按本次选项重写开关。
 
-存在对应二进制不表示服务已配置：lazydocker 仍依赖可连接的 Docker 环境，Yazi 的媒体预览也可能依赖额外工具。按实际错误处理，不把 socket 权限修改当作通用修复。
+- **television 快捷键与 FZF 共存问题**：television 默认以优雅共存模式加载，专享 `Ctrl+P` 快捷呼出。若希望由 television 完全接管文件与历史搜索按键，可运行 `bash install.sh --set tv-keys=1`（将 `Ctrl+T` 绑定至 `tv-smart-autocomplete`，`Ctrl+R` 绑定至 `tv-shell-history`）；随时运行 `--set tv-keys=0` 可切回 FZF 优先模式。
+- **tre 编号跳转失效**：`tre` 自动封装 `-e` 编号模式并在执行后加载 `/tmp/tre_aliases_$USER`。若编号别名未生效，检查临时文件写权限以及是否已安装并配置 `EDITOR`（如 Neovim/Vim）。
+- **agrep 在 Debian/Ubuntu 找不到命令**：Debian/Ubuntu 官方包名为 `tre-agrep`。安装器与重试工具会自动将其链接至 `~/.local/bin/agrep`，模板也会自动设置 `alias agrep='tre-agrep'`。若缺少命令可执行 `bash install.sh --retry-failed agrep`。
+- **lazydocker 状态异常**：存在对应二进制不表示服务已配置：lazydocker 仍依赖可连接的 Docker 环境，Yazi 的媒体预览也可能依赖额外工具。按实际错误处理，不把 socket 权限修改当作通用修复。
 
 ## 5. vfox 超时、启动慢或切换目录慢
 

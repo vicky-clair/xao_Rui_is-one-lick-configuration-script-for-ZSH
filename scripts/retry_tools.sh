@@ -213,6 +213,10 @@ for component in "${REQUESTED[@]}"; do
   ok=0
   if available "$component"; then ok=1
   elif package_install "$component" > "$RUN/$component.log" 2>&1; then
+    if [[ "$component" == agrep ]] && ! command -v agrep >/dev/null 2>&1 && command -v tre-agrep >/dev/null 2>&1; then
+      mkdir -p "$HOME/.local/bin"
+      [[ ! -e "$HOME/.local/bin/agrep" ]] && ln -s "$(command -v tre-agrep)" "$HOME/.local/bin/agrep" 2>/dev/null || true
+    fi
     if [[ "$component" == ncurses-term ]] || available "$component"; then ok=1; fi
   fi
   if ((ok == 0)) && [[ "$component" == lazydocker ]]; then

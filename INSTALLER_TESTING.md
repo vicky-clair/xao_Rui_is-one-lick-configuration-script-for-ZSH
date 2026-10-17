@@ -4,16 +4,16 @@
 
 ## 最近一次本地验证
 
-日期：2026-10-17。基于提交 `66c4bc3` 的工作区，包含 macOS 兼容性全面修复（Bash 3.2 数组展开、Homebrew 包与路径适配、Release 回退修复与测试隔离）。测试环境为 macOS Golden Gate 27.0.1 (arm64 Apple M1)，系统原生 Bash 3.2.57 与 Zsh 5.9，Homebrew 管理器环境。
+日期：2026-10-17。基于最新工作区，包含全套现代 CLI 工具链扩充（集成 `television` 模糊搜索器、`tre` 现代目录树与 `agrep` 近似正则工具，支持 Linux 多包管理器与 GitHub Release 架构回退）。测试环境为 macOS Golden Gate 27.0.1 (arm64 Apple M1)，系统原生 Bash 3.2.57 与 Zsh 5.9，以及 Linux (Ubuntu/Debian/Fedora/Arch) 隔离回归测试环境。
 
 | 检查 | 本次结果 | 解释 |
 | --- | --- | --- |
 | 六个正式 Bash 脚本语法 | 通过 | 解析检查，全数通过 |
 | Zsh 模板与配置语法检查 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
-| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、原生悬空符号链接、回退保护用例均通过 |
-| `bash scripts/test_management.sh` | 退出码 0，全量通过 | Zsh 开关、差异恢复、失败重试隔离、macOS PTY `script` 终端启动诊断全数通过 |
-| macOS 实际安装部署 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh` 实机部署成功，受管配置与备份完整生效 |
-| 终端交互与组件验收 | 通过 | 新开终端会话启动正常（~740ms - 2300ms），11 款 CLI 工具挂载正常，Fastfetch 渲染正常，Tmux 插件生态就绪 |
+| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
+| `bash scripts/test_management.sh` | 退出码 0，全量通过 | Zsh 开关（含 television、tv-keys、tre）、差异恢复、失败重试隔离、macOS PTY 终端启动诊断全数通过 |
+| macOS 实际安装部署 | 通过 | `install.sh --profile full --p10k-style skip --lang zh` 实机部署成功，受管配置与备份完整生效 |
+| 终端交互与组件验收 | 通过 | 新开终端会话启动正常（~450ms - 540ms），14 款 CLI 工具挂载正常，Banner 完整输出，`tv` (Ctrl+P)、`tre` (-e)、`agrep` 均正常响应 |
 | 当前版本远端 CI | 本轮未查询或触发 | 工作流存在不等于当前代码已通过 |
 
 本次测试现场保留在 `/var/folders/.../zsh-installer-tests.*` 和 `zsh-management-tests.*`。这些是测试运行的临时路径，不是需要部署的仓库资源。
@@ -111,6 +111,9 @@ bash install.sh --profile full --p10k-style skip --lang zh
 | 主题、补全、自动建议 | Tab 路径补全；输入已有命令前缀，在行尾按右键接受建议 |
 | 高亮 | 输入存在和不存在的命令，观察颜色差异 |
 | FZF | Ctrl+R、Ctrl+T、Alt+C；检查预览和目录切换 |
+| television | `tv` / Ctrl+P 模糊查找；`tv-keys=1` 验证是否接管 Ctrl+T/Ctrl+R |
+| tre | `tre -s` 目录树与 `[1]`, `[2]` 编号跳转与编辑器联动 |
+| agrep | `agrep -V` 近似正则表达式匹配与容错搜索 |
 | 共享历史 | 两个同用户会话搜索独特 echo 标记，同时检查 `fc -l` |
 | Yazi / zoxide | `y` 退出目录联动；访问目录后 `z` 跳转 |
 | lazygit / lazydocker | 先查看版本，再按需要打开界面，不为验收执行删除或提交 |

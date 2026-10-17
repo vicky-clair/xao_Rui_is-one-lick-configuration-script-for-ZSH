@@ -98,29 +98,36 @@ bash install.sh --profile full --p10k-style rainbow --lang zh
 先按目标系统准备 Zsh、Git、curl、归档工具和哈希工具。以下是对应环境的基础示例，只执行适合自己系统的一组：
 
 ```bash
-# Debian / Ubuntu
+# Debian / Ubuntu 基础依赖与可选 agrep
 sudo apt-get update
-sudo apt-get install zsh git curl ca-certificates coreutils unzip tar
+sudo apt-get install zsh git curl ca-certificates coreutils unzip tar tre-agrep
+# 可选完整工具：fzf, fd-find, bat, eza, zoxide, yazi, neovim
+# 注：television 与 tre-command 官方仓库未提供 deb 时，安装脚本会自动从 GitHub Release 下载预编译版本
 ```
 
 ```bash
-# Fedora
-sudo dnf install zsh git curl ca-certificates coreutils unzip tar
+# Fedora 基础依赖与可选 agrep
+sudo dnf install zsh git curl ca-certificates coreutils unzip tar tre
+# 可选完整工具：fzf, fd-find, bat, eza, zoxide, yazi, neovim
+# 注：television 与 tre-command 可通过 GitHub Release 或 cargo/copr 安装
 ```
 
 ```bash
-# Arch
-sudo pacman -Syu --needed zsh git curl ca-certificates coreutils unzip tar
+# Arch Linux 基础依赖、agrep 与完整工具
+sudo pacman -Syu --needed zsh git curl ca-certificates coreutils unzip tar tre
+# 可选完整工具可通过 pacman 或 AUR 安装：
+# yay -S --needed television tre-command fzf fd bat eza zoxide yazi neovim
 ```
 
 ```bash
-# openSUSE
-sudo zypper install zsh git curl ca-certificates coreutils unzip tar
+# openSUSE 基础依赖与可选 agrep
+sudo zypper install zsh git curl ca-certificates coreutils unzip tar tre
+# 可选完整工具：fzf, fd-find, bat, eza, zoxide, yazi, neovim
 ```
 
 ```bash
-# 已配置 Homebrew 的 macOS，普通用户执行
-brew install zsh git curl coreutils unzip tar
+# 已配置 Homebrew 的 macOS，普通用户执行（含完整新工具）
+brew install zsh git curl coreutils unzip tar television tre-command tre
 ```
 
 检查 `zsh --version` 和 `zsh -f -c 'print -r -- OK'`。尚未完成配置验收时，不急于设置默认登录 Shell。
@@ -174,6 +181,9 @@ brew install zsh git curl coreutils unzip tar
   cp templates/zshrc.zsh "$manual_stage/zshrc"
   printf '%s\n' \
     'ZSH_PROJECT_FULL=0' \
+    'ZSH_PROJECT_TELEVISION=0' \
+    'ZSH_PROJECT_TV_KEYBINDINGS=0' \
+    'ZSH_PROJECT_TRE=0' \
     'ZSH_PROJECT_VFOX=0' \
     'ZSH_PROJECT_LAZYDOCKER=0' \
     'ZSH_PROJECT_LAZYGIT=0' \
@@ -224,6 +234,7 @@ bash install.sh --set lazygit=1
 | FZF | `fzf --zsh` 是否支持；模板有系统脚本回退，不要重复 source 多套集成 |
 | television | 模糊查找器（`tv`）；默认提供独立小部件 `Ctrl+P`，可通过 `tv-keys=1` 切换接管 `Ctrl+R`/`Ctrl+T` |
 | tre | 现代化目录树（`tre`）；包装函数默认追加 `-e` 编号并加载快捷别名文件 `/tmp/tre_aliases_$USER` |
+| agrep | TRE 近似正则匹配工具（`agrep` / `tre-agrep`）；Debian/Ubuntu 包名为 `tre-agrep`，安装脚本与模板自动提供映射与别名 |
 | bat | 模板只在主题存在时设置 `tokyonight_night`；自定义 BAT_THEME 需自行确认 |
 | Fastfetch | 有 `~/.config/fastfetch/config.jsonc` 时使用该文件，否则运行默认配置；项目未提供个人配置 |
 | vfox | 安装后还需 SDK 配置；模板移除 `_vfox_hook` 自动目录/提示符钩子 |

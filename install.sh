@@ -1094,7 +1094,7 @@ if ((WITH_TMUX)); then
   fi
 fi
 
-# 命令名软链接映射（兼容各发行版的 fdfind / batcat）
+# 命令名软链接映射（兼容各发行版的 fdfind / batcat / tre-agrep）
 mkdir -p "$HOME/.local/bin"
 if ! command -v fd >/dev/null 2>&1 && command -v fdfind >/dev/null 2>&1; then
   [[ ! -e "$HOME/.local/bin/fd" ]] && ln -s "$(command -v fdfind)" "$HOME/.local/bin/fd" 2>/dev/null || true
@@ -1102,6 +1102,10 @@ fi
 if ! command -v bat >/dev/null 2>&1 && command -v batcat >/dev/null 2>&1; then
   [[ ! -e "$HOME/.local/bin/bat" ]] && ln -s "$(command -v batcat)" "$HOME/.local/bin/bat" 2>/dev/null || true
 fi
+if ! command -v agrep >/dev/null 2>&1 && command -v tre-agrep >/dev/null 2>&1; then
+  [[ ! -e "$HOME/.local/bin/agrep" ]] && ln -s "$(command -v tre-agrep)" "$HOME/.local/bin/agrep" 2>/dev/null || true
+fi
+
 
 # 9. 安装 Oh My Zsh、主题及插件
 clone_missing() {

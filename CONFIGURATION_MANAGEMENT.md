@@ -75,11 +75,13 @@ zsh-config --set banner=0
 bash install.sh --retry-failed
 bash install.sh --retry-failed lazydocker
 bash install.sh --retry-failed lazygit
+bash install.sh --retry-failed television
+bash install.sh --retry-failed tre-command
 ```
 
-新安装将未完成的可选包写入状态目录的 `failed-components`。不带名称时重试清单；旧安装没有清单时可指定组件。支持 fzf、fd/fd-find、bat/batcat、eza、zoxide、yazi、neovim/nvim、fastfetch、vfox、lazydocker、lazygit、tmux、xclip、wl-clipboard/wl-copy、ncurses-term。
+新安装将未完成的可选包写入状态目录的 `failed-components`。不带名称时重试清单；旧安装没有清单时可指定组件。支持 fzf、fd/fd-find、bat/batcat、eza、zoxide、yazi、neovim/nvim、fastfetch、television、tre-command、agrep、vfox、lazydocker、lazygit、tmux、xclip、wl-clipboard/wl-copy、ncurses-term。
 
-重试先检查命令是否已在 PATH，否则调用系统包管理器安装。lazydocker 与 lazygit 额外支持官方 Release 下载回退，按版本号拼接资产名。其余工具在仓库无包时仍会失败并保留记录；此入口不保证升级到特定版本，不重部署配置、主题或 SDK，也不配置 Docker。成功后仅移除对应失败项，其余失败保留。日志位于状态目录的 `retry-XXXXXXXX/组件.log`。
+重试先检查命令是否已在 PATH，否则调用系统包管理器安装。lazydocker、lazygit、television 与 tre-command 额外支持官方 Release 下载回退，按版本号和系统/架构拼接资产名。其余工具在仓库无包时仍会失败并保留记录；此入口不保证升级到特定版本，不重部署配置、主题或 SDK，也不配置 Docker。成功后仅移除对应失败项，其余失败保留。日志位于状态目录的 `retry-XXXXXXXX/组件.log`。
 
 ## 备份查看与按范围恢复
 

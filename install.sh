@@ -367,13 +367,12 @@ if ((DO_UPDATE)); then
   # Tmux 插件升级
   if [[ -x "$HOME/.tmux/plugins/tpm/bin/update_plugins" ]]; then
     info "$(msg "正在更新 Tmux 插件..." "Updating Tmux plugins...")"
-    local tpm_err=""
+    tpm_err=""
     if tpm_err=$(bash "$HOME/.tmux/plugins/tpm/bin/update_plugins" all 2>&1); then
       UPDATED_OK+=("Tmux 插件 (TPM)")
       success "$(msg "Tmux 插件更新完成" "Tmux plugins updated successfully")"
     else
       UPDATE_INCOMPLETE=1
-      local tpm_short
       tpm_short=$(printf '%s\n' "$tpm_err" | command grep -v '^[[:space:]]*$' | head -n 1)
       UPDATED_FAIL+=("Tmux 插件 (TPM) | ${tpm_short:-$(msg "更新失败" "Update failed")} | bash \"$HOME/.tmux/plugins/tpm/bin/update_plugins\" all 或进入 tmux 按 prefix + U")
       warn "$(msg "Tmux 插件更新遇到错误，已保留待处理状态。" "Tmux plugin update encountered errors.")"
@@ -425,10 +424,9 @@ if ((DO_UPDATE)); then
 
   # 智能同步缓存：将成功更新的组件从 available_updates 清单中剔除
   if [[ -f "$AVAILABLE_FILE" ]] && ((${#UPDATED_OK[@]} > 0)); then
-    local tmp_avail
     tmp_avail=$(mktemp "$AVAILABLE_FILE.tmp.XXXXXX")
     while IFS= read -r a_line || [[ -n "$a_line" ]]; do
-      local matched=0
+      matched=0
       for ok_item in "${UPDATED_OK[@]}"; do
         if [[ "$a_line" == *"$ok_item"* ]]; then
           matched=1
@@ -460,8 +458,8 @@ if ((DO_UPDATE)); then
   if ((${#UPDATED_SKIP[@]} > 0)); then
     printf '\033[1;33m%s (%d):\033[0m\n' "$(msg "⚠ 跳过升级" "⚠ Skipped Updates")" "${#UPDATED_SKIP[@]}"
     for item in "${UPDATED_SKIP[@]}"; do
-      local s_name="${item%% | *}"
-      local s_act="${item#* | }"
+      s_name="${item%% | *}"
+      s_act="${item#* | }"
       printf '  \033[33m•\033[0m %s\n' "$s_name"
       [[ "$s_act" != "$item" ]] && printf '    \033[36m👉 %s\033[0m\n' "$s_act"
     done
@@ -471,10 +469,10 @@ if ((DO_UPDATE)); then
   if ((${#UPDATED_FAIL[@]} > 0)); then
     printf '\033[1;31m%s (%d):\033[0m\n' "$(msg "❌ 升级失败 (可单独处理)" "❌ Failed Updates (Action Required)")" "${#UPDATED_FAIL[@]}"
     for item in "${UPDATED_FAIL[@]}"; do
-      local f_name="${item%% | *}"
-      local rest="${item#* | }"
-      local f_reason="${rest%% | *}"
-      local f_act="${rest#* | }"
+      f_name="${item%% | *}"
+      rest="${item#* | }"
+      f_reason="${rest%% | *}"
+      f_act="${rest#* | }"
       printf '  \033[31m✖\033[0m \033[1m%s\033[0m (%s)\n' "$f_name" "$f_reason"
       [[ "$f_act" != "$rest" ]] && printf '    \033[36m👉 %s\033[0m\n' "$f_act"
     done

@@ -526,13 +526,13 @@ if [[ ! -r "$SCRIPT_DIR/templates/zshrc.zsh" ]]; then
     RAW_BASE="https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main"
     command mkdir -p "$LOCAL_BOOTSTRAP_DIR/templates" "$LOCAL_BOOTSTRAP_DIR/scripts"
     if command -v curl >/dev/null 2>&1; then
-      command curl -fsSL "$RAW_BASE/templates/zshrc.zsh" -o "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" 2>/dev/null || true
-      command curl -fsSL "$RAW_BASE/templates/tmux.conf" -o "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" 2>/dev/null || true
-      command curl -fsSL "$RAW_BASE/scripts/check_updates.sh" -o "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" 2>/dev/null || true
+      command curl -fsSL --connect-timeout 10 -m 30 "$RAW_BASE/templates/zshrc.zsh" -o "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" 2>/dev/null || true
+      command curl -fsSL --connect-timeout 10 -m 30 "$RAW_BASE/templates/tmux.conf" -o "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" 2>/dev/null || true
+      command curl -fsSL --connect-timeout 10 -m 30 "$RAW_BASE/scripts/check_updates.sh" -o "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" 2>/dev/null || true
     elif command -v wget >/dev/null 2>&1; then
-      command wget -qO "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" "$RAW_BASE/templates/zshrc.zsh" 2>/dev/null || true
-      command wget -qO "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" "$RAW_BASE/templates/tmux.conf" 2>/dev/null || true
-      command wget -qO "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" "$RAW_BASE/scripts/check_updates.sh" 2>/dev/null || true
+      command wget -T 30 -qO "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" "$RAW_BASE/templates/zshrc.zsh" 2>/dev/null || true
+      command wget -T 30 -qO "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" "$RAW_BASE/templates/tmux.conf" 2>/dev/null || true
+      command wget -T 30 -qO "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" "$RAW_BASE/scripts/check_updates.sh" 2>/dev/null || true
     fi
     command chmod +x "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" 2>/dev/null || true
   fi
@@ -663,7 +663,7 @@ case "$FAMILY" in
     fi
     ;;
   apt)
-    sudo apt-get update
+    sudo apt-get update || true
     sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term x11-utils 2>/dev/null || \
     sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term
     ;;
@@ -1017,7 +1017,7 @@ if ((WITH_VFOX)) && ! command -v vfox >/dev/null 2>&1; then
   if ! command -v vfox >/dev/null 2>&1; then
     info "$(msg "系统仓库无 vfox，正在尝试通过官方脚本安装至用户目录..." "vfox not in repo; attempting official install script...")"
     vfox_stage=$(mktemp -d "$HOME/.vfox-tmp-XXXXXX")
-    if curl -fsSL "https://raw.githubusercontent.com/version-fox/vfox/main/install.sh" -o "$vfox_stage/install.sh" 2>/dev/null; then
+    if curl -fsSL --connect-timeout 10 -m 60 "https://raw.githubusercontent.com/version-fox/vfox/main/install.sh" -o "$vfox_stage/install.sh" 2>/dev/null; then
       if bash "$vfox_stage/install.sh" --user >/dev/null 2>&1; then
         success "$(msg "vfox 官方脚本安装成功" "vfox installed successfully via official script")"
         remove_skipped vfox
@@ -1043,7 +1043,7 @@ if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
     lzd_version=${lzd_tag#v}
     if [[ "$lzd_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       lzd_url="https://github.com/jesseduffield/lazydocker/releases/download/${lzd_tag}/lazydocker_${lzd_version}_${lzd_os}_${lzd_arch}.tar.gz"
-      if curl -fsSL "$lzd_url" -o "$lzd_stage/lzd.tar.gz" 2>/dev/null; then
+      if curl -fsSL --connect-timeout 10 -m 90 "$lzd_url" -o "$lzd_stage/lzd.tar.gz" 2>/dev/null; then
         if tar -xzf "$lzd_stage/lzd.tar.gz" -C "$lzd_stage" lazydocker 2>/dev/null && [[ -x "$lzd_stage/lazydocker" ]]; then
           mkdir -p "$HOME/.local/bin"
           install -m 755 "$lzd_stage/lazydocker" "$HOME/.local/bin/lazydocker"
@@ -1071,7 +1071,7 @@ if ((WITH_LAZYGIT)) && ! command -v lazygit >/dev/null 2>&1; then
     lg_version=${lg_tag#v}
     if [[ "$lg_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       lg_download_url="https://github.com/jesseduffield/lazygit/releases/download/${lg_tag}/lazygit_${lg_version}_${lg_os}_${lg_arch}.tar.gz"
-      if curl -fsSL "$lg_download_url" -o "$lg_stage/lg.tar.gz" 2>/dev/null; then
+      if curl -fsSL --connect-timeout 10 -m 90 "$lg_download_url" -o "$lg_stage/lg.tar.gz" 2>/dev/null; then
         if tar -xzf "$lg_stage/lg.tar.gz" -C "$lg_stage" lazygit 2>/dev/null && [[ -x "$lg_stage/lazygit" ]]; then
           mkdir -p "$HOME/.local/bin"
           install -m 755 "$lg_stage/lazygit" "$HOME/.local/bin/lazygit"
@@ -1261,26 +1261,23 @@ case "$P10K_STYLE" in
 esac
 
 # 11. 切换默认 Shell（Linux 与 macOS 分别适配）
-if ask "$(msg '是否将 Zsh 设为当前用户的默认登录 Shell？' 'Set Zsh as default login shell for current user?') "; then
+current_shell="${SHELL:-}"
+if [[ "$current_shell" == *zsh ]]; then
+  info "$(msg "当前默认 Shell 已经是 Zsh ($current_shell)，无需修改。" "Current default shell is already Zsh ($current_shell); no change needed.")"
+elif ask "$(msg '是否将 Zsh 设为当前用户的默认登录 Shell？' 'Set Zsh as default login shell for current user?') "; then
   zsh_bin=$(command -v zsh)
-  current_shell="${SHELL:-}"
+  if ! grep -Fxq "$zsh_bin" /etc/shells; then
+    warn "$(msg "路径 $zsh_bin 不在 /etc/shells 列表中，正在请求权限添加..." "$zsh_bin not in /etc/shells, requesting permission to add...")"
+    if command -v sudo >/dev/null 2>&1; then
+      echo "$zsh_bin" | sudo tee -a /etc/shells >/dev/null
+    fi
+  fi
 
-  if [[ "$current_shell" == *zsh ]]; then
-    info "$(msg "当前默认 Shell 已经是 Zsh ($current_shell)，无需修改。" "Current default shell is already Zsh ($current_shell); no change needed.")"
+  if grep -Fxq "$zsh_bin" /etc/shells && command -v chsh >/dev/null 2>&1; then
+    info "$(msg "正在调用 chsh（若提示 Password 请输入当前用户密码）..." "Calling chsh (please enter user password if prompted)...")"
+    chsh -s "$zsh_bin" || warn "$(msg "默认 Shell 修改失败，请稍后手动运行: chsh -s $zsh_bin" "chsh failed; please run manually: chsh -s $zsh_bin")"
   else
-    if ! grep -Fxq "$zsh_bin" /etc/shells; then
-      warn "$(msg "路径 $zsh_bin 不在 /etc/shells 列表中，正在请求权限添加..." "$zsh_bin not in /etc/shells, requesting permission to add...")"
-      if command -v sudo >/dev/null 2>&1; then
-        echo "$zsh_bin" | sudo tee -a /etc/shells >/dev/null
-      fi
-    fi
-
-    if grep -Fxq "$zsh_bin" /etc/shells && command -v chsh >/dev/null 2>&1; then
-      info "$(msg "正在调用 chsh（若提示 Password 请输入当前用户密码）..." "Calling chsh (please enter user password if prompted)...")"
-      chsh -s "$zsh_bin" || warn "$(msg "默认 Shell 修改失败，请稍后手动运行: chsh -s $zsh_bin" "chsh failed; please run manually: chsh -s $zsh_bin")"
-    else
-      warn "$(msg "未修改默认 Shell：缺少 chsh 或权限不足。" "Default shell not modified: missing chsh or insufficient permissions.")"
-    fi
+    warn "$(msg "未修改默认 Shell：缺少 chsh 或权限不足。" "Default shell not modified: missing chsh or insufficient permissions.")"
   fi
 fi
 
@@ -1310,7 +1307,7 @@ if [[ "$P10K_STYLE" == wizard ]] && [[ -t 0 ]] && command -v zsh >/dev/null 2>&1
 fi
 if [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
   echo ""
-  if ask "$(msg '是否现在立即进入全新的 Zsh 交互环境？' 'Start fresh Zsh session now?') "; then
+  if ask "$(msg '是否现在立即进入全新的 Zsh 交互环境？' 'Start fresh Zsh session now?')"; then
     printf '\n\033[1;32m%s\033[0m\n' "$(msg '🚀 正在启动全新 Zsh 交互环境...' '🚀 Starting fresh Zsh environment...')"
     exec zsh -l
   fi

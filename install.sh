@@ -331,7 +331,8 @@ if ((DO_UPDATE)); then
   update_git_repo() {
     local name=$1 dir=$2
     [[ -d "$dir/.git" ]] || return 0
-    if [[ -n $(git -C "$dir" status --porcelain 2>/dev/null) ]]; then
+    # 使用 -uno 仅检测受版本控制文件的修改与删除，避免运行期生成的缓存（如 __pycache__）误判为代码冲突
+    if [[ -n $(git -C "$dir" status --porcelain -uno 2>/dev/null) ]]; then
       UPDATE_INCOMPLETE=1
       UPDATED_SKIP+=("$name | $(msg "存在未提交的本地修改，已跳过自动拉取以防止代码冲突" "has local changes, skipped auto-pull to prevent conflict") | cd \"$dir\" && git status")
       warn "$(msg "$name 存在未提交的本地修改，跳过自动拉取以防止冲突。" "$name has uncommitted local changes; skipping pull to prevent conflicts.")"

@@ -2,22 +2,33 @@
 
 本文维护可复现的测试入口、结果边界和目标机验收方法。首次安装见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，管理命令见[配置管理](CONFIGURATION_MANAGEMENT.md)。
 
-## 最近一次本地验证
+## 最近一次实机与隔离回归验证
 
-日期：2026-10-18。基于最新工作区，包含全套现代 CLI 工具链扩充、现代 GPU 加速终端模拟器适配（WezTerm、Ghostty、Alacritty 及官方 Gatekeeper 隔离修复），以及 Yazi 官方多媒体预览伴生套件（`ffmpeg-full`、`imagemagick-full`、`sevenzip`、`poppler`、`ripgrep`、`resvg`、`jq` 等）。测试环境为 macOS Golden Gate 27.0.1 (arm64 Apple M1)，系统原生 Bash 3.2.57 与 Zsh 5.9，以及 Linux (Ubuntu/Debian/Fedora/Arch) 隔离回归测试环境。
+日期：2026-10-18。基于最新工作区（包含代码审计修复、全套现代 CLI 工具链扩充、现代 GPU 加速终端模拟器适配及 Yazi 多媒体预览伴生套件）。已在 **macOS (arm64 Apple M1)** 与 **Debian GNU/Linux 13 (trixie) x86_64 远程实机** 双平台上完成实机部署与全套隔离回归验证。
 
-| 检查 | 本次结果 | 解释 |
-| --- | --- | --- |
-| 六个正式 Bash 脚本语法 | 通过 | 解析检查，全数通过（`bash -n`） |
-| Zsh 模板与配置语法检查 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
-| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
-| `bash scripts/test_management.sh` | 退出码 0，全量通过 | Zsh 开关（含 television、tv-keys、tre）、差异恢复、失败重试隔离、macOS PTY 终端启动诊断全数通过 |
-| macOS 实际安装部署 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux --with-latest-nvim` 实机部署成功，受管配置与备份完整生效 |
-| 推荐现代终端与字体安装 | 通过 | WezTerm、Ghostty、Alacritty (v0.17.0 独立 DMG + 移除隔离) 与 JetBrainsMono / MesloLGS Nerd Fonts 全部就绪 |
-| Yazi 多媒体预览套件 | 通过 | `ffmpeg`、`7zz`、`pdftoppm`、`magick`、`resvg`、`rg` 全部正确安装与挂载，无多余冗余开销 |
-| 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 修复 `ffmpeg -nostdin </dev/null` 键盘监听挂起与 `7zz` 探测，全部 23 项工具版本秒级读取 |
-| 终端交互与组件验收 | 通过 | 新开终端会话启动正常（~1.3s），所有 CLI 工具挂载正常，Banner 完整输出，快捷键均正常响应 |
-| 当前版本远端 CI | 本轮未查询或触发 | 工作流存在不等于当前代码已通过 |
+### 1. 跨平台实机部署与验收结果表
+
+| 检查项目 | macOS (arm64 M1) 实测 | Linux Debian 13 (x86_64 远端实机) | 详细解释与验收边界 |
+| --- | --- | --- | --- |
+| 六个正式 Bash 脚本语法 | 通过 | 通过 | `bash -n` 静态解析检查，全数通过 |
+| Zsh 模板与配置语法检查 | 通过 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
+| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
+| `bash scripts/test_management.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Zsh 开关（含 television、tv-keys、tre）、差异恢复、失败重试隔离、控制终端诊断全数通过 |
+| 生产实际安装部署 | 通过 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux` 实机部署成功，跳过包数量为 0，受管配置与备份完整生效 |
+| 现代终端与 Nerd 字体安装 | 通过 | 通过 | 字体与图形协议环境就绪，自动安装或识别 Symbols Nerd Font 图标字体 |
+| Yazi 多媒体预览套件 | 通过 | 通过 | `ripgrep`、`jq`、`ffmpeg`、`7z` / `7zz`、`pdftoppm`、`magick`、`resvg` 全部正确安装与挂载 |
+| 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 退出码 0，0 项异常 | 全部 23 项工具版本秒级读取，无悬空声明，无键盘挂死 |
+| 终端交互与会话冷启动 | 通过 (~1.3s) | 通过 (**143ms**) | PTY 会话秒级极速自举，所有 14 项 CLI 工具挂载正常，Fastfetch 完整输出，无报错与警告 |
+| Tmux 终端复用器与 TPM | 通过 (tmux 3.5a) | 通过 (tmux 3.5a) | TPM 插件生态自动部署，全平台剪贴板互通与美化状态栏正常 |
+| 启动性能分析 (`--profile-startup`) | 通过 | 通过 | 通过 `zprof` 完成函数级耗时诊断，详细性能明细输出完整 |
+
+### 2. Debian 13 远程实机环境明细
+
+- **测试主机与内核**：ATOPNUC AG50 (Intel N5095A 4核 @ 2.90GHz), Linux 6.12.107+deb13-amd64, Debian GNU/Linux 13 (trixie) x86_64
+- **目标用户与权限**：`hailan20251015`，具备 `sudo` 与 `docker` 用户组，默认登录 Shell 确认为 `/bin/zsh` (Zsh 5.9)
+- **部署模式**：`--profile full --p10k-style rainbow --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux --lang zh`
+- **安全备份存档**：已保存至 `~/.local/state/zsh-project/install-WG8EDTNK`
+- **安装耗时与结果**：网络包管理器事务与插件安装一次性完成，跳过项为 `none`，新会话启动耗时仅 143ms。
 
 本次测试现场保留在 `/var/folders/.../zsh-installer-tests.*` 和 `zsh-management-tests.*`。这些是测试运行的临时路径，不是需要部署的仓库资源。
 

@@ -155,12 +155,20 @@ if [[ -d "$HOME/.fzf/.git" ]]; then
   check_git_repo "FZF (Binary Repo)" "$HOME/.fzf"
 fi
 
-# 5. 检测命令行应用/工具（Linux / macOS）
+# ==============================================================================
+# 5. 系统命令行应用与包管理器工具版本更新检测
+# ==============================================================================
+# 针对不同操作系统与包管理器家族进行轻量级版本查询：
+# - macOS (Homebrew): 通过 `brew outdated --formula --quiet` 查找待升级公式
+# - Debian/Ubuntu (APT): 通过 `apt list --upgradable` 匹配受管工具链包名
+# - Fedora/CentOS (DNF): 通过 `dnf check-update --quiet` 检查元数据升级清单 (退出码 100 表示有更新)
+# - Arch Linux (Pacman): 通过 `checkupdates` 快速读取待更新包，绝不锁定 pacman 数据库
+# 所有检测均包裹在 run_with_timeout 中，遇到网络波动时超时熔断，严防阻塞终端交互。
 check_apps() {
   local os
   os=$(uname -s)
   if [[ "$os" == Darwin ]] && command -v brew >/dev/null 2>&1; then
-    # macOS Homebrew 检测
+    # --- macOS Homebrew 公式待升级检测 ---
     local outdated
     outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 run_with_timeout "$TIMEOUT_SEC" brew outdated --formula --quiet 2>/dev/null) || { CHECK_FAILED=1; return 0; }
     if [[ -n "$outdated" ]]; then

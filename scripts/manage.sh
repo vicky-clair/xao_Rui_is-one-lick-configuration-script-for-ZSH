@@ -7,7 +7,10 @@ export LC_ALL=C
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
 ACTION='' ARG='' SCOPE=zsh DRY=0 YES=0 LOCKED=0
+# 错误退出辅助函数：向 stderr 输出格式化错误信息并终止执行
 fail() { printf '错误：%s\n' "$*" >&2; exit 1; }
+
+# 用户操作确认函数：在 --yes 参数下静默通过，否则要求物理交互 TTY 并提示 [y/N]
 confirm() {
   ((YES)) && return 0
   [[ -t 0 ]] || fail '需要交互确认；自动化测试可显式使用 --yes'
@@ -15,6 +18,7 @@ confirm() {
   read -r -p "$1 [y/N] " answer
   [[ "$answer" == y || "$answer" == Y ]]
 }
+
 # 每次仅接受一个管理动作；范围与确认选项由后续动作共同使用。
 while (($#)); do
   case "$1" in
@@ -39,25 +43,38 @@ done
 [[ -d "$HOME" && "$HOME" == /* ]] || fail '无效 HOME'
 if ((DRY)); then printf '[DRY RUN] %s %s scope=%s；不写文件、不联网、不执行配置。\n' "$ACTION" "$ARG" "$SCOPE"; exit 0; fi
 
-# 缺失文件用固定标记参与比较，以区分“原本不存在”和“内容已修改”。
+# ==============================================================================
+# 核心安全与原子操作辅助函数
+# ==============================================================================
+
+# 计算文件 SHA-256 哈希值：
+# 缺失文件输出固定标记 'missing'，以精准区分“原本不存在”与“内容已修改”
 calc_file_hash() {
   if [[ ! -e "$1" ]]; then printf 'missing\n'
   elif command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d ' ' -f1
   else shasum -a 256 "$1" | cut -d ' ' -f1; fi
 }
-# 写入前拒绝符号链接与特殊文件，避免配置操作落到意外目标。
+
+# 普通文件安全检查：
+# 严格拒绝符号链接、设备文件或套接字，防止配置写入被重定向攻击至系统关键路径
 regular() { [[ ! -L "$1" && ( ! -e "$1" || -f "$1" ) ]] || fail "拒绝链接或非普通文件：$1"; }
-# 用目录创建的原子性阻止并发管理操作；退出时仅释放本进程取得的锁。
+
+# 进程排他锁：
+# 基于 Linux/Unix mkdir 系统调用的原子性保证，阻止多进程并发执行产生配置竞争
 lock() {
   mkdir -p "$STATE"
   mkdir "$STATE/manage.lock" 2>/dev/null || fail '已有管理操作运行，或上次异常留下 manage.lock，请先检查'
   LOCKED=1
 }
+
+# 进程退出自动解锁钩子：仅当本进程真正持有锁时才执行 rmdir 释放
 cleanup() { if ((LOCKED)); then rmdir "$STATE/manage.lock" 2>/dev/null || true; fi; }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-# 保存操作前内容、存在状态与所属 HOME；操作后由 record 更新冲突检测哈希。
+
+# 创建配置快照：
+# 记录操作前的文件内容、存在状态（present/absent）以及当前用户归属信息
 snapshot() {
   local file
   SNAP=$(mktemp -d "$STATE/manage-XXXXXXXX")
@@ -73,9 +90,12 @@ snapshot() {
     calc_file_hash "$HOME/$file" > "$SNAP/$file.sha256"
   done
 }
-# 哈希记录操作后的状态，恢复时据此识别用户在操作之后做出的修改。
+
+# 登记操作后状态：记录操作完成后的文件哈希，作为后续回退时检测用户是否自行修改的基准
 record() { local file; for file in "$@"; do calc_file_hash "$HOME/$file" > "$SNAP/$file.sha256"; done; printf '备份：%s\n' "$SNAP"; }
-# 将旧字节码移入快照，避免新配置仍命中旧的 Zsh 编译缓存。
+
+# Zsh 编译字节码退役函数：
+# 将现有的 .zwc 编译缓存移至快照中，确保新写入的配置能即刻生效，避免命中旧缓存
 retire_bytecode() {
   local target=$1
   if [[ -e "$target.zwc" || -L "$target.zwc" ]]; then
@@ -83,7 +103,9 @@ retire_bytecode() {
     mv "$target.zwc" "$SNAP/retired.${target##*/}.zwc"
   fi
 }
-# 在 HOME 内准备受限权限的临时文件，再通过重命名替换目标配置。
+
+# 原子安全写入函数：
+# 在 HOME 目录下创建具备 0600 严格权限的临时文件，完成字节码退役后通过 mv 原子覆盖
 atomic_copy() {
   local source=$1 target=$2 tmp
   regular "$target"
@@ -93,7 +115,9 @@ atomic_copy() {
   retire_bytecode "$target"
   mv -f "$tmp" "$target"
 }
-# 校验备份归属，并按 zsh/tmux/all 范围筛选有明确存在状态的配置文件。
+
+# 加载并严格校验备份归属：
+# 验证 manifest 确保备份目录属于当前用户，按 scope (zsh/tmux/all) 过滤有效受管文件
 load_backup() {
   [[ -d "$ARG" && ! -L "$ARG" && -f "$ARG/manifest" ]] || fail '无效备份目录'
   [[ $(head -n 1 "$ARG/manifest") == "$HOME" ]] || fail '备份属于其它 HOME'
@@ -114,7 +138,9 @@ load_backup() {
   done
   ((${#FILES[@]})) || fail '此备份没有选定范围的文件'
 }
-# 只读取严格的布尔赋值；重复键取最后一项，不执行用户选项文件。
+
+# 安全读取布尔配置选项：
+# 使用严格正则表达式截取行末最后一次赋值，绝不 source 或 eval 用户选项文件
 get_option() {
   local key=$1 default=$2 value=''
   if [[ -f "$HOME/.zsh-project-options" ]]; then
@@ -122,7 +148,9 @@ get_option() {
   fi
   printf '%s\n' "${value:-$default}"
 }
-# 将菜单名称映射到固定变量名，限制可修改的选项集合。
+
+# 选项名称到内部变量映射函数：
+# 限制可修改的配置项在白名单内，防止意外写入非法变量
 option_key() {
   case "$1" in
     full) echo ZSH_PROJECT_FULL ;; vfox) echo ZSH_PROJECT_VFOX ;;
@@ -135,7 +163,9 @@ option_key() {
     *) fail '可选项：full vfox lazydocker lazygit tmux banner fastfetch timer auto-update television tv-keys tre' ;;
   esac
 }
-# 确认后先加锁和备份，再替换单项设置；选项在新会话中生效。
+
+# 设置单个功能开关：
+# 先完成用户确认、排他锁加锁、快照备份，再按行替换设置并原子写回
 set_option() {
   local name=${1%%=*} value=${1#*=} key tmp
   [[ "$1" == *=* && ( "$value" == 0 || "$value" == 1 ) ]] || fail '格式应为选项=0或1'
@@ -154,8 +184,11 @@ set_option() {
   record .zsh-project-options
 }
 
-# 各管理动作共享上述备份与写入规则；只读动作不取得写锁。
+# ==============================================================================
+# 各管理动作分发执行分支
+# ==============================================================================
 case "$ACTION" in
+  # --- 停用配置：备份原配置并部署安全最小空配置，保留其他应用、插件与 tmux ---
   --disable)
     [[ ! -e "$STATE/disabled" ]] || { echo '已经停用，无需重复操作。'; exit 0; }
     regular "$HOME/.zshrc"
@@ -169,6 +202,8 @@ case "$ACTION" in
     printf '%s\n' "$SNAP" > "$STATE/disabled"
     echo '已停用。新开终端生效；原有会话保持原状态。'
     ;;
+
+  # --- 恢复配置：将停用前备份的受管配置还原，校验哈希确保未被外部篡改 ---
   --enable)
     SCOPE=zsh
     [[ -f "$STATE/disabled" && ! -L "$STATE/disabled" ]] || fail '没有可恢复的停用记录'
@@ -181,7 +216,11 @@ case "$ACTION" in
     rm "$STATE/disabled"
     echo '已恢复，新开终端验证。'
     ;;
+
+  # --- 命令行脚本化修改单项配置开关 ---
   --set) set_option "$ARG" ;;
+
+  # --- 交互式终端配置菜单：列出全部支持的功能开关并接受修改 ---
   --configure)
     [[ -t 0 ]] || fail '配置菜单需要交互终端；脚本化设置请用 --set banner=0'
     echo '可选项（0=关闭，1=开启；不安装/卸载软件）：'
@@ -193,6 +232,7 @@ case "$ACTION" in
     read -r -p '输入一项设置，如 banner=0；直接回车取消：' choice
     [[ -z "$choice" ]] || set_option "$choice"
     ;;
+  # --- 列出所有安装与配置管理历史备份记录及受管文件状态 ---
   --list-backups)
     for dir in "$STATE"/install-* "$STATE"/manage-*; do
       [[ -f "$dir/manifest" ]] || continue
@@ -204,6 +244,8 @@ case "$ACTION" in
       done
     done
     ;;
+
+  # --- 比较配置差异 (--diff-backup) 或从历史备份安全还原配置 (--restore-backup) ---
   --diff-backup|--restore-backup)
     load_backup
     for file in "${FILES[@]}"; do
@@ -230,6 +272,8 @@ case "$ACTION" in
       record "${FILES[@]}"
     }
     ;;
+
+  # --- 只读配置健康体检：检查配置语法、OMZ生态、23项常用CLI工具及版本 ---
   --doctor)
     issues=0
     echo '只读体检：不会 source 配置，不联网，也不自动修复。'
@@ -288,6 +332,7 @@ case "$ACTION" in
     printf '体检结束：%s 项需要检查。\n' "$issues"
     ((issues == 0))
     ;;
+  # --- 会话冷启动耗时剖析：通过 zsh/zprof 对当前配置进行微秒级函数与初始化耗时分析 ---
   --profile-startup)
     command -v zsh >/dev/null || fail '缺少 Zsh'
     timer=$(command -v timeout || command -v gtimeout || true)
@@ -307,6 +352,8 @@ case "$ACTION" in
       exit "$status"
     fi
     ;;
+
+  # --- 重试失败组件：读取记录或指定组件名称，仅通过包管理器/Release下载安装，不改写配置 ---
   --retry-failed)
     args=(); [[ -z "$ARG" ]] || args+=("$ARG")
     ((YES == 0)) || args+=(--yes)

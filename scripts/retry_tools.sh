@@ -9,7 +9,11 @@ while (($#)); do
   case "$1" in --yes) YES=1 ;; --dry-run) DRY=1 ;; --*) echo '未知参数' >&2; exit 1 ;; *) [[ -z "$TOOL" ]] || exit 1; TOOL=$1 ;; esac
   shift
 done
-# 统一发行版包名与命令别名，并拒绝不在支持列表中的组件。
+# ==============================================================================
+# 组件名称规范化函数 (Component Normalization)
+# ==============================================================================
+# 统一各 Linux 发行版及 macOS Homebrew 下的软件包名、别名与命令名称，
+# 映射到标准化的内部组件名，并拦截不在支持列表内的非法参数，防止路径遍历攻击。
 normalize() {
   case "$1" in
     fd-find|fd) echo fd ;; batcat|bat) echo bat ;; neovim|nvim) echo neovim ;;

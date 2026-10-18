@@ -68,7 +68,7 @@
 
 | 平台或组件 | 当前实现与边界 |
 | --- | --- |
-| Linux | 安装器识别 APT、DNF/YUM、Pacman、Zypper 及部分衍生发行版；识别成功不代表所有可选软件都有可用包 |
+| Linux | 安装器识别 APT、DNF/YUM、Pacman、Zypper 及部分衍生发行版；已在 Debian 13 (trixie) x86_64 生产实机完成全量安装、自动化体检与回归验证 |
 | macOS | 安装路径使用 Homebrew（未安装时可交互引导）；已在 macOS (Apple Silicon arm64 / Intel) 上完成实机安装部署与全套回归测试验证 |
 | 架构 | 安装器接受 `x86_64`/`amd64`、`aarch64`/`arm64`；每个上游二进制仍有自己的系统要求 |
 | Windows | 可在 MSYS/Cygwin 中运行部分隔离测试；真实安装入口不支持 Windows 原生环境 |

@@ -49,26 +49,30 @@ if [[ -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
   export PATH="$_EXTRA_PATHS:$PATH"
   unset _EXTRA_PATHS
 fi
-DRY_RUN=0
-PROFILE=basic
-PROFILE_SET=0
-WITH_VFOX=0
-WITH_LAZYDOCKER=0
-WITH_LAZYGIT=0
-WITH_TMUX=0
-WITHOUT_TMUX=0
-WITH_LATEST_NVIM=0
-P10K_STYLE=rainbow
-P10K_STYLE_SET=0
-CHECK_UPDATES=0
-DO_UPDATE=0
-LANG_CHOICE="${ZSH_PROJECT_LANG:-zh}"
-LANG_SET=0
-ASSUME_YES=0
-BACKUP=''
-ROLLBACK=''
-SKIPPED=()
+# ==============================================================================
+# 全局控制标志与安装参数定义
+# ==============================================================================
+DRY_RUN=0            # 预演模式标志：1 为只显示计划不执行实际写操作或安装
+PROFILE=basic        # 安装配置方案：basic 为轻量基础版，full 为完整工具链版
+PROFILE_SET=0        # 标志用户是否通过命令行显式指定了 profile 参数
+WITH_VFOX=0          # 是否启用 vfox 多版本管理工具 (0=否, 1=是)
+WITH_LAZYDOCKER=0    # 是否安装 lazydocker 容器终端面板 (0=否, 1=是)
+WITH_LAZYGIT=0       # 是否安装 lazygit Git 终端控制面板 (0=否, 1=是)
+WITH_TMUX=0          # 是否启用并部署 tmux 现代化配置 (0=否, 1=是)
+WITHOUT_TMUX=0       # 是否显式跳过 tmux 配置（即使系统已存在 tmux 也不加载）
+WITH_LATEST_NVIM=0   # 是否从 GitHub Release 强制升级下载最新官方 Neovim
+P10K_STYLE=rainbow   # Powerlevel10k 主题预设风格 (rainbow/lean/classic/wizard/skip)
+P10K_STYLE_SET=0     # 标志用户是否通过命令行显式指定了主题风格
+CHECK_UPDATES=0      # 是否执行组件与插件版本更新检测
+DO_UPDATE=0          # 是否执行交互式升级流程
+LANG_CHOICE="${ZSH_PROJECT_LANG:-zh}"  # 界面语言环境，优先读取历史配置，默认中文 zh
+LANG_SET=0           # 标志用户是否通过命令行显式指定了语言
+ASSUME_YES=0         # 非交互自动化模式标志（--yes/-y，所有确认均默认接受）
+BACKUP=''            # 本次安装的配置安全备份目录路径
+ROLLBACK=''          # 用户指定的配置回退恢复目录路径
+SKIPPED=()           # 记录因仓库未收录或网络超时而跳过的可选软件组件清单
 
+# 双语信息格式化输出函数：根据当前 LANG_CHOICE 返回中文或英文文案
 msg() {
   if [[ "$LANG_CHOICE" == en ]]; then
     printf '%s' "$2"
@@ -77,6 +81,7 @@ msg() {
   fi
 }
 
+# 命令行帮助信息打印函数：展示所有支持的参数说明与用法示例
 usage() {
   cat <<EOF
 $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
@@ -108,9 +113,16 @@ $(msg "实际安装必须在交互终端确认，或显式传入 --yes 参数。
 EOF
 }
 
+# 严重错误并退出：在标准错误流输出高亮红色提示并以退出码 1 终止执行
 die() { printf '\033[1;31m%s: %s\033[0m\n' "$(msg '错误' 'Error')" "$*" >&2; exit 1; }
+
+# 普通信息提示：输出蓝色高亮前缀 ℹ
 info() { printf '\033[1;34mℹ %s\033[0m\n' "$*"; }
+
+# 成功信息提示：输出绿色高亮前缀 ✓
 success() { printf '\033[1;32m✓ %s\033[0m\n' "$*"; }
+
+# 警告信息提示：输出黄色高亮前缀 ⚠
 warn() { printf '\033[1;33m⚠ %s\033[0m\n' "$*"; }
 
 # --- 单键免回车瞬时读取函数（静默捕获，彻底消除终端回显+脚本echo导致的重复显示如 yy）---

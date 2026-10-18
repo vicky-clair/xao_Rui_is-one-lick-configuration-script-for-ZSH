@@ -249,9 +249,27 @@ case "$ACTION" in
     if [[ -n "$limiter" ]]; then
       for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch tv tre agrep rg jq ffmpeg 7z pdftoppm magick resvg; do
         command -v "$tool" >/dev/null || continue
-        if version=$("$limiter" -k 1s 2s "$tool" --version 2>&1 || "$limiter" -k 1s 2s "$tool" -V 2>&1 || "$limiter" -k 1s 2s "$tool" -v 2>&1); then
-          printf 'VERSION: %s: %s\n' "$tool" "${version%%$'\n'*}"
-        else printf 'WARN: %s 版本查询失败或超时\n' "$tool"; issues=$((issues+1)); fi
+        version=""
+        case "$tool" in
+          ffmpeg)
+            version=$("$limiter" -k 1s 2s ffmpeg -version 2>&1 || true)
+            ;;
+          7z|7zz)
+            version=$("$limiter" -k 1s 2s "$tool" -h 2>&1 || "$limiter" -k 1s 2s "$tool" 2>&1 || true)
+            ;;
+          pdftoppm)
+            version=$("$limiter" -k 1s 2s pdftoppm -v 2>&1 || true)
+            ;;
+          *)
+            version=$("$limiter" -k 1s 2s "$tool" --version 2>&1 || "$limiter" -k 1s 2s "$tool" -version 2>&1 || "$limiter" -k 1s 2s "$tool" -V 2>&1 || "$limiter" -k 1s 2s "$tool" -v 2>&1 || true)
+            ;;
+        esac
+        first_line=$(printf '%s\n' "$version" | grep -v '^[[:space:]]*$' | head -n 1)
+        if [[ -n "$first_line" ]]; then
+          printf 'VERSION: %s: %s\n' "$tool" "$first_line"
+        else
+          printf 'INFO: %s 已安装但未返回标准版本输出\n' "$tool"
+        fi
       done
     else echo 'INFO: 没有超时工具，跳过版本查询，避免体检卡住。'; fi
     echo '以下是配置中的钩子/初始化声明（不代表当前会话运行状态）：'

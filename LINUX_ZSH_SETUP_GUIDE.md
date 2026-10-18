@@ -100,35 +100,43 @@ bash install.sh --profile full --p10k-style rainbow --lang zh
 ```bash
 # Debian / Ubuntu 基础依赖与可选 agrep
 sudo apt-get update
-sudo apt-get install zsh git curl ca-certificates coreutils unzip tar tre-agrep
-# 可选完整工具：fzf, fd-find, bat, eza, zoxide, yazi, neovim
+sudo apt-get install zsh git curl ca-certificates coreutils unzip tar file tre-agrep
+# 剪贴板支持（Yazi / Tmux）：sudo apt-get install xclip (X11) 或 wl-clipboard (Wayland)
+# 可选完整工具与 Yazi 预览依赖：fzf, fd-find, bat, eza, zoxide, yazi, neovim, ripgrep, jq, ffmpeg, 7zip (或 p7zip-full), poppler-utils, imagemagick, resvg
 # 注：television 与 tre-command 官方仓库未提供 deb 时，安装脚本会自动从 GitHub Release 下载预编译版本
 ```
 
 ```bash
 # Fedora 基础依赖与可选 agrep
-sudo dnf install zsh git curl ca-certificates coreutils unzip tar tre
-# 可选完整工具：fzf, fd-find, bat, eza, zoxide, yazi, neovim
+sudo dnf install zsh git curl ca-certificates coreutils unzip tar file tre
+# 剪贴板支持（Yazi / Tmux）：sudo dnf install xclip (X11) 或 wl-clipboard (Wayland)
+# 可选完整工具与 Yazi 预览依赖：fzf, fd-find, bat, eza, zoxide, yazi, neovim, ripgrep, jq, ffmpeg, p7zip, poppler-utils, ImageMagick
 # 注：television 与 tre-command 可通过 GitHub Release 或 cargo/copr 安装
 ```
 
 ```bash
 # Arch Linux 基础依赖、agrep 与完整工具
-sudo pacman -Syu --needed zsh git curl ca-certificates coreutils unzip tar tre
-# 可选完整工具可通过 pacman 或 AUR 安装：
-# yay -S --needed television tre-command fzf fd bat eza zoxide yazi neovim
+sudo pacman -Syu --needed zsh git curl ca-certificates coreutils unzip tar file tre
+# 可选完整工具与 Yazi 预览依赖可通过 pacman 或 AUR 安装（剪贴板支持含 xclip / wl-clipboard）：
+# yay -S --needed television tre-command fzf fd bat eza zoxide yazi neovim ripgrep jq ffmpeg 7zip poppler imagemagick resvg xclip wl-clipboard
 ```
 
 ```bash
 # openSUSE 基础依赖与可选 agrep
-sudo zypper install zsh git curl ca-certificates coreutils unzip tar tre
-# 可选完整工具：fzf, fd-find, bat, eza, zoxide, yazi, neovim
+sudo zypper install zsh git curl ca-certificates coreutils unzip tar file tre
+# 剪贴板支持（Yazi / Tmux）：sudo zypper install xclip 或 wl-clipboard
+# 可选完整工具与 Yazi 预览依赖：fzf, fd-find, bat, eza, zoxide, yazi, neovim, ripgrep, jq, ffmpeg, p7zip, poppler-tools, ImageMagick
 ```
 
 ```bash
-# 已配置 Homebrew 的 macOS，普通用户执行（含完整新工具）
-brew install zsh git curl coreutils unzip tar television tre-command tre
+# 已配置 Homebrew 的 macOS，普通用户执行（含完整新工具与 Yazi 官方多媒体依赖）
+brew install zsh git curl coreutils unzip tar file television tre-command tre
+# 参考 Yazi 官方指南 (https://yazi-rs.github.io/docs/installation/) 完整安装与链接：
+brew install yazi ffmpeg-full sevenzip jq poppler fd ripgrep fzf zoxide resvg imagemagick-full font-symbols-only-nerd-font
+brew link ffmpeg-full imagemagick-full -f --overwrite
 ```
+
+> **提示**：自动化安装脚本具备严格的**幂等性判断**机制——如果本机已经安装了相应程序或发行版等效别名（如 `fdfind`、`batcat`、`tre-agrep`、`7zz`、`convert`、`wl-copy`/`xclip`、已安装的 Nerd Fonts 图标字体等），脚本会自动识别并跳过，绝不会进行任何重复性安装或覆盖。
 
 检查 `zsh --version` 和 `zsh -f -c 'print -r -- OK'`。尚未完成配置验收时，不急于设置默认登录 Shell。
 

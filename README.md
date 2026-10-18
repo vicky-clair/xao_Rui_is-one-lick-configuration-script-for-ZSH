@@ -110,7 +110,7 @@ If Git cloning fails and the raw-file fallback is used, it downloads only the Zs
 | Layer | Components and behavior |
 | :--- | :--- |
 | **Core shell** | Oh My Zsh, Powerlevel10k, autosuggestions, extra completions, and syntax highlighting |
-| **Full profile** | Attempts to install and integrate FZF, fd, bat, eza, zoxide, Yazi, Neovim, Fastfetch, television, tre, and agrep |
+| **Full profile** | Attempts to install and integrate FZF, fd, bat, eza, zoxide, Yazi (with multimedia preview companion tools: ripgrep, jq, ffmpeg, 7-zip, poppler, ImageMagick, resvg), Neovim, Fastfetch, television, tre, and agrep |
 | **Optional tools** | vfox, lazydocker, lazygit, and tmux; SDK installation and Docker service/permission setup are separate tasks |
 | **Prompt styles** | Rainbow, Lean, Classic, the official wizard, or preserve your existing `.p10k.zsh` |
 | **Configuration** | Feature switches, read-only health checks, explicit startup diagnostics, disable/enable, and failed-component retries |
@@ -143,7 +143,7 @@ These shortcuts refer to the installed template and require the corresponding to
 | `Ctrl+R` / `Ctrl+T` / `Alt+C` | FZF history search / file picker / directory picker (`full=1`) |
 | `↑` / `↓` | Search history by the prefix you have typed |
 | `Esc` twice | Add a sudo prefix using the OMZ sudo plugin |
-| `y` / `z keyword` | Change directory after exiting Yazi / jump with zoxide (`full=1`) |
+| `y` / `z keyword` | Yazi file manager (with video/PDF/image preview, changes directory upon exit) / jump with zoxide (`full=1`) |
 | `tv` / `Ctrl+P` | television smart fuzzy finder (`full=1`, or take over Ctrl+T/Ctrl+R via `tv-keys=1`) |
 | `tre` | Modern tree directory view (`full=1`, with `.gitignore` and `-e` numbered jumping) |
 | `agrep` | TRE approximate regex matching CLI tool (`full=1`) |

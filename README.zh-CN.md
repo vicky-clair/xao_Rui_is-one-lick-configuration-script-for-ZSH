@@ -32,7 +32,7 @@
 ## 功能与适用范围
 
 - **基础环境**：Oh My Zsh、Powerlevel10k，以及自动建议、额外补全和语法高亮三个外部插件。
-- **完整工具集**：尝试安装并集成 FZF、fd、bat、eza、zoxide、Yazi、Neovim、Fastfetch、television、tre、agrep。
+- **完整工具集**：尝试安装并集成 FZF、fd、bat、eza、zoxide、Yazi 及伴生多媒体预览工具（ripgrep、jq、ffmpeg、7-zip、poppler、ImageMagick、resvg 等）、Neovim、Fastfetch、television、tre、agrep。
 - **可选组件**：vfox、lazydocker、lazygit、tmux；安装 SDK、配置 Docker 服务和权限需另外处理。
 - **主题选择**：Rainbow、Lean、Classic、官方向导，或保留现有 `.p10k.zsh`。
 - **日常管理**：开关设置、只读体检、显式启动诊断、停用/恢复和失败组件重试。
@@ -148,7 +148,7 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | Ctrl+R / Ctrl+T / Alt+C | FZF 历史搜索 / 文件选择 / 目录选择（`full=1`） |
 | 上下方向键 | 按已输入前缀搜索历史 |
 | 双击 Esc | OMZ sudo 插件为当前输入添加 sudo 前缀 |
-| `y` / `z 关键词` | Yazi 退出后切换目录 / zoxide 跳转（`full=1`） |
+| `y` / `z 关键词` | Yazi 终端文件管理器（含视频/PDF/图片预览，退出后切换目录） / zoxide 跳转（`full=1`） |
 | `tv` / Ctrl+P | television 智能模糊查找器（`full=1`，可通过 `tv-keys=1` 接管 Ctrl+T/Ctrl+R） |
 | `tre` | 现代化目录树（`full=1`，带 `.gitignore` 过滤与 `-e` 编号跳转联动） |
 | `agrep` | TRE 模糊正则表达式匹配工具（`full=1`） |

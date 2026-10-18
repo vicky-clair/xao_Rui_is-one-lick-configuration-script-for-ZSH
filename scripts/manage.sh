@@ -242,14 +242,14 @@ case "$ACTION" in
     for path in .oh-my-zsh/oh-my-zsh.sh powerlevel10k/powerlevel10k.zsh-theme .oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh .oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh; do
       if [[ -r "$HOME/$path" ]]; then echo "PASS: $path"; else echo "WARN: 缺少 $path"; issues=$((issues+1)); fi
     done
-    for tool in zsh git fzf fd fdfind bat batcat eza zoxide yazi nvim vfox lazydocker lazygit tmux fastfetch tv tre agrep tre-agrep; do
+    for tool in zsh git fzf fd fdfind bat batcat eza zoxide yazi nvim vfox lazydocker lazygit tmux fastfetch tv tre agrep tre-agrep rg jq ffmpeg 7z 7zz pdftoppm magick convert resvg; do
       if location=$(command -v "$tool"); then printf 'FOUND: %s -> %s\n' "$tool" "$location"; else printf 'INFO: 未在当前 PATH 中找到 %s（可选组件不一定需要）\n' "$tool"; fi
     done
     limiter=$(command -v timeout || command -v gtimeout || true)
     if [[ -n "$limiter" ]]; then
-      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch tv tre agrep; do
+      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch tv tre agrep rg jq ffmpeg 7z pdftoppm magick resvg; do
         command -v "$tool" >/dev/null || continue
-        if version=$("$limiter" -k 1s 2s "$tool" --version 2>&1 || "$limiter" -k 1s 2s "$tool" -V 2>&1); then
+        if version=$("$limiter" -k 1s 2s "$tool" --version 2>&1 || "$limiter" -k 1s 2s "$tool" -V 2>&1 || "$limiter" -k 1s 2s "$tool" -v 2>&1); then
           printf 'VERSION: %s: %s\n' "$tool" "${version%%$'\n'*}"
         else printf 'WARN: %s 版本查询失败或超时\n' "$tool"; issues=$((issues+1)); fi
       done

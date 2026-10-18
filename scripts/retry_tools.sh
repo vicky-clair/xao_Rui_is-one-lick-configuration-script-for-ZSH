@@ -17,6 +17,14 @@ normalize() {
     television|tv) echo television ;;
     tre-command|tre) echo tre-command ;;
     tre-agrep|agrep) echo agrep ;;
+    ripgrep|rg) echo ripgrep ;;
+    jq) echo jq ;;
+    ffmpeg|ffmpeg-full) echo ffmpeg ;;
+    sevenzip|7zip|p7zip|p7zip-full|7z|7zz) echo 7zip ;;
+    poppler|poppler-utils|poppler-tools|pdftoppm) echo poppler ;;
+    imagemagick|imagemagick-full|ImageMagick|magick) echo imagemagick ;;
+    resvg) echo resvg ;;
+    font-symbols-only-nerd-font) echo font-symbols-only-nerd-font ;;
     fzf|eza|zoxide|yazi|fastfetch|lazydocker|lazygit|vfox|tmux|xclip|ncurses-term) echo "$1" ;;
     *) printf '不支持的组件：%s\n' "$1" >&2; return 1 ;;
   esac
@@ -63,6 +71,21 @@ elif [[ -r /etc/os-release ]]; then
   case "${ID:-} ${ID_LIKE:-}" in *debian*|*ubuntu*) FAMILY=apt ;; *fedora*|*rhel*) FAMILY=dnf ;; *arch*) FAMILY=pacman ;; *suse*) FAMILY=zypper ;; esac
 fi
 [[ -n "$FAMILY" ]] || { echo '不支持此发行版的自动重试'; exit 1; }
+has_nerd_font() {
+  if command -v fc-list >/dev/null 2>&1; then
+    if fc-list : family 2>/dev/null | grep -qiE 'nerd font|nerdfont'; then
+      return 0
+    fi
+  fi
+  local font_dir
+  for font_dir in "$HOME/.local/share/fonts" "$HOME/.fonts" "/usr/share/fonts" "/usr/local/share/fonts" "$HOME/Library/Fonts" "/Library/Fonts"; do
+    if [[ -d "$font_dir" ]] && find "$font_dir" -maxdepth 3 \( -iname "*nerdfont*" -o -iname "*nerd font*" -o -iname "*symbols*nerd*" \) 2>/dev/null | head -n 1 | grep -q .; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 # 按实际命令判断可用性；ncurses-term 是终端数据包，交由包管理器确认。
 available() {
   local component=$1 cmd=$1
@@ -77,10 +100,27 @@ available() {
       command -v tre-agrep >/dev/null && return 0
       return 1
       ;;
+    ripgrep) cmd=rg ;;
+    poppler) cmd=pdftoppm ;;
+    7zip)
+      command -v 7z >/dev/null && return 0
+      command -v 7zz >/dev/null && return 0
+      return 1
+      ;;
+    imagemagick)
+      command -v magick >/dev/null && return 0
+      command -v convert >/dev/null && return 0
+      return 1
+      ;;
+    font-symbols-only-nerd-font)
+      has_nerd_font && return 0
+      return 1
+      ;;
   esac
   command -v "$cmd" >/dev/null && return 0
-  if [[ "$component" == fd ]] && command -v fdfind >/dev/null; then return 0; fi
-  if [[ "$component" == bat ]] && command -v batcat >/dev/null; then return 0; fi
+  if [[ "$component" == fd ]] && command -v fdfind >/dev/null 2>&1; then return 0; fi
+  if [[ "$component" == bat ]] && command -v batcat >/dev/null 2>&1; then return 0; fi
+  if [[ "$component" == xclip || "$component" == wl-clipboard ]] && (command -v wl-copy >/dev/null 2>&1 || command -v xclip >/dev/null 2>&1 || command -v xsel >/dev/null 2>&1); then return 0; fi
   return 1
 }
 # 将统一组件名转换为对应发行版的包名，优先使用系统包管理器。
@@ -89,12 +129,65 @@ package_install() {
   if [[ "$component" == fd && ( "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == zypper ) ]]; then package=fd-find; fi
   if [[ "$component" == agrep && "$FAMILY" == apt ]]; then package=tre-agrep; fi
   if [[ "$component" == agrep && "$FAMILY" != apt ]]; then package=tre; fi
+  if [[ "$component" == poppler && ( "$FAMILY" == apt || "$FAMILY" == dnf ) ]]; then package=poppler-utils; fi
+  if [[ "$component" == poppler && "$FAMILY" == zypper ]]; then package=poppler-tools; fi
+  if [[ "$component" == imagemagick && ( "$FAMILY" == dnf || "$FAMILY" == zypper ) ]]; then package=ImageMagick; fi
+  if [[ "$component" == 7zip ]]; then
+    case "$FAMILY" in
+      brew) package=sevenzip ;;
+      apt) package=7zip ;;
+      dnf|zypper) package=p7zip ;;
+      pacman) package=7zip ;;
+    esac
+  fi
   case "$FAMILY" in
-    apt) sudo apt-get install -y "$package" ;;
-    dnf) sudo dnf install -y "$package" ;;
-    pacman) sudo pacman -S --needed --noconfirm "$package" ;;
-    zypper) sudo zypper install -y "$package" ;;
-    brew) HOMEBREW_NO_AUTO_UPDATE=1 brew install "$package" ;;
+    apt|dnf|zypper)
+      if [[ "$component" == font-symbols-only-nerd-font ]]; then
+        local font_dest="$HOME/.local/share/fonts/NerdFonts"
+        mkdir -p "$font_dest"
+        if curl -fsSL --connect-timeout 10 -m 60 "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/NerdFontsSymbolsOnly.zip" -o "$font_dest/symbols.zip" 2>/dev/null; then
+          if command -v unzip >/dev/null 2>&1; then
+            unzip -qo "$font_dest/symbols.zip" -d "$font_dest" 2>/dev/null || true
+          elif command -v python3 >/dev/null 2>&1; then
+            python3 -c "import zipfile; zipfile.ZipFile('$font_dest/symbols.zip').extractall('$font_dest')" 2>/dev/null || true
+          fi
+          rm -f "$font_dest/symbols.zip"
+        elif curl -fsSL --connect-timeout 10 -m 30 "https://github.com/ryanoasis/nerd-fonts/raw/HEAD/patched-fonts/NerdFontsSymbolsOnly/SymbolsNerdFont-Regular.ttf" -o "$font_dest/SymbolsNerdFont-Regular.ttf" 2>/dev/null; then
+          :
+        fi
+        if command -v fc-cache >/dev/null 2>&1; then fc-cache -f "$font_dest" 2>/dev/null || true; fi
+      elif [[ "$FAMILY" == apt ]]; then
+        sudo apt-get install -y "$package" 2>/dev/null || {
+          if [[ "$component" == 7zip ]]; then sudo apt-get install -y p7zip-full; fi
+        }
+      elif [[ "$FAMILY" == dnf ]]; then
+        sudo dnf install -y "$package" 2>/dev/null || {
+          if [[ "$component" == 7zip ]]; then sudo dnf install -y 7zip; fi
+        }
+      elif [[ "$FAMILY" == zypper ]]; then
+        sudo zypper install -y "$package"
+      fi
+      ;;
+    pacman)
+      if [[ "$component" == font-symbols-only-nerd-font ]]; then
+        sudo pacman -S --needed --noconfirm ttf-nerd-fonts-symbols 2>/dev/null || sudo pacman -S --needed --noconfirm ttf-nerd-fonts-symbols-mono
+      else
+        sudo pacman -S --needed --noconfirm "$package"
+      fi
+      ;;
+    brew)
+      if [[ "$component" == ffmpeg ]]; then
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg-full 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg
+        HOMEBREW_NO_AUTO_UPDATE=1 brew link ffmpeg-full -f --overwrite 2>/dev/null || true
+      elif [[ "$component" == imagemagick ]]; then
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install imagemagick-full 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install imagemagick
+        HOMEBREW_NO_AUTO_UPDATE=1 brew link imagemagick-full -f --overwrite 2>/dev/null || true
+      elif [[ "$component" == font-symbols-only-nerd-font ]]; then
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install font-symbols-only-nerd-font 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask font-symbols-only-nerd-font
+      else
+        HOMEBREW_NO_AUTO_UPDATE=1 brew install "$package"
+      fi
+      ;;
   esac
 }
 # 包管理器安装失败时下载官方二进制；验证可执行性后才写入用户命令目录。

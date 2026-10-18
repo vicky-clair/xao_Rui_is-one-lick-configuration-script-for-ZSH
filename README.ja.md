@@ -112,7 +112,7 @@ Git のクローンに失敗して個別ファイルのダウンロードに切�
 | 分類 | 内容と動作 |
 | :--- | :--- |
 | **基本のシェル環境** | Oh My Zsh、Powerlevel10k、入力候補の自動提案、追加の補完、シンタックスハイライト |
-| **フルプロファイル** | FZF、fd、bat、eza、zoxide、Yazi、Neovim、Fastfetch、television、tre、agrep のインストールと連携を試行 |
+| **フルプロファイル** | FZF、fd、bat、eza、zoxide、Yazi（マルチメディアプレビュー連携ツール: ripgrep、jq、ffmpeg、7-zip、poppler、ImageMagick、resvg 等を含む）、Neovim、Fastfetch、television、tre、agrep のインストールと連携を試行 |
 | **追加ツール** | vfox、lazydocker、lazygit、tmux。SDK の導入、Docker サービスや権限の設定は別途必要 |
 | **プロンプトのスタイル** | Rainbow、Lean、Classic、公式ウィザード、または既存の `.p10k.zsh` を維持 |
 | **設定管理** | 機能の切り替え、読み取り専用の状態確認、明示的な起動診断、無効化・有効化、失敗したコンポーネントの再試行 |
@@ -145,7 +145,7 @@ Git のクローンに失敗して個別ファイルのダウンロードに切�
 | `Ctrl+R` / `Ctrl+T` / `Alt+C` | FZF の履歴検索 / ファイル選択 / ディレクトリ選択（`full=1`） |
 | `↑` / `↓` | 入力済みの文字列を前方一致で履歴検索 |
 | `Esc` を 2 回 | OMZ の sudo プラグインで入力の先頭に sudo を追加 |
-| `y` / `z keyword` | Yazi 終了後にディレクトリを移動 / zoxide で移動（`full=1`） |
+| `y` / `z keyword` | Yazi ファイルマネージャー（動画・PDF・画像プレビュー対応、終了後にディレクトリ移動） / zoxide で移動（`full=1`） |
 | `tv` / `Ctrl+P` | television 曖昧ファインダー（`full=1`、`tv-keys=1` で Ctrl+T/Ctrl+R を置き換え可能） |
 | `tre` | モダンなディレクトリツリー表示（`full=1`、`.gitignore` 対応および `-e` 番号ジャンプ連携） |
 | `agrep` | TRE 近似正規表現検索 CLI ツール（`full=1`） |

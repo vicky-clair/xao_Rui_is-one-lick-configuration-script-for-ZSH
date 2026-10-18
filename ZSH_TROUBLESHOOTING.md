@@ -81,8 +81,17 @@ bash install.sh --set lazygit=1
 
 - **television 快捷键与 FZF 共存问题**：television 默认以优雅共存模式加载，专享 `Ctrl+P` 快捷呼出。若希望由 television 完全接管文件与历史搜索按键，可运行 `bash install.sh --set tv-keys=1`（将 `Ctrl+T` 绑定至 `tv-smart-autocomplete`，`Ctrl+R` 绑定至 `tv-shell-history`）；随时运行 `--set tv-keys=0` 可切回 FZF 优先模式。
 - **tre 编号跳转失效**：`tre` 自动封装 `-e` 编号模式并在执行后加载 `/tmp/tre_aliases_$USER`。若编号别名未生效，检查临时文件写权限以及是否已安装并配置 `EDITOR`（如 Neovim/Vim）。
-- **agrep 在 Debian/Ubuntu 找不到命令**：Debian/Ubuntu 官方包名为 `tre-agrep`。安装器与重试工具会自动将其链接至 `~/.local/bin/agrep`，模板也会自动设置 `alias agrep='tre-agrep'`。若缺少命令可执行 `bash install.sh --retry-failed agrep`。
-- **lazydocker 状态异常**：存在对应二进制不表示服务已配置：lazydocker 仍依赖可连接的 Docker 环境，Yazi 的媒体预览也可能依赖额外工具。按实际错误处理，不把 socket 权限修改当作通用修复。
+- **lazydocker 状态异常**：存在对应二进制不表示服务已配置：lazydocker 仍依赖可连接的 Docker 环境。按实际错误处理，不把 socket 权限修改当作通用修复。
+- **Yazi 媒体预览缺失或无法生成缩略图**：参考 [Yazi 官方安装文档](https://yazi-rs.github.io/docs/installation/)，Yazi 依赖外部工具提供高阶预览与缩略图支持：
+  - **文件类型检测**：依赖 `file`（核心基础依赖，安装器已默认安装）。
+  - **视频封面**：依赖 `ffmpeg`（Homebrew 优先推荐 `ffmpeg-full`）。
+  - **压缩包预览**：依赖 `7z` / `7zz`（`7zip`、`sevenzip` 或 `p7zip-full`）。
+  - **PDF 预览**：依赖 `pdftoppm`（`poppler` 或 `poppler-utils`）。
+  - **字体与复杂图片预览**：依赖 `magick`（`imagemagick` 或 `imagemagick-full`）。
+  - **SVG 矢量图预览**：依赖 `resvg`。
+  - **内容检索与跳转**：依赖 `ripgrep` (`rg`)、`fd`、`fzf`、`zoxide`。
+  - **图标字体**：推荐使用 Nerd Fonts，Homebrew 可安装 `font-symbols-only-nerd-font`。
+  若 macOS 上部分全量库出现软链接冲突，可执行官方强制覆盖链接命令：`brew link ffmpeg-full imagemagick-full -f --overwrite`；其他平台可使用 `bash install.sh --retry-failed <组件名>` 进行单项补偿安装。
 
 ## 5. vfox 超时、启动慢或切换目录慢
 

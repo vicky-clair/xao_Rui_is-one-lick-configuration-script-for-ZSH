@@ -66,6 +66,32 @@ remove_skipped fzf
 ((${#SKIPPED[@]} == 0)) || fail 'remove_skipped did not clear single item'
 pass 'remove_skipped handles empty arrays under nounset'
 
+# 验证 optional_package 幂等性：命令或别名已存在时绝不触发包管理器
+eval "$(extract_function optional_package)"
+FAMILY=apt
+for fake_cmd in fd bat 7zz convert ripgrep wl-copy; do
+  printf '#!/usr/bin/env bash\nexit 0\n' > "$STAGE/bin/$fake_cmd"
+  chmod +x "$STAGE/bin/$fake_cmd"
+done
+optional_package fd fd-find || fail 'optional_package fd failed'
+optional_package bat batcat || fail 'optional_package bat failed'
+optional_package 7z 7zip || fail 'optional_package 7z (via 7zz) failed'
+optional_package magick imagemagick || fail 'optional_package magick (via convert) failed'
+optional_package rg ripgrep || fail 'optional_package rg (via ripgrep) failed'
+optional_package xclip xclip || fail 'optional_package xclip (via wl-copy) failed'
+[[ ! -e "$AUDIT_MARKER" ]] || fail 'optional_package invoked package manager despite existing binaries/aliases'
+pass 'optional_package idempotency and alias detection'
+
+# 验证 has_nerd_font 字体检测幂等性
+eval "$(extract_function has_nerd_font)"
+font_mock_dir="$HOME/.local/share/fonts/NerdFonts"
+rm -rf "$font_mock_dir"
+has_nerd_font && fail 'has_nerd_font reported positive on clean state'
+mkdir -p "$font_mock_dir"
+touch "$font_mock_dir/SymbolsNerdFont-Regular.ttf"
+has_nerd_font || fail 'has_nerd_font failed to detect installed Nerd Font'
+pass 'has_nerd_font detection'
+
 eval "$(extract_function calc_sha256)"
 eval "$(extract_function restore)"
 msg() { printf '%s' "$1"; }

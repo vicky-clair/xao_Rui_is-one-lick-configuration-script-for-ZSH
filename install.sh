@@ -402,7 +402,7 @@ if ((DO_UPDATE)); then
     info "$(msg "正在通过 Homebrew 升级命令行工具..." "Upgrading CLI tools via Homebrew...")"
     brew_outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --quiet 2>/dev/null) || true
     brew_targets=()
-    for _b_pkg in fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux television tre-command tre; do
+    for _b_pkg in fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux television tre-command tre ripgrep jq poppler sevenzip resvg ffmpeg-full imagemagick-full ffmpeg imagemagick; do
       if printf '%s\n' "${brew_outdated:-}" | grep -qFx "$_b_pkg"; then
         brew_targets+=("$_b_pkg")
       fi
@@ -716,8 +716,8 @@ case "$P10K_STYLE" in
   wizard) printf '%s\n' "$(msg '主题配置：安装完成后自动唤起 p10k configure 官方配置向导。' 'Prompt config: Automatically launch p10k configure wizard after install.')" ;;
   skip) printf '%s\n' "$(msg '主题配置：保持原有设置，不覆盖 ~/.p10k.zsh。' 'Prompt config: Keep existing setup, do not touch ~/.p10k.zsh.')" ;;
 esac
-printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils unzip tar；OMZ、Powerlevel10k、三个 Zsh 核心插件。' 'Base dependencies: zsh, git, curl, ca-certificates, coreutils, unzip, tar; OMZ, Powerlevel10k, 3 core plugins.')"
-[[ "$PROFILE" == full ]] && printf '%s\n' "$(msg '完整工具：fzf fd bat eza zoxide yazi neovim fastfetch television tre agrep（仓库没有则跳过并记录）。' 'Full tools: fzf, fd, bat, eza, zoxide, yazi, neovim, fastfetch, television, tre, agrep (skipped if unavailable in repository).')"
+printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils unzip tar file；OMZ、Powerlevel10k、三个 Zsh 核心插件。' 'Base dependencies: zsh, git, curl, ca-certificates, coreutils, unzip, tar, file; OMZ, Powerlevel10k, 3 core plugins.')"
+[[ "$PROFILE" == full ]] && printf '%s\n' "$(msg '完整工具：fzf fd bat eza zoxide yazi neovim fastfetch television tre agrep 及 Yazi 预览依赖（ripgrep jq ffmpeg 7-zip poppler imagemagick 等，仓库没有则跳过并记录）。' 'Full tools: fzf, fd, bat, eza, zoxide, yazi, neovim, fastfetch, television, tre, agrep and Yazi preview dependencies (ripgrep, jq, ffmpeg, 7-zip, poppler, imagemagick; skipped if unavailable in repository).')"
 ((WITH_TMUX)) && printf '%s\n' "$(msg 'Tmux 增强：安装 tmux、终端剪贴板工具、TPM 插件生态并部署 ~/.tmux.conf。' 'Tmux enhancement: install tmux, clipboard tools, TPM plugins, and ~/.tmux.conf.')"
 printf '%s\n' "$(msg '备份并更新受管配置；选定主题样式会备份并替换 .p10k.zsh，skip 则保留。保留 .zshenv、custom 和历史。' 'Back up managed configs; theme selection replaces .p10k.zsh after backup; skip preserves it. Keep .zshenv, custom and history.')"
 printf '%s\n' "$(msg '默认 Shell 将在配置安装成功后单独询问。' 'Default login shell will be prompted separately after configuration.')"
@@ -762,7 +762,7 @@ case "$FAMILY" in
     export HOMEBREW_NO_AUTO_UPDATE=1
     brew_base_pkgs=()
     command -v gtimeout >/dev/null 2>&1 || brew_base_pkgs+=(coreutils)
-    for _base_cmd in zsh git curl unzip; do
+    for _base_cmd in zsh git curl unzip file; do
       command -v "$_base_cmd" >/dev/null 2>&1 || brew_base_pkgs+=("$_base_cmd")
     done
     command -v tar >/dev/null 2>&1 || brew_base_pkgs+=(gnu-tar)
@@ -772,21 +772,21 @@ case "$FAMILY" in
     ;;
   apt)
     sudo apt-get update || true
-    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term x11-utils 2>/dev/null || \
-    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar ncurses-term
+    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term x11-utils 2>/dev/null || \
+    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term
     ;;
   dnf)
     if command -v dnf >/dev/null 2>&1; then
-      sudo dnf install -y zsh git curl ca-certificates coreutils unzip tar
+      sudo dnf install -y zsh git curl ca-certificates coreutils unzip tar file
     else
-      sudo yum install -y zsh git curl ca-certificates coreutils unzip tar
+      sudo yum install -y zsh git curl ca-certificates coreutils unzip tar file
     fi
     ;;
   pacman)
-    sudo pacman -Syu --needed --noconfirm zsh git curl ca-certificates coreutils unzip tar
+    sudo pacman -Syu --needed --noconfirm zsh git curl ca-certificates coreutils unzip tar file
     ;;
   zypper)
-    sudo zypper install -y zsh git curl ca-certificates coreutils unzip tar
+    sudo zypper install -y zsh git curl ca-certificates coreutils unzip tar file
     ;;
 esac
 
@@ -810,10 +810,37 @@ else
   export PATH="$HOME/.local/bin:$PATH"
 fi
 
-# 可选软件包安装函数
+# 辅助函数：检测系统或用户目录是否已安装 Nerd Font
+has_nerd_font() {
+  if command -v fc-list >/dev/null 2>&1; then
+    if fc-list : family 2>/dev/null | grep -qiE 'nerd font|nerdfont'; then
+      return 0
+    fi
+  fi
+  local font_dir
+  for font_dir in "$HOME/.local/share/fonts" "$HOME/.fonts" "/usr/share/fonts" "/usr/local/share/fonts" "$HOME/Library/Fonts" "/Library/Fonts"; do
+    if [[ -d "$font_dir" ]] && find "$font_dir" -maxdepth 3 \( -iname "*nerdfont*" -o -iname "*nerd font*" -o -iname "*symbols*nerd*" \) 2>/dev/null | head -n 1 | grep -q .; then
+      return 0
+    fi
+  done
+  return 1
+}
+
+# 可选软件包安装函数（具备严格幂等性检查，已有对应命令或发行版别名时自动跳过，杜绝重复安装）
 optional_package() {
   local cmd=$1 pkg=$2
-  command -v "$cmd" >/dev/null 2>&1 && return 0
+  [[ -n "$cmd" ]] && command -v "$cmd" >/dev/null 2>&1 && return 0
+  if [[ "$cmd" == fd ]] && command -v fdfind >/dev/null 2>&1; then return 0; fi
+  if [[ "$cmd" == bat ]] && command -v batcat >/dev/null 2>&1; then return 0; fi
+  if [[ "$cmd" == agrep ]] && command -v tre-agrep >/dev/null 2>&1; then return 0; fi
+  if [[ "$cmd" == 7z ]] && command -v 7zz >/dev/null 2>&1; then return 0; fi
+  if [[ "$cmd" == magick ]] && command -v convert >/dev/null 2>&1; then return 0; fi
+  if [[ "$cmd" == rg ]] && command -v ripgrep >/dev/null 2>&1; then return 0; fi
+  if [[ "$cmd" == xclip || "$cmd" == wl-copy || "$cmd" == xsel ]]; then
+    if command -v wl-copy >/dev/null 2>&1 || command -v xclip >/dev/null 2>&1 || command -v xsel >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
   case "$FAMILY" in
     brew)
       if HOMEBREW_NO_AUTO_UPDATE=1 brew install "$pkg"; then
@@ -854,9 +881,49 @@ optional_package() {
 # 8. 安装完整工具集
 if [[ "$PROFILE" == full ]]; then
   info "$(msg "正在安装完整工具集..." "Installing full modern CLI toolchain...")"
+
+  # --- Homebrew (macOS) 针对 Yazi 与全套工具：仅在缺失时安装，杜绝重复安装 ---
+  if [[ "$FAMILY" == brew ]]; then
+    brew_missing=()
+    command -v yazi >/dev/null 2>&1 || brew_missing+=(yazi)
+    command -v ffmpeg >/dev/null 2>&1 || brew_missing+=(ffmpeg-full)
+    (command -v 7z >/dev/null 2>&1 || command -v 7zz >/dev/null 2>&1) || brew_missing+=(sevenzip)
+    command -v jq >/dev/null 2>&1 || brew_missing+=(jq)
+    command -v pdftoppm >/dev/null 2>&1 || brew_missing+=(poppler)
+    (command -v fd >/dev/null 2>&1 || command -v fdfind >/dev/null 2>&1) || brew_missing+=(fd)
+    (command -v rg >/dev/null 2>&1 || command -v ripgrep >/dev/null 2>&1) || brew_missing+=(ripgrep)
+    command -v fzf >/dev/null 2>&1 || brew_missing+=(fzf)
+    command -v zoxide >/dev/null 2>&1 || brew_missing+=(zoxide)
+    command -v resvg >/dev/null 2>&1 || brew_missing+=(resvg)
+    (command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1) || brew_missing+=(imagemagick-full)
+    has_nerd_font || brew_missing+=(font-symbols-only-nerd-font)
+
+    if ((${#brew_missing[@]} > 0)); then
+      info "$(msg "检测到缺失的工具/伴生依赖: ${brew_missing[*]}，正在通过 Homebrew 安装..." "Missing tools/dependencies detected: ${brew_missing[*]}; installing via Homebrew...")"
+      HOMEBREW_NO_AUTO_UPDATE=1 brew install "${brew_missing[@]}" 2>/dev/null || {
+        for _y_pkg in "${brew_missing[@]}"; do
+          if [[ "$_y_pkg" == ffmpeg-full ]]; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg-full 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg 2>/dev/null || true
+          elif [[ "$_y_pkg" == imagemagick-full ]]; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install imagemagick-full 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install imagemagick 2>/dev/null || true
+          elif [[ "$_y_pkg" == font-symbols-only-nerd-font ]]; then
+            HOMEBREW_NO_AUTO_UPDATE=1 brew install font-symbols-only-nerd-font 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask font-symbols-only-nerd-font 2>/dev/null || true
+          else
+            optional_package "$_y_pkg" "$_y_pkg"
+          fi
+        done
+      }
+      # 强制链接 ffmpeg-full 与 imagemagick-full
+      HOMEBREW_NO_AUTO_UPDATE=1 brew link ffmpeg-full imagemagick-full -f --overwrite 2>/dev/null || true
+    else
+      success "$(msg "Yazi 及其全部推荐伴生依赖已安装，跳过重复安装。" "Yazi and all companion dependencies already installed; skipping redundant install.")"
+    fi
+  fi
+
   fd_pkg=fd
   [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == zypper ]] && fd_pkg=fd-find
 
+  # 基础核心工具集：仅在未安装时执行
   optional_package fzf fzf
   optional_package fd "$fd_pkg"
   optional_package bat bat
@@ -869,6 +936,124 @@ if [[ "$PROFILE" == full ]]; then
   agrep_pkg=tre
   [[ "$FAMILY" == apt ]] && agrep_pkg=tre-agrep
   optional_package agrep "$agrep_pkg"
+
+  # Yazi 媒体与文本伴生依赖 (参考 Yazi 官方指南推荐安装，已有则自动跳过)
+  optional_package rg ripgrep
+  optional_package jq jq
+  optional_package ffmpeg ffmpeg
+
+  # 7-Zip (归档文件解压与预览，已有 7z 或 7zz 则自动跳过)
+  if ! command -v 7z >/dev/null 2>&1 && ! command -v 7zz >/dev/null 2>&1; then
+    case "$FAMILY" in
+      brew)
+        optional_package 7z sevenzip
+        ;;
+      apt)
+        if ! optional_package 7z 7zip; then
+          if optional_package 7z p7zip-full; then
+            remove_skipped 7zip
+          fi
+        fi
+        ;;
+      dnf)
+        if ! optional_package 7z 7zip; then
+          if optional_package 7z p7zip; then
+            remove_skipped 7zip
+          fi
+        fi
+        ;;
+      pacman)
+        optional_package 7z 7zip
+        ;;
+      zypper)
+        if ! optional_package 7z 7zip; then
+          if optional_package 7z p7zip; then
+            remove_skipped 7zip
+          fi
+        fi
+        ;;
+    esac
+  fi
+
+  # Poppler (pdftoppm: PDF 封面与文档预览，已有 pdftoppm 则自动跳过)
+  if ! command -v pdftoppm >/dev/null 2>&1; then
+    case "$FAMILY" in
+      brew)
+        optional_package pdftoppm poppler
+        ;;
+      apt|dnf)
+        optional_package pdftoppm poppler-utils
+        ;;
+      pacman)
+        optional_package pdftoppm poppler
+        ;;
+      zypper)
+        if ! optional_package pdftoppm poppler-tools; then
+          if optional_package pdftoppm poppler-utils; then
+            remove_skipped poppler-tools
+          fi
+        fi
+        ;;
+    esac
+  fi
+
+  # ImageMagick (图片缩略图、字体与高阶格式预览，已有 magick 或 convert 则自动跳过)
+  if ! command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; then
+    case "$FAMILY" in
+      brew)
+        optional_package magick imagemagick-full || optional_package magick imagemagick
+        ;;
+      apt|pacman)
+        optional_package magick imagemagick
+        ;;
+      dnf|zypper)
+        optional_package magick ImageMagick
+        ;;
+    esac
+  fi
+
+  # resvg (SVG 矢量图预览，已有 resvg 则自动跳过)
+  optional_package resvg resvg
+
+  # Linux 剪贴板支持 (xclip / wl-clipboard / xsel: 已有任意一个则自动跳过)
+  if [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
+    if ! command -v wl-copy >/dev/null 2>&1 && ! command -v xclip >/dev/null 2>&1 && ! command -v xsel >/dev/null 2>&1; then
+      info "$(msg "检测到缺少 Linux 剪贴板工具，正在安装 xclip / wl-clipboard..." "Clipboard tool missing on Linux; installing xclip / wl-clipboard...")"
+      if [[ "${XDG_SESSION_TYPE:-}" == wayland || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        optional_package wl-copy wl-clipboard || optional_package xclip xclip || optional_package xsel xsel
+      else
+        optional_package xclip xclip || optional_package wl-copy wl-clipboard || optional_package xsel xsel
+      fi
+    fi
+  fi
+
+  # 图标字体检测与安装 (Nerd Fonts，已有则自动跳过)
+  if ! has_nerd_font; then
+    if [[ "$FAMILY" == pacman ]]; then
+      sudo pacman -S --needed --noconfirm ttf-nerd-fonts-symbols 2>/dev/null || sudo pacman -S --needed --noconfirm ttf-nerd-fonts-symbols-mono 2>/dev/null || true
+    elif [[ "$FAMILY" != brew ]]; then
+      info "$(msg "未检测到 Nerd Font 图标字体，正在自动安装 Symbols Nerd Font 至 ~/.local/share/fonts/..." "No Nerd Font detected; installing Symbols Nerd Font to ~/.local/share/fonts/...")"
+      font_dest="$HOME/.local/share/fonts/NerdFonts"
+      mkdir -p "$font_dest"
+      if curl -fsSL --connect-timeout 10 -m 60 "https://github.com/ryanoasis/nerd-fonts/releases/latest/download/NerdFontsSymbolsOnly.zip" -o "$font_dest/symbols.zip" 2>/dev/null; then
+        if command -v unzip >/dev/null 2>&1; then
+          unzip -qo "$font_dest/symbols.zip" -d "$font_dest" 2>/dev/null || true
+        elif command -v python3 >/dev/null 2>&1; then
+          python3 -c "import zipfile; zipfile.ZipFile('$font_dest/symbols.zip').extractall('$font_dest')" 2>/dev/null || true
+        fi
+        rm -f "$font_dest/symbols.zip"
+        if command -v fc-cache >/dev/null 2>&1; then
+          fc-cache -f "$font_dest" 2>/dev/null || true
+        fi
+        success "$(msg "Symbols Nerd Font 图标字体安装成功" "Symbols Nerd Font installed successfully")"
+      elif curl -fsSL --connect-timeout 10 -m 30 "https://github.com/ryanoasis/nerd-fonts/raw/HEAD/patched-fonts/NerdFontsSymbolsOnly/SymbolsNerdFont-Regular.ttf" -o "$font_dest/SymbolsNerdFont-Regular.ttf" 2>/dev/null; then
+        if command -v fc-cache >/dev/null 2>&1; then
+          fc-cache -f "$font_dest" 2>/dev/null || true
+        fi
+        success "$(msg "Symbols Nerd Font 图标字体安装成功" "Symbols Nerd Font installed successfully")"
+      fi
+    fi
+  fi
 
   # 架构匹配定义
   ARCH_UNAME=$(uname -m 2>/dev/null || echo "$ARCH")

@@ -307,3 +307,124 @@ cat /etc/shells
 - Windows 向目标机传输时使用自己的连接信息，例如在 PowerShell 中设置 `$remoteTarget = 'user@example-host'`，再通过 SCP 传完整仓库或暂存文件；不要复用历史文档中的私人主机地址。
 
 回退命令、管理范围与冲突处理见[配置管理](CONFIGURATION_MANAGEMENT.md)。遇到启动异常时先保留可用会话，通过 `bash --noprofile --norc` 或 `zsh -f` 排查，再决定恢复哪份配置。
+
+## 9. 推荐现代终端模拟器安装指南（macOS 与主流 Linux 发行版）
+
+为了充分发挥本项目的 **Powerlevel10k 彩虹流线主题**、**Yazi 终端多媒体图片/PDF 预览** 与 **FZF / tmux 快捷键** 的全部效能，强烈推荐使用支持 GPU 硬件加速与现代图形协议的终端模拟器。
+
+### 9.1 终端选型速查
+
+| 终端 | 开发语言 | 核心特性 | 最佳场景 |
+| :--- | :--- | :--- | :--- |
+| **WezTerm** | **Rust** (Metal / OpenGL) | 功能最全、自带分屏与标签页，原生支持 Kitty 图像协议与富文本 | **首选推荐**：开箱即用，高颜值与 Yazi 终端内图片/PDF/视频预览 |
+| **Alacritty** | **Rust** (Metal / OpenGL) | 极简哲学、极致吞吐量与极低输入延迟 | **极客首选**：追求极致速度，配合本项目 `--with-tmux` 分屏配置 |
+| **Ghostty** | **Zig** + Metal / GTK4 | 现象级跨界新作，macOS 原生毛玻璃背景，支持 Kitty 图像协议 | **现代颜值**：原生 macOS / Linux 桌面整合体验 |
+
+---
+
+### 9.2 macOS 安装指南 (Homebrew)
+
+在 macOS 上，直接使用 Homebrew Cask 快速安装：
+
+```bash
+# 一键安装三款推荐终端（可根据喜好全选或单选）
+brew install --cask wezterm alacritty ghostty
+
+# 或单独安装任意一款：
+brew install --cask wezterm    # WezTerm (Rust, 功能最全)
+brew install --cask alacritty  # Alacritty (Rust, 极简飞快)
+brew install --cask ghostty    # Ghostty (Zig, 高颜值原生)
+
+# 必备配套 Nerd Font 字体（确保图标与 Powerlevel10k 提示符 100% 正常显示）：
+brew install --cask font-jetbrains-mono-nerd-font font-meslo-for-powerlevel10k
+```
+
+各终端配置文件位置：
+* **WezTerm**：`~/.wezterm.lua`
+* **Alacritty**：`~/.config/alacritty/alacritty.toml`
+* **Ghostty**：`~/.config/ghostty/config`
+
+---
+
+### 9.3 主流 Linux 发行版安装指南
+
+#### (1) WezTerm (Rust 全能终端) 安装
+
+* **Debian / Ubuntu / Linux Mint**：
+  ```bash
+  curl -fsSL https://apt.fury.io/wez/gpg.key | sudo gpg --yes --dearmor -o /etc/apt/keyrings/wezterm-fury.gpg
+  echo 'deb [signed-by=/etc/apt/keyrings/wezterm-fury.gpg] https://apt.fury.io/wez/ * *' | sudo tee /etc/apt/sources.list.d/wezterm.list
+  sudo apt-get update && sudo apt-get install -y wezterm
+  ```
+* **Fedora / RHEL / CentOS**：
+  ```bash
+  sudo dnf copr enable -y wezfurlong/wezterm-nightly
+  sudo dnf install -y wezterm
+  ```
+* **Arch Linux / Manjaro**：
+  ```bash
+  sudo pacman -S --needed wezterm
+  ```
+* **openSUSE**：
+  ```bash
+  sudo zypper install wezterm
+  ```
+* **通用 Linux (Flatpak)**：
+  ```bash
+  flatpak install flathub org.wezfurlong.wezterm
+  ```
+
+#### (2) Alacritty (Rust 极简极速终端) 安装
+
+* **Debian 12+ / Ubuntu 22.04+**：
+  ```bash
+  sudo apt-get update && sudo apt-get install -y alacritty
+  ```
+* **Fedora**：
+  ```bash
+  sudo dnf install -y alacritty
+  ```
+* **Arch Linux**：
+  ```bash
+  sudo pacman -S --needed alacritty
+  ```
+* **openSUSE**：
+  ```bash
+  sudo zypper install alacritty
+  ```
+
+#### (3) Ghostty (现代高性能终端) 安装
+
+* **Arch Linux**：
+  ```bash
+  sudo pacman -S --needed ghostty
+  ```
+* **Fedora**：
+  ```bash
+  sudo dnf copr enable -y pgdev/ghostty
+  sudo dnf install -y ghostty
+  ```
+* **Ubuntu / 通用 Linux (Snap)**：
+  ```bash
+  sudo snap install ghostty --classic
+  ```
+
+#### (4) Linux 图标字体配置 (Nerd Fonts)
+
+终端图标依赖 Nerd Fonts 字体，若系统未自带，可通过以下命令快速补充：
+
+* **Debian / Ubuntu / Linux Mint**：
+  ```bash
+  mkdir -p ~/.local/share/fonts
+  curl -fsSL https://github.com/ryanoasis/nerd-fonts/releases/latest/download/NerdFontsSymbolsOnly.zip -o /tmp/symbols.zip
+  unzip -qo /tmp/symbols.zip -d ~/.local/share/fonts/
+  fc-cache -fv ~/.local/share/fonts
+  ```
+* **Arch Linux**：
+  ```bash
+  sudo pacman -S --needed ttf-jetbrains-mono-nerd ttf-meslo-nerd ttf-nerd-fonts-symbols
+  ```
+* **Fedora**：
+  ```bash
+  sudo dnf install -y jetbrains-mono-fonts-all
+  ```

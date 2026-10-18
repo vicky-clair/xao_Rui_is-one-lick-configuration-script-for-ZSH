@@ -80,6 +80,18 @@
 
 tmux 的相关功能从 3.2 引入，参见[官方发布说明](https://github.com/tmux/tmux/issues/2737)。FZF 的 `--zsh` 从 0.48.0 提供，参见[官方集成说明](https://github.com/junegunn/fzf#setting-up-shell-integration)。本项目没有验证各发行版的最低/最高版本，不以过时的系统版本表承诺兼容。
 
+### 推荐现代终端模拟器 (GPU 加速 / Rust / 高颜值)
+
+为了使 Powerlevel10k 彩虹流线主题、Yazi 终端图片/PDF/视频预览以及 FZF 快捷键达到最佳视觉与性能体验，推荐搭配以下现代终端：
+
+| 终端 | 核心语言 | 特点与优势 | 快速安装命令 |
+| :--- | :--- | :--- | :--- |
+| **WezTerm** | **Rust** | 功能最全，自带分屏，原生支持 Kitty 图形协议（Yazi 图片预览首选） | macOS: `brew install --cask wezterm`<br>Linux: [详细安装方法](LINUX_ZSH_SETUP_GUIDE.md#1-wezterm-rust-全能终端-安装) |
+| **Alacritty** | **Rust** | 极简极速，输入延迟极低，天然契合搭配本项目 tmux 分屏使用 | macOS: `brew install --cask alacritty`<br>Linux: `sudo apt install alacritty` / `pacman -S alacritty` |
+| **Ghostty** | **Zig** | 原生 macOS Metal 硬件加速与毛玻璃背景，支持图形协议 | macOS: `brew install --cask ghostty`<br>Linux: [详细安装方法](LINUX_ZSH_SETUP_GUIDE.md#3-ghostty-现代高性能终端-安装) |
+
+> 详细的各 Linux 发行版（Debian/Ubuntu/Fedora/Arch/openSUSE）与 macOS 完整安装命令请参阅：[现代终端模拟器安装指南](LINUX_ZSH_SETUP_GUIDE.md#9-推荐现代终端模拟器安装指南macos-与主流-linux-发行版)。
+
 ## 快速开始
 
 在目标 Linux 或 macOS 的普通用户终端中执行。Linux 安装系统包时会调用 sudo；不要用 `sudo bash install.sh`。

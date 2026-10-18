@@ -264,11 +264,14 @@ case "$ACTION" in
           pdftoppm)
             version=$("$limiter" -k 1s 2s pdftoppm -v </dev/null 2>&1 || true)
             ;;
+          yazi)
+            version=$(yazi -V 2>/dev/null || true)
+            ;;
           *)
             version=$("$limiter" -k 1s 2s "$tool" --version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -V </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -v </dev/null 2>&1 || true)
             ;;
         esac
-        first_line=$(printf '%s\n' "$version" | grep -v '^[[:space:]]*$' | head -n 1)
+        first_line=$(printf '%s\n' "$version" | grep -v '^[[:space:]]*$' | head -n 1 || true)
         if [[ -n "$first_line" ]]; then
           printf 'VERSION: %s: %s\n' "$tool" "$first_line"
         else

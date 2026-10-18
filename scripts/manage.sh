@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 export LC_ALL=C
 # 仅在非测试环境下补全常用执行路径，避免子进程缺失命令
-[[ -z "${AUDIT_MARKER:-}" ]] && export PATH="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
+[[ -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]] && export PATH="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
 ACTION='' ARG='' SCOPE=zsh DRY=0 YES=0 LOCKED=0
@@ -40,7 +40,7 @@ done
 if ((DRY)); then printf '[DRY RUN] %s %s scope=%s；不写文件、不联网、不执行配置。\n' "$ACTION" "$ARG" "$SCOPE"; exit 0; fi
 
 # 缺失文件用固定标记参与比较，以区分“原本不存在”和“内容已修改”。
-hash() {
+calc_file_hash() {
   if [[ ! -e "$1" ]]; then printf 'missing\n'
   elif command -v sha256sum >/dev/null; then sha256sum "$1" | cut -d ' ' -f1
   else shasum -a 256 "$1" | cut -d ' ' -f1; fi
@@ -70,11 +70,11 @@ snapshot() {
       cp -p "$HOME/$file" "$SNAP/$file"
       echo present > "$SNAP/$file.state"
     else echo absent > "$SNAP/$file.state"; fi
-    hash "$HOME/$file" > "$SNAP/$file.sha256"
+    calc_file_hash "$HOME/$file" > "$SNAP/$file.sha256"
   done
 }
 # 哈希记录操作后的状态，恢复时据此识别用户在操作之后做出的修改。
-record() { local file; for file in "$@"; do hash "$HOME/$file" > "$SNAP/$file.sha256"; done; printf '备份：%s\n' "$SNAP"; }
+record() { local file; for file in "$@"; do calc_file_hash "$HOME/$file" > "$SNAP/$file.sha256"; done; printf '备份：%s\n' "$SNAP"; }
 # 将旧字节码移入快照，避免新配置仍命中旧的 Zsh 编译缓存。
 retire_bytecode() {
   local target=$1
@@ -173,7 +173,7 @@ case "$ACTION" in
     SCOPE=zsh
     [[ -f "$STATE/disabled" && ! -L "$STATE/disabled" ]] || fail '没有可恢复的停用记录'
     ARG=$(cat "$STATE/disabled"); load_backup
-    [[ -f "$ARG/.zshrc.sha256" && $(hash "$HOME/.zshrc") == "$(cat "$ARG/.zshrc.sha256")" ]] || fail '停用后的 .zshrc 已修改，拒绝覆盖'
+    [[ -f "$ARG/.zshrc.sha256" && $(calc_file_hash "$HOME/.zshrc") == "$(cat "$ARG/.zshrc.sha256")" ]] || fail '停用后的 .zshrc 已修改，拒绝覆盖'
     confirm '恢复停用前的 .zshrc？' || exit 0
     lock; snapshot .zshrc
     atomic_copy "$ARG/.zshrc" "$HOME/.zshrc"
@@ -216,7 +216,7 @@ case "$ACTION" in
     [[ "$ACTION" != --restore-backup ]] || {
       [[ ! -e "$STATE/disabled" ]] || fail '配置已停用，请先 enable，避免停用记录与恢复状态冲突'
       for file in "${FILES[@]}"; do
-        [[ -f "$ARG/$file.sha256" && $(hash "$HOME/$file") == "$(cat "$ARG/$file.sha256")" ]] || fail "$file 在安装后发生变化，请手动比较后恢复"
+        [[ -f "$ARG/$file.sha256" && $(calc_file_hash "$HOME/$file") == "$(cat "$ARG/$file.sha256")" ]] || fail "$file 在安装后发生变化，请手动比较后恢复"
       done
       confirm "仅恢复 scope=$SCOPE 的以上配置？" || exit 0
       lock; snapshot "${FILES[@]}"

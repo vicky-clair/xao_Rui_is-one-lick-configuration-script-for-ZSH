@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 export LC_ALL=C
 STATE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
-[[ -z "${AUDIT_MARKER:-}" ]] && export PATH="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
+[[ -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]] && export PATH="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
 YES=0 DRY=0 TOOL=''
 while (($#)); do
   case "$1" in --yes) YES=1 ;; --dry-run) DRY=1 ;; --*) echo '未知参数' >&2; exit 1 ;; *) [[ -z "$TOOL" ]] || exit 1; TOOL=$1 ;; esac
@@ -59,7 +59,7 @@ trap 'exit 143' TERM
 RUN=$(mktemp -d "$STATE/retry-XXXXXXXX")
 chmod 700 "$RUN"
 # 测试环境下避免宿主机全局二进制泄露影响测试断言；正常执行时补全 Homebrew 路径
-if [[ -z "${AUDIT_MARKER:-}" ]]; then
+if [[ -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
   export PATH="$HOME/.local/bin:$HOME/.version-fox/sdks/golang/packages/bin:$PATH:/opt/homebrew/bin:/usr/local/bin"
 else
   export PATH="$HOME/.local/bin:$HOME/.version-fox/sdks/golang/packages/bin:$PATH"
@@ -68,7 +68,23 @@ FAMILY=''
 if [[ $(uname -s) == Darwin ]]; then FAMILY=brew
 elif [[ -r /etc/os-release ]]; then
   . /etc/os-release
-  case "${ID:-} ${ID_LIKE:-}" in *debian*|*ubuntu*) FAMILY=apt ;; *fedora*|*rhel*) FAMILY=dnf ;; *arch*) FAMILY=pacman ;; *suse*) FAMILY=zypper ;; esac
+  ID_LOWER="${ID:-}"
+  ID_LIKE_LOWER="${ID_LIKE:-}"
+  for _distro_token in $ID_LOWER $ID_LIKE_LOWER; do
+    case "$_distro_token" in
+      debian|ubuntu|mint|kali|pop|raspbian|deepin|uos|kylin) FAMILY=apt; break ;;
+      fedora|rhel|centos|rocky|almalinux|alma|ol|amzn) FAMILY=dnf; break ;;
+      arch|manjaro|endeavouros|artix|garuda) FAMILY=pacman; break ;;
+      opensuse*|suse|sles) FAMILY=zypper; break ;;
+    esac
+  done
+  if [[ -z "$FAMILY" ]]; then
+    if command -v apt-get >/dev/null 2>&1; then FAMILY=apt;
+    elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then FAMILY=dnf;
+    elif command -v pacman >/dev/null 2>&1; then FAMILY=pacman;
+    elif command -v zypper >/dev/null 2>&1; then FAMILY=zypper;
+    fi
+  fi
 fi
 [[ -n "$FAMILY" ]] || { echo '不支持此发行版的自动重试'; exit 1; }
 has_nerd_font() {
@@ -162,7 +178,7 @@ package_install() {
           if command -v unzip >/dev/null 2>&1; then
             unzip -qo "$font_dest/symbols.zip" -d "$font_dest" 2>/dev/null || true
           elif command -v python3 >/dev/null 2>&1; then
-            python3 -c "import zipfile; zipfile.ZipFile('$font_dest/symbols.zip').extractall('$font_dest')" 2>/dev/null || true
+            python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$font_dest/symbols.zip" "$font_dest" 2>/dev/null || true
           fi
           rm -f "$font_dest/symbols.zip"
         elif curl -fsSL --connect-timeout 10 -m 30 "https://github.com/ryanoasis/nerd-fonts/raw/HEAD/patched-fonts/NerdFontsSymbolsOnly/SymbolsNerdFont-Regular.ttf" -o "$font_dest/SymbolsNerdFont-Regular.ttf" 2>/dev/null; then

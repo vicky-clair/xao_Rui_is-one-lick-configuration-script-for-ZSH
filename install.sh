@@ -44,7 +44,7 @@ for _management_arg in "$@"; do
 done
 unset _management_arg
 # 统一补充常用包管理器与语言工具链 bin 目录（Homebrew/Go/Cargo/pnpm/vfox），确保检测与安装一致
-if [[ -z "${AUDIT_MARKER:-}" ]]; then
+if [[ -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
   _EXTRA_PATHS="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin"
   export PATH="$_EXTRA_PATHS:$PATH"
   unset _EXTRA_PATHS
@@ -314,9 +314,7 @@ if ((DO_UPDATE)); then
   info "$(msg "正在检测已安装插件与工具的更新状态..." "Checking update status for installed plugins and tools...")"
   check_status=0
   if [[ -f "$SCRIPT_DIR/scripts/check_updates.sh" ]]; then
-    if ! bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE"; then
-      check_status=$?
-    fi
+    bash "$SCRIPT_DIR/scripts/check_updates.sh" --lang "$LANG_CHOICE" || check_status=$?
   fi
 
   if ((check_status != 0)); then
@@ -456,7 +454,9 @@ if ((DO_UPDATE)); then
     while IFS= read -r a_line || [[ -n "$a_line" ]]; do
       matched=0
       for ok_item in "${UPDATED_OK[@]}"; do
-        if [[ "$a_line" == *"$ok_item"* ]]; then
+        match_target="$ok_item"
+        [[ "$match_target" == "Homebrew: "* ]] && match_target="${match_target#Homebrew: }"
+        if [[ "$a_line" == *"$match_target"* ]]; then
           matched=1
           break
         fi
@@ -632,20 +632,29 @@ elif [[ "$OS" == Linux ]]; then
     . /etc/os-release
     ID_LOWER="${ID:-}"
     ID_LIKE_LOWER="${ID_LIKE:-}"
-    case "$ID_LOWER $ID_LIKE_LOWER" in
-      *debian*|*ubuntu*|*mint*|*kali*|*pop*|*raspbian*|*deepin*|*uos*|*kylin*) FAMILY=apt ;;
-      *fedora*|*rhel*|*centos*|*rocky*|*alma*|*ol*|*amzn*) FAMILY=dnf ;;
-      *arch*|*manjaro*|*endeavouros*|*artix*|*garuda*) FAMILY=pacman ;;
-      *opensuse*|*suse*) FAMILY=zypper ;;
-      *)
-        if command -v apt-get >/dev/null 2>&1; then FAMILY=apt;
-        elif command -v dnf >/dev/null 2>&1; then FAMILY=dnf;
-        elif command -v yum >/dev/null 2>&1; then FAMILY=dnf;
-        elif command -v pacman >/dev/null 2>&1; then FAMILY=pacman;
-        elif command -v zypper >/dev/null 2>&1; then FAMILY=zypper;
-        else die "$(msg "暂不自动支持发行版：${ID:-未知系统}；请参考教程手动安装" "Distribution not automatically supported: ${ID:-unknown}; refer to manual guide")"; fi
-        ;;
-    esac
+    for _distro_token in $ID_LOWER $ID_LIKE_LOWER; do
+      case "$_distro_token" in
+        debian|ubuntu|mint|kali|pop|raspbian|deepin|uos|kylin) FAMILY=apt; break ;;
+        fedora|rhel|centos|rocky|almalinux|alma|ol|amzn) FAMILY=dnf; break ;;
+        arch|manjaro|endeavouros|artix|garuda) FAMILY=pacman; break ;;
+        opensuse*|suse|sles) FAMILY=zypper; break ;;
+      esac
+    done
+    if [[ -z "${FAMILY:-}" ]]; then
+      case "$ID_LOWER $ID_LIKE_LOWER" in
+        *debian*|*ubuntu*|*mint*|*kali*|*pop*|*raspbian*|*deepin*|*uos*|*kylin*) FAMILY=apt ;;
+        *fedora*|*rhel*|*centos*|*rocky*|*almalinux*|*amzn*) FAMILY=dnf ;;
+        *arch*|*manjaro*|*endeavouros*|*artix*|*garuda*) FAMILY=pacman ;;
+        *opensuse*|*suse*) FAMILY=zypper ;;
+        *)
+          if command -v apt-get >/dev/null 2>&1; then FAMILY=apt;
+          elif command -v dnf >/dev/null 2>&1 || command -v yum >/dev/null 2>&1; then FAMILY=dnf;
+          elif command -v pacman >/dev/null 2>&1; then FAMILY=pacman;
+          elif command -v zypper >/dev/null 2>&1; then FAMILY=zypper;
+          else die "$(msg "暂不自动支持发行版：${ID:-未知系统}；请参考教程手动安装" "Distribution not automatically supported: ${ID:-unknown}; refer to manual guide")"; fi
+          ;;
+      esac
+    fi
   elif ((DRY_RUN)); then
     FAMILY=apt
     info "$(msg "[预演模式] 未找到 /etc/os-release，默认模拟 apt 发行版" "[Dry Run] /etc/os-release not found; simulating apt distribution")"
@@ -671,20 +680,26 @@ if [[ ! -r "$SCRIPT_DIR/templates/zshrc.zsh" ]]; then
       command git clone --depth=1 "$REPO_REMOTE" "$LOCAL_BOOTSTRAP_DIR" --quiet 2>/dev/null || true
     fi
   fi
-  # 若无 git 或 clone 失败，通过 curl/wget 提取必要模板
+  # 若无 git 或 clone 失败，通过 curl/wget 提取必要模板与管理脚本
   if [[ ! -r "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" ]]; then
     RAW_BASE="https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main"
     command mkdir -p "$LOCAL_BOOTSTRAP_DIR/templates" "$LOCAL_BOOTSTRAP_DIR/scripts"
-    if command -v curl >/dev/null 2>&1; then
-      command curl -fsSL --connect-timeout 10 -m 30 "$RAW_BASE/templates/zshrc.zsh" -o "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" 2>/dev/null || true
-      command curl -fsSL --connect-timeout 10 -m 30 "$RAW_BASE/templates/tmux.conf" -o "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" 2>/dev/null || true
-      command curl -fsSL --connect-timeout 10 -m 30 "$RAW_BASE/scripts/check_updates.sh" -o "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" 2>/dev/null || true
-    elif command -v wget >/dev/null 2>&1; then
-      command wget -T 30 -qO "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" "$RAW_BASE/templates/zshrc.zsh" 2>/dev/null || true
-      command wget -T 30 -qO "$LOCAL_BOOTSTRAP_DIR/templates/tmux.conf" "$RAW_BASE/templates/tmux.conf" 2>/dev/null || true
-      command wget -T 30 -qO "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" "$RAW_BASE/scripts/check_updates.sh" 2>/dev/null || true
-    fi
-    command chmod +x "$LOCAL_BOOTSTRAP_DIR/scripts/check_updates.sh" 2>/dev/null || true
+    _bootstrap_files=(
+      "install.sh"
+      "templates/zshrc.zsh"
+      "templates/tmux.conf"
+      "scripts/manage.sh"
+      "scripts/retry_tools.sh"
+      "scripts/check_updates.sh"
+    )
+    for _bf in "${_bootstrap_files[@]}"; do
+      if command -v curl >/dev/null 2>&1; then
+        command curl -fsSL --connect-timeout 10 -m 30 "$RAW_BASE/$_bf" -o "$LOCAL_BOOTSTRAP_DIR/$_bf" 2>/dev/null || true
+      elif command -v wget >/dev/null 2>&1; then
+        command wget -T 30 -qO "$LOCAL_BOOTSTRAP_DIR/$_bf" "$RAW_BASE/$_bf" 2>/dev/null || true
+      fi
+    done
+    command chmod +x "$LOCAL_BOOTSTRAP_DIR/install.sh" "$LOCAL_BOOTSTRAP_DIR/scripts"/*.sh 2>/dev/null || true
   fi
   if [[ -r "$LOCAL_BOOTSTRAP_DIR/templates/zshrc.zsh" ]]; then
     SCRIPT_DIR="$LOCAL_BOOTSTRAP_DIR"
@@ -772,6 +787,7 @@ printf '%s\n' "$(msg '基础依赖：zsh git curl ca-certificates coreutils unzi
 ((WITH_TMUX)) && printf '%s\n' "$(msg 'Tmux 增强：安装 tmux、终端剪贴板工具、TPM 插件生态并部署 ~/.tmux.conf。' 'Tmux enhancement: install tmux, clipboard tools, TPM plugins, and ~/.tmux.conf.')"
 printf '%s\n' "$(msg '备份并更新受管配置；选定主题样式会备份并替换 .p10k.zsh，skip 则保留。保留 .zshenv、custom 和历史。' 'Back up managed configs; theme selection replaces .p10k.zsh after backup; skip preserves it. Keep .zshenv, custom and history.')"
 printf '%s\n' "$(msg '默认 Shell 将在配置安装成功后单独询问。' 'Default login shell will be prompted separately after configuration.')"
+[[ "$FAMILY" == pacman ]] && printf '%s\n' "$(msg '系统维护：Arch Linux 滚动架构下，若缺失基础核心依赖将执行 pacman -Syu 同步升级。' 'System maintenance: On Arch Linux, missing core dependencies will trigger pacman -Syu.')"
 
 if ((DRY_RUN)); then
   printf '\n%s\n' "$(msg '预演结束。实际可用包将在确认安装后通过本机仓库检测。' 'Dry run finished. Available packages will be checked via local repositories upon confirmation.')"
@@ -823,6 +839,7 @@ STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
 mkdir -p "$STATE_ROOT"
 BACKUP=$(mktemp -d "$STATE_ROOT/install-XXXXXXXX")
 chmod 700 "$BACKUP"
+exec 3>&1 4>&2
 exec > >(tee -a "$BACKUP/install.log") 2>&1
 trap 'printf "安装未完成。日志与原配置：%s\n系统软件安装不会自动回退。\n" "$BACKUP" >&2' ERR
 
@@ -895,7 +912,7 @@ remove_skipped() {
 
 mkdir -p "$HOME/.local/bin"
 # 确保常用路径与 Homebrew 在 PATH 中
-if [[ -z "${AUDIT_MARKER:-}" ]]; then
+if [[ -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
   _EXTRA_PATHS="$HOME/.local/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:/usr/local/sbin:/opt/nvim:$HOME/go/bin:$HOME/.cargo/bin:$HOME/.local/share/pnpm:$HOME/.version-fox/sdks/golang/packages/bin"
   export PATH="$_EXTRA_PATHS:$PATH"
   unset _EXTRA_PATHS
@@ -992,6 +1009,7 @@ optional_package() {
   # 4. 仓库中无此包时安全记录并警告，保持向后兼容
   SKIPPED+=("$pkg")
   warn "$(msg "可选包未在仓库中找到：$pkg，已跳过安装。" "Optional package not found in repository: $pkg, skipped.")"
+  return 1
 }
 
 # 8. 安装完整工具集
@@ -1031,7 +1049,7 @@ if [[ "$PROFILE" == full ]]; then
           elif [[ "$_y_pkg" == font-symbols-only-nerd-font ]]; then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install font-symbols-only-nerd-font 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask font-symbols-only-nerd-font 2>/dev/null || true
           else
-            optional_package "$_y_pkg" "$_y_pkg"
+            optional_package "$_y_pkg" "$_y_pkg" || true
           fi
         done
       }
@@ -1048,18 +1066,18 @@ if [[ "$PROFILE" == full ]]; then
   # ----------------------------------------------------------------------------
   # 基础现代命令行工具集：仅在未安装时通过包管理器部署
   # ----------------------------------------------------------------------------
-  optional_package fzf fzf
-  optional_package fd "$fd_pkg"
-  optional_package bat bat
+  optional_package fzf fzf || true
+  optional_package fd "$fd_pkg" || true
+  optional_package bat bat || true
   for pkg in eza zoxide yazi fastfetch; do
-    optional_package "$pkg" "$pkg"
+    optional_package "$pkg" "$pkg" || true
   done
-  optional_package nvim neovim
-  optional_package tv television
-  optional_package tre tre-command
+  optional_package nvim neovim || true
+  optional_package tv television || true
+  optional_package tre tre-command || true
   agrep_pkg=tre
   [[ "$FAMILY" == apt ]] && agrep_pkg=tre-agrep
-  optional_package agrep "$agrep_pkg"
+  optional_package agrep "$agrep_pkg" || true
 
   # ============================================================================
   # Yazi 现代多媒体预览套件（依照 Yazi 官方指南要求，已有任意工具则自动跳过）
@@ -1067,18 +1085,18 @@ if [[ "$PROFILE" == full ]]; then
   # ============================================================================
 
   # 1. 文本搜索与 JSON 语法格式化预览
-  optional_package rg ripgrep
-  optional_package jq jq
+  optional_package rg ripgrep || true
+  optional_package jq jq || true
 
   # 2. 视频与多媒体缩略图提取核心依赖
-  optional_package ffmpeg ffmpeg
+  optional_package ffmpeg ffmpeg || true
 
   # 3. 归档文件（zip/tar/7z/rar/iso 等）解压与目录树内联预览
   # 检查 7z 或 7zz 命令是否存在；缺失时按发行版优先级尝试安装
   if ! command -v 7z >/dev/null 2>&1 && ! command -v 7zz >/dev/null 2>&1; then
     case "$FAMILY" in
       brew)
-        optional_package 7z sevenzip
+        optional_package 7z sevenzip || true
         ;;
       apt)
         # Debian/Ubuntu 优先安装新版 7zip，若无此包则自动回退安装 p7zip-full
@@ -1097,7 +1115,7 @@ if [[ "$PROFILE" == full ]]; then
         fi
         ;;
       pacman)
-        optional_package 7z 7zip
+        optional_package 7z 7zip || true
         ;;
       zypper)
         if ! optional_package 7z 7zip; then
@@ -1113,13 +1131,13 @@ if [[ "$PROFILE" == full ]]; then
   if ! command -v pdftoppm >/dev/null 2>&1; then
     case "$FAMILY" in
       brew)
-        optional_package pdftoppm poppler
+        optional_package pdftoppm poppler || true
         ;;
       apt|dnf)
-        optional_package pdftoppm poppler-utils
+        optional_package pdftoppm poppler-utils || true
         ;;
       pacman)
-        optional_package pdftoppm poppler
+        optional_package pdftoppm poppler || true
         ;;
       zypper)
         if ! optional_package pdftoppm poppler-tools; then
@@ -1135,19 +1153,19 @@ if [[ "$PROFILE" == full ]]; then
   if ! command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; then
     case "$FAMILY" in
       brew)
-        optional_package magick imagemagick-full || optional_package magick imagemagick
+        optional_package magick imagemagick-full || optional_package magick imagemagick || true
         ;;
       apt|pacman)
-        optional_package magick imagemagick
+        optional_package magick imagemagick || true
         ;;
       dnf|zypper)
-        optional_package magick ImageMagick
+        optional_package magick ImageMagick || true
         ;;
     esac
   fi
 
   # 6. resvg：支持 SVG 矢量图形终端栅格化预览
-  optional_package resvg resvg
+  optional_package resvg resvg || true
 
   # 7. Linux 终端剪贴板支持（实现 Yazi 文件复制/剪切与系统剪贴板互通）
   if [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
@@ -1155,9 +1173,9 @@ if [[ "$PROFILE" == full ]]; then
       info "$(msg "检测到缺少 Linux 剪贴板工具，正在安装 xclip / wl-clipboard..." "Clipboard tool missing on Linux; installing xclip / wl-clipboard...")"
       # 根据当前显示服务（Wayland 或 X11）动态优先选用对应的剪贴板后端
       if [[ "${XDG_SESSION_TYPE:-}" == wayland || -n "${WAYLAND_DISPLAY:-}" ]]; then
-        optional_package wl-copy wl-clipboard || optional_package xclip xclip || optional_package xsel xsel
+        optional_package wl-copy wl-clipboard || optional_package xclip xclip || optional_package xsel xsel || true
       else
-        optional_package xclip xclip || optional_package wl-copy wl-clipboard || optional_package xsel xsel
+        optional_package xclip xclip || optional_package wl-copy wl-clipboard || optional_package xsel xsel || true
       fi
     fi
   fi
@@ -1174,7 +1192,7 @@ if [[ "$PROFILE" == full ]]; then
         if command -v unzip >/dev/null 2>&1; then
           unzip -qo "$font_dest/symbols.zip" -d "$font_dest" 2>/dev/null || true
         elif command -v python3 >/dev/null 2>&1; then
-          python3 -c "import zipfile; zipfile.ZipFile('$font_dest/symbols.zip').extractall('$font_dest')" 2>/dev/null || true
+          python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$font_dest/symbols.zip" "$font_dest" 2>/dev/null || true
         fi
         rm -f "$font_dest/symbols.zip"
         if command -v fc-cache >/dev/null 2>&1; then
@@ -1327,7 +1345,7 @@ if [[ "$PROFILE" == full ]]; then
       if command -v unzip >/dev/null 2>&1; then
         unzip -q "$yazi_stage/yazi.zip" -d "$yazi_stage" 2>/dev/null || true
       elif command -v python3 >/dev/null 2>&1; then
-        python3 -c "import zipfile; zipfile.ZipFile('$yazi_stage/yazi.zip').extractall('$yazi_stage')" 2>/dev/null || true
+        python3 -c "import sys, zipfile; zipfile.ZipFile(sys.argv[1]).extractall(sys.argv[2])" "$yazi_stage/yazi.zip" "$yazi_stage" 2>/dev/null || true
       fi
       yazi_bin=$(find "$yazi_stage" -type f -name yazi -perm -111 2>/dev/null | head -n 1)
       if [[ -n "$yazi_bin" && -x "$yazi_bin" ]]; then
@@ -1443,7 +1461,7 @@ fi
 
 # vfox 可选版本管理安装（优先包管理器，缺失时尝试官方用户态脚本）
 if ((WITH_VFOX)) && ! command -v vfox >/dev/null 2>&1; then
-  optional_package vfox vfox
+  optional_package vfox vfox || true
   if ! command -v vfox >/dev/null 2>&1; then
     info "$(msg "系统仓库无 vfox，正在尝试通过官方脚本安装至用户目录..." "vfox not in repo; attempting official install script...")"
     vfox_stage=$(mktemp -d "$HOME/.vfox-tmp-XXXXXX")
@@ -1459,7 +1477,7 @@ fi
 
 # lazydocker 容器管理面板安装（优先包管理器，缺失时尝试官方独立预编译二进制）
 if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
-  optional_package lazydocker lazydocker
+  optional_package lazydocker lazydocker || true
   if ! command -v lazydocker >/dev/null 2>&1; then
     info "$(msg "系统仓库无 lazydocker，正在尝试下载官方独立二进制至 ~/.local/bin..." "lazydocker not in repo; downloading official binary...")"
     lzd_arch="x86_64"
@@ -1488,7 +1506,7 @@ fi
 
 # lazygit Git 终端面板安装（优先包管理器，缺失时尝试官方独立预编译二进制）
 if ((WITH_LAZYGIT)) && ! command -v lazygit >/dev/null 2>&1; then
-  optional_package lazygit lazygit
+  optional_package lazygit lazygit || true
   if ! command -v lazygit >/dev/null 2>&1; then
     info "$(msg "系统仓库无 lazygit，正在尝试下载官方独立二进制至 ~/.local/bin..." "lazygit not in repo; downloading official binary...")"
     lg_arch="x86_64"
@@ -1516,11 +1534,11 @@ fi
 
 if ((WITH_TMUX)); then
   info "$(msg "正在安装 tmux 及终端剪贴板依赖..." "Installing tmux and clipboard dependencies...")"
-  optional_package tmux tmux
+  optional_package tmux tmux || true
   if [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
-    optional_package xclip xclip
-    optional_package wl-copy wl-clipboard
-    [[ "$FAMILY" == apt ]] && optional_package "" ncurses-term
+    optional_package xclip xclip || true
+    optional_package wl-copy wl-clipboard || true
+    [[ "$FAMILY" == apt ]] && { optional_package "" ncurses-term || true; }
   fi
 fi
 
@@ -1623,6 +1641,7 @@ done
 # 10. 部署配置文件
 cp "$SCRIPT_DIR/templates/zshrc.zsh" "$BACKUP/new.zshrc"
 
+q_script_dir=$(printf '%q' "$SCRIPT_DIR")
 cat <<EOF > "$BACKUP/new.options"
 # 安装器生成；1 为启用，0 为关闭。
 ZSH_PROJECT_FULL=$([[ "$PROFILE" == full ]] && echo 1 || echo 0)
@@ -1633,7 +1652,7 @@ ZSH_PROJECT_VFOX=$WITH_VFOX
 ZSH_PROJECT_LAZYDOCKER=$WITH_LAZYDOCKER
 ZSH_PROJECT_LAZYGIT=$WITH_LAZYGIT
 ZSH_PROJECT_TMUX=$WITH_TMUX
-ZSH_PROJECT_DIR="$SCRIPT_DIR"
+ZSH_PROJECT_DIR=${q_script_dir}
 ZSH_PROJECT_LANG="$LANG_CHOICE"
 ZSH_PROJECT_AUTO_CHECK_UPDATE=1
 ZSH_PROJECT_CHECK_INTERVAL_DAYS=7
@@ -1724,6 +1743,10 @@ fi
 
 printf '\n%s:\n  bash %s/install.sh --rollback %q\n' \
   "$(msg '若需要回退配置，请运行' 'To rollback configuration, run')" "$SCRIPT_DIR" "$BACKUP"
+
+# 恢复终端原始标准输出与标准错误流，确保后续向导与全新交互式 Shell 会话拥有物理 TTY 控制权
+exec 1>&3 2>&4
+exec 3>&- 4>&-
 
 # 恢复原始语言环境，彻底杜绝全新的 Zsh 与 Neovim 受到 C 字符集污染产生乱码
 if [[ -n "${ORIG_LC_ALL:-}" ]]; then

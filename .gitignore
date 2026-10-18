@@ -1,5 +1,11 @@
-# Local test scratch directory
+# Local test scratch and troubleshooting directories
 scratch/
+clash_tun_troubleshooting/
+
+# Shell history & local backup files
+.zhistory
+.zsh_history
+*.before-fix
 
 # macOS metadata
 .DS_Store

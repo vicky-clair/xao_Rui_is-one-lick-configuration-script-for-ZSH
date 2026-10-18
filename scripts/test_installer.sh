@@ -80,7 +80,11 @@ optional_package magick imagemagick || fail 'optional_package magick (via conver
 optional_package rg ripgrep || fail 'optional_package rg (via ripgrep) failed'
 optional_package xclip xclip || fail 'optional_package xclip (via wl-copy) failed'
 [[ ! -e "$AUDIT_MARKER" ]] || fail 'optional_package invoked package manager despite existing binaries/aliases'
-pass 'optional_package idempotency and alias detection'
+if optional_package missing_command definitely_missing_pkg 2>/dev/null; then
+  fail 'optional_package should return non-zero when package is missing'
+fi
+((${#SKIPPED[@]} > 0)) || fail 'optional_package did not record missing package to SKIPPED'
+pass 'optional_package idempotency, alias detection, and missing package handling'
 
 # 验证 has_nerd_font 字体检测幂等性
 eval "$(extract_function has_nerd_font)"

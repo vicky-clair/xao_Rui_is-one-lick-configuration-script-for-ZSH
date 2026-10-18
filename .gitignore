@@ -1,2 +1,9 @@
 # Local test scratch directory
 scratch/
+
+# macOS metadata
+.DS_Store
+
+# Temporary log and diagnostic files
+*.log
+*.tmp

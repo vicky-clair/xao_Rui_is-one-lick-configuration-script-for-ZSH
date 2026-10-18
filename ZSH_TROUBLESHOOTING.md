@@ -225,6 +225,48 @@ Debian 13 中 `/usr/bin/resize` 由 xterm 包提供，参见[官方文件清单]
 
 遇到 manage.lock/retry.lock，先确认没有对应操作运行，再检查上次日志并处理残留锁。不要并发执行安装、管理和重试，也不要直接删除全部状态目录。
 
+## 12. 现代终端模拟器与字体排查
+
+### (1) macOS Gatekeeper 阻止或 Homebrew Cask 禁用 Alacritty
+- **现象**：执行 `brew install --cask alacritty` 报 `Cask 'alacritty' has been disabled because it does not pass the macOS Gatekeeper check!`；或者打开应用提示“已损坏，无法打开”。
+- **原因**：Homebrew 官方于 2026-09-01 暂时禁用了 `alacritty` Cask（由于上游构建公证签名策略变更）。
+- **处理方式**：通过 GitHub 官方 Release 下载 `.dmg` 镜像，手动拖入 `/Applications/`，并执行以下命令移除隔离属性：
+  ```bash
+  xattr -r -d com.apple.quarantine /Applications/Alacritty.app
+  mkdir -p ~/.local/bin && ln -sf /Applications/Alacritty.app/Contents/MacOS/alacritty ~/.local/bin/alacritty
+  ```
+
+### (2) 终端图标显示方框、乱码或 Powerlevel10k 提示符断裂
+- **现象**：P10k 箭头、Git 图标或 Yazi 文件图标显示为乱码或方框问号。
+- **原因**：终端未正确配置 Nerd Font 字体。
+- **处理方式**：
+  1. 确保安装了配套字体：
+     ```bash
+     brew install --cask font-jetbrains-mono-nerd-font font-meslo-for-powerlevel10k
+     ```
+  2. 在终端配置文件中指定字体名称：
+     - **WezTerm** (`~/.wezterm.lua`):
+       ```lua
+       local wezterm = require 'wezterm'
+       local config = wezterm.config_builder()
+       config.font = wezterm.font("JetBrainsMono Nerd Font")
+       return config
+       ```
+     - **Ghostty** (`~/.config/ghostty/config`):
+       ```text
+       font-family = "JetBrainsMono Nerd Font"
+       ```
+     - **Alacritty** (`~/.config/alacritty/alacritty.toml`):
+       ```toml
+       [font.normal]
+       family = "JetBrainsMono Nerd Font"
+       ```
+
+### (3) `install.sh --doctor` 体检时 `ffmpeg` 阻塞或卡住
+- **现象**：体检执行到 `FOUND: ffmpeg` 之后长时间无响应。
+- **原因**：`ffmpeg` 默认会在子进程中监听标准输入（stdin）等待键盘交互。
+- **处理方式**：已在当前项目的 `scripts/manage.sh` 中为 `ffmpeg -version` 增加了 `-nostdin </dev/null` 重定向。若此前已安装旧版管理脚本，只需在仓库根目录执行 `git pull` 并将 `scripts/manage.sh` 重新同步至状态目录即可。
+
 ## 历史验证摘要
 
 以下保留自旧文档的 2026-09-06 至 09-07 Debian 13 / Zsh 5.9 用户反馈，属于历史记录，本轮未再次连接目标机验证。

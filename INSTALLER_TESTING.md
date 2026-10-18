@@ -4,16 +4,19 @@
 
 ## 最近一次本地验证
 
-日期：2026-10-17。基于最新工作区，包含全套现代 CLI 工具链扩充（集成 `television` 模糊搜索器、`tre` 现代目录树与 `agrep` 近似正则工具，支持 Linux 多包管理器与 GitHub Release 架构回退）。测试环境为 macOS Golden Gate 27.0.1 (arm64 Apple M1)，系统原生 Bash 3.2.57 与 Zsh 5.9，以及 Linux (Ubuntu/Debian/Fedora/Arch) 隔离回归测试环境。
+日期：2026-10-18。基于最新工作区，包含全套现代 CLI 工具链扩充、现代 GPU 加速终端模拟器适配（WezTerm、Ghostty、Alacritty 及官方 Gatekeeper 隔离修复），以及 Yazi 官方多媒体预览伴生套件（`ffmpeg-full`、`imagemagick-full`、`sevenzip`、`poppler`、`ripgrep`、`resvg`、`jq` 等）。测试环境为 macOS Golden Gate 27.0.1 (arm64 Apple M1)，系统原生 Bash 3.2.57 与 Zsh 5.9，以及 Linux (Ubuntu/Debian/Fedora/Arch) 隔离回归测试环境。
 
 | 检查 | 本次结果 | 解释 |
 | --- | --- | --- |
-| 六个正式 Bash 脚本语法 | 通过 | 解析检查，全数通过 |
+| 六个正式 Bash 脚本语法 | 通过 | 解析检查，全数通过（`bash -n`） |
 | Zsh 模板与配置语法检查 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
 | `bash scripts/test_installer.sh` | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
 | `bash scripts/test_management.sh` | 退出码 0，全量通过 | Zsh 开关（含 television、tv-keys、tre）、差异恢复、失败重试隔离、macOS PTY 终端启动诊断全数通过 |
-| macOS 实际安装部署 | 通过 | `install.sh --profile full --p10k-style skip --lang zh` 实机部署成功，受管配置与备份完整生效 |
-| 终端交互与组件验收 | 通过 | 新开终端会话启动正常（~450ms - 540ms），14 款 CLI 工具挂载正常，Banner 完整输出，`tv` (Ctrl+P)、`tre` (-e)、`agrep` 均正常响应 |
+| macOS 实际安装部署 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux --with-latest-nvim` 实机部署成功，受管配置与备份完整生效 |
+| 推荐现代终端与字体安装 | 通过 | WezTerm、Ghostty、Alacritty (v0.17.0 独立 DMG + 移除隔离) 与 JetBrainsMono / MesloLGS Nerd Fonts 全部就绪 |
+| Yazi 多媒体预览套件 | 通过 | `ffmpeg`、`7zz`、`pdftoppm`、`magick`、`resvg`、`rg` 全部正确安装与挂载，无多余冗余开销 |
+| 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 修复 `ffmpeg -nostdin </dev/null` 键盘监听挂起与 `7zz` 探测，全部 23 项工具版本秒级读取 |
+| 终端交互与组件验收 | 通过 | 新开终端会话启动正常（~1.3s），所有 CLI 工具挂载正常，Banner 完整输出，快捷键均正常响应 |
 | 当前版本远端 CI | 本轮未查询或触发 | 工作流存在不等于当前代码已通过 |
 
 本次测试现场保留在 `/var/folders/.../zsh-installer-tests.*` 和 `zsh-management-tests.*`。这些是测试运行的临时路径，不是需要部署的仓库资源。

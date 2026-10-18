@@ -87,7 +87,7 @@ tmux 的相关功能从 3.2 引入，参见[官方发布说明](https://github.c
 | 终端 | 核心语言 | 特点与优势 | 快速安装命令 |
 | :--- | :--- | :--- | :--- |
 | **WezTerm** | **Rust** | 功能最全，自带分屏，原生支持 Kitty 图形协议（Yazi 图片预览首选） | macOS: `brew install --cask wezterm`<br>Linux: [详细安装方法](LINUX_ZSH_SETUP_GUIDE.md#1-wezterm-rust-全能终端-安装) |
-| **Alacritty** | **Rust** | 极简极速，输入延迟极低，天然契合搭配本项目 tmux 分屏使用 | macOS: `brew install --cask alacritty`<br>Linux: `sudo apt install alacritty` / `pacman -S alacritty` |
+| **Alacritty** | **Rust** | 极简极速，输入延迟极低，天然契合搭配本项目 tmux 分屏使用 | macOS: [官方 DMG / Cargo 安装](LINUX_ZSH_SETUP_GUIDE.md#alacritty-macos-install)<br>Linux: `sudo apt install alacritty` / `pacman -S alacritty` |
 | **Ghostty** | **Zig** | 原生 macOS Metal 硬件加速与毛玻璃背景，支持图形协议 | macOS: `brew install --cask ghostty`<br>Linux: [详细安装方法](LINUX_ZSH_SETUP_GUIDE.md#3-ghostty-现代高性能终端-安装) |
 
 > 详细的各 Linux 发行版（Debian/Ubuntu/Fedora/Arch/openSUSE）与 macOS 完整安装命令请参阅：[现代终端模拟器安装指南](LINUX_ZSH_SETUP_GUIDE.md#9-推荐现代终端模拟器安装指南macos-与主流-linux-发行版)。

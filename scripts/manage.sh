@@ -247,25 +247,25 @@ case "$ACTION" in
     done
     limiter=$(command -v timeout || command -v gtimeout || true)
     if [[ -n "$limiter" ]]; then
-      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch tv tre agrep rg jq ffmpeg 7z pdftoppm magick resvg; do
+      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch tv tre agrep rg jq ffmpeg 7z 7zz pdftoppm magick resvg; do
         command -v "$tool" >/dev/null || continue
         version=""
         # 查询各命令行工具版本：不同工具对版本参数有严格要求
-        # - ffmpeg: 必须使用单短横线 `-version`（使用 `--version` 会报错）
+        # - ffmpeg: 必须使用单短横线 `-version`，且指定 `-nostdin </dev/null` 避免监听键盘交互导致体检阻塞
         # - 7z/7zz: 不支持 `--version`（会以退出码 7 失败），且 `-v` 是分卷压缩参数；查看版本输出最安全的是帮助参数 `-h`
         # - pdftoppm: Poppler 工具集只接受 `-v`（传入 `--version` 会被当做未知选项）
         case "$tool" in
           ffmpeg)
-            version=$("$limiter" -k 1s 2s ffmpeg -version 2>&1 || true)
+            version=$("$limiter" -k 1s 2s ffmpeg -nostdin -version </dev/null 2>&1 || true)
             ;;
           7z|7zz)
-            version=$("$limiter" -k 1s 2s "$tool" -h 2>&1 || "$limiter" -k 1s 2s "$tool" 2>&1 || true)
+            version=$("$limiter" -k 1s 2s "$tool" -h </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" </dev/null 2>&1 || true)
             ;;
           pdftoppm)
-            version=$("$limiter" -k 1s 2s pdftoppm -v 2>&1 || true)
+            version=$("$limiter" -k 1s 2s pdftoppm -v </dev/null 2>&1 || true)
             ;;
           *)
-            version=$("$limiter" -k 1s 2s "$tool" --version 2>&1 || "$limiter" -k 1s 2s "$tool" -version 2>&1 || "$limiter" -k 1s 2s "$tool" -V 2>&1 || "$limiter" -k 1s 2s "$tool" -v 2>&1 || true)
+            version=$("$limiter" -k 1s 2s "$tool" --version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -V </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -v </dev/null 2>&1 || true)
             ;;
         esac
         first_line=$(printf '%s\n' "$version" | grep -v '^[[:space:]]*$' | head -n 1)

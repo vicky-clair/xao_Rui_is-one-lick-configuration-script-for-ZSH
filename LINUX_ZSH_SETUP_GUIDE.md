@@ -322,22 +322,41 @@ cat /etc/shells
 
 ---
 
-### 9.2 macOS 安装指南 (Homebrew)
+### 9.2 macOS 安装指南
 
-在 macOS 上，直接使用 Homebrew Cask 快速安装：
+#### (1) WezTerm 与 Ghostty (Homebrew Cask 快速安装)
 
 ```bash
-# 一键安装三款推荐终端（可根据喜好全选或单选）
-brew install --cask wezterm alacritty ghostty
+# 推荐终端与 Nerd Font 字体一键安装：
+brew install --cask wezterm ghostty font-jetbrains-mono-nerd-font font-meslo-for-powerlevel10k
 
-# 或单独安装任意一款：
-brew install --cask wezterm    # WezTerm (Rust, 功能最全)
-brew install --cask alacritty  # Alacritty (Rust, 极简飞快)
-brew install --cask ghostty    # Ghostty (Zig, 高颜值原生)
+# 或按需单独安装：
+brew install --cask wezterm    # WezTerm (Rust, 功能最全，Yazi 多媒体预览首选)
+brew install --cask ghostty    # Ghostty (Zig, 高颜值原生毛玻璃)
 
 # 必备配套 Nerd Font 字体（确保图标与 Powerlevel10k 提示符 100% 正常显示）：
 brew install --cask font-jetbrains-mono-nerd-font font-meslo-for-powerlevel10k
 ```
+
+<a id="alacritty-macos-install"></a>
+#### (2) Alacritty macOS 独立安装
+
+> [!WARNING] macOS 下 Alacritty Cask 说明
+> Homebrew 官方在 2026-09-01 将 `alacritty` Cask 暂时禁用（因未通过 macOS Gatekeeper 公证安全检测）。若直接执行 `brew install --cask alacritty` 会报错中断。
+> **推荐通过官方 DMG 快速安装**（自动移除 Gatekeeper 隔离属性并建立终端命令软链接）：
+> ```bash
+> # 下载官方 DMG（以 v0.17.0 为例）并挂载安装
+> curl -fLo /tmp/Alacritty.dmg https://github.com/alacritty/alacritty/releases/download/v0.17.0/Alacritty-v0.17.0.dmg
+> hdiutil attach /tmp/Alacritty.dmg -nobrowse -mountpoint /tmp/alacritty_mount
+> cp -R /tmp/alacritty_mount/Alacritty.app /Applications/
+> hdiutil detach /tmp/alacritty_mount
+> # 移除 Gatekeeper 隔离属性，避免提示损坏或拦截
+> xattr -r -d com.apple.quarantine /Applications/Alacritty.app
+> # 建立命令行软链接 (确保可在终端输入 alacritty 启动)
+> mkdir -p ~/.local/bin && ln -sf /Applications/Alacritty.app/Contents/MacOS/alacritty ~/.local/bin/alacritty
+> rm -f /tmp/Alacritty.dmg
+> ```
+> *亦可通过 Rust 官方工具链直接编译安装*：`cargo install alacritty`。
 
 各终端配置文件位置：
 * **WezTerm**：`~/.wezterm.lua`

@@ -168,7 +168,7 @@ To get the best visual rendering and latency with Powerlevel10k, Yazi multimedia
 | Terminal | Language | Highlights | Quick Install Command |
 | :--- | :--- | :--- | :--- |
 | **WezTerm** | **Rust** | Full-featured, native tabs/splits, Kitty image protocol (Best for Yazi previews) | macOS: `brew install --cask wezterm`<br>Linux: [Installation Guide](LINUX_ZSH_SETUP_GUIDE.md#1-wezterm-rust-全能终端-安装) |
-| **Alacritty** | **Rust** | Ultra-minimal, lowest input latency, pairs naturally with tmux | macOS: `brew install --cask alacritty`<br>Linux: `sudo apt install alacritty` / `pacman -S alacritty` |
+| **Alacritty** | **Rust** | Ultra-minimal, lowest input latency, pairs naturally with tmux | macOS: [Official DMG / Cargo](LINUX_ZSH_SETUP_GUIDE.md#alacritty-macos-install)<br>Linux: `sudo apt install alacritty` / `pacman -S alacritty` |
 | **Ghostty** | **Zig** | Native macOS Metal acceleration, liquid glassmorphism, native Kitty graphics protocol | macOS: `brew install --cask ghostty`<br>Linux: [Installation Guide](LINUX_ZSH_SETUP_GUIDE.md#3-ghostty-现代高性能终端-安装) |
 
 > For comprehensive multi-distribution Linux and macOS setup commands, see [Modern Terminal Emulator Installation Guide](LINUX_ZSH_SETUP_GUIDE.md#9-推荐现代终端模拟器安装指南macos-与主流-linux-发行版).

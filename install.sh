@@ -89,6 +89,7 @@ $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --with-lazydocker     $(msg "请求安装 lazydocker，不配置 Docker 服务或权限" "Install lazydocker (does not configure Docker daemon or permissions)")
   --with-lazygit        $(msg "请求安装 lazygit Git 终端管理面板" "Install lazygit Git TUI panel")
   --with-tmux           $(msg "请求安装并配置 tmux 终端复用器（含剪贴板互通与美化主题）" "Install and configure tmux terminal multiplexer (with clipboard & themes)")
+  --without-tmux|--no-tmux $(msg "显式跳过 tmux 及其配置（即使系统已安装 tmux 也不启用）" "Explicitly skip tmux and its configuration even if installed")
   --check-updates       $(msg "检测已安装的 Zsh 插件与常用应用是否有新版本" "Check if installed plugins and CLI tools have new updates")
   --update              $(msg "交互式升级已安装的 Zsh/Tmux 插件、主题与包管理器工具" "Interactively update installed plugins, themes, and CLI tools")
   --lang zh|en          $(msg "界面语言（zh 为中文，en 为英文）" "UI language (zh for Chinese, en for English)")
@@ -780,7 +781,7 @@ fi
 echo ""
 ask "$(msg '确认按以上计划安装并替换配置？' 'Confirm installation and replace configuration according to plan?')" || exit 0
 
-# 权限与基础核心依赖前置检测（幂等性与零冗余开销保障）
+# 权限与基础核心依赖前置检测（幂等性、按需提权与零冗余开销保障）
 base_missing=()
 if [[ "$FAMILY" == brew ]]; then
   command -v gtimeout >/dev/null 2>&1 || base_missing+=(coreutils)
@@ -792,10 +793,28 @@ else
   for _base_cmd in zsh git curl unzip tar file; do
     command -v "$_base_cmd" >/dev/null 2>&1 || base_missing+=("$_base_cmd")
   done
+
+  # 动态评估是否需要管理员提权（sudo）：
+  # 1. 存在缺失的基础核心包（base_missing > 0）
+  # 2. 用户选定完整工具链（PROFILE == full，后续需安装系统包）
+  # 3. 用户启用了 tmux 但系统中尚未安装 tmux
+  needs_elevation=0
   if ((${#base_missing[@]} > 0)); then
-    command -v sudo >/dev/null || die "$(msg '缺少 sudo，请先由管理员安装依赖' 'Missing sudo; please ask administrator to install dependencies')"
-    sudo -v
+    needs_elevation=1
+  elif [[ "$PROFILE" == full ]]; then
+    needs_elevation=1
+  elif ((WITH_TMUX)) && ! command -v tmux >/dev/null 2>&1; then
+    needs_elevation=1
+  fi
+
+  if ((needs_elevation)); then
+    # 若当前已是 root 用户（例如在 Docker 容器中直接执行），无需依赖 sudo
+    if [[ "${EUID:-$(id -u 2>/dev/null || echo 1)}" -ne 0 ]]; then
+      command -v sudo >/dev/null || die "$(msg '缺少 sudo，请先由管理员安装依赖' 'Missing sudo; please ask administrator to install dependencies')"
+      sudo -v
+    fi
   elif sudo -n true 2>/dev/null; then
+    # 纯配置模式且已有免密凭据时，顺带刷新，确保后续可选微调安全执行
     sudo -v 2>/dev/null || true
   fi
 fi
@@ -831,8 +850,8 @@ case "$FAMILY" in
   apt)
     if ((${#base_missing[@]} > 0)); then
       sudo apt-get update || true
-      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${base_missing[@]}" ncurses-term x11-utils 2>/dev/null || \
-      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${base_missing[@]}" ncurses-term
+      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${base_missing[@]}" ca-certificates ncurses-term x11-utils 2>/dev/null || \
+      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${base_missing[@]}" ca-certificates ncurses-term
     else
       success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed, skipping redundant apt install.")"
     fi
@@ -840,9 +859,9 @@ case "$FAMILY" in
   dnf)
     if ((${#base_missing[@]} > 0)); then
       if command -v dnf >/dev/null 2>&1; then
-        sudo dnf install -y "${base_missing[@]}"
+        sudo dnf install -y "${base_missing[@]}" ca-certificates
       else
-        sudo yum install -y "${base_missing[@]}"
+        sudo yum install -y "${base_missing[@]}" ca-certificates
       fi
     else
       success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed.")"
@@ -850,14 +869,14 @@ case "$FAMILY" in
     ;;
   pacman)
     if ((${#base_missing[@]} > 0)); then
-      sudo pacman -Syu --needed --noconfirm "${base_missing[@]}"
+      sudo pacman -Syu --needed --noconfirm "${base_missing[@]}" ca-certificates
     else
       success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed.")"
     fi
     ;;
   zypper)
     if ((${#base_missing[@]} > 0)); then
-      sudo zypper install -y "${base_missing[@]}"
+      sudo zypper install -y "${base_missing[@]}" ca-certificates
     else
       success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed.")"
     fi
@@ -942,7 +961,7 @@ optional_package() {
       ;;
     apt)
       # 预检软件包是否存在于 apt 缓存中，并强制非交互式防止 debconf 挂起
-      if (apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1) && sudo -n true 2>/dev/null; then
+      if apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1; then
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" && return 0
       fi
       ;;
@@ -1272,7 +1291,7 @@ if [[ "$PROFILE" == full ]]; then
       if [[ "$FAMILY" == apt ]]; then
         ff_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.deb"
         if curl -fsSL --connect-timeout 10 -m 60 "$ff_url" -o "$ff_stage/fastfetch.deb" 2>/dev/null; then
-          if sudo -n true 2>/dev/null && (sudo -n dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1 || (sudo -n apt-get install -fy >/dev/null 2>&1 && sudo -n dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1)); then
+          if sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1 || (sudo apt-get install -fy >/dev/null 2>&1 && sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1); then
             success "$(msg "fastfetch 安装成功 (deb 软件包)" "fastfetch installed successfully via deb")"
             remove_skipped fastfetch
           fi

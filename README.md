@@ -256,6 +256,7 @@ Choose one primary operation per invocation. See [Configuration management](CONF
 | `--p10k-wizard` | Alias for `--p10k-style wizard` |
 | `--with-latest-nvim` | Request an official Neovim release download for the non-Homebrew `full` profile; does not independently take effect in `basic` |
 | `--with-vfox` / `--with-lazydocker` / `--with-lazygit` / `--with-tmux` | Enable the corresponding optional tool |
+| `--without-tmux` / `--no-tmux` | Explicitly skip tmux and its configuration even if tmux is already installed on the system |
 | `--lang zh` / `--lang en` | Installer/update interface language; management scripts are currently primarily Chinese |
 | `--check-updates` | Check online and write the cache without upgrading software |
 | `--update` | Check, confirm, then update third-party components; Linux system packages still require manual upgrades |

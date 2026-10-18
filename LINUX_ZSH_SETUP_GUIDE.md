@@ -74,11 +74,12 @@ bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 
 `skip` 保留 `.p10k.zsh`；`rainbow`、`lean`、`classic` 会备份并替换个人主题。希望自定义可使用 `--p10k-wizard`。不要默认反复安装会保留所有开关，选项文件会根据本次选择重新生成。
 
-可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。在需要静默免确认执行时，可显式传入 `--yes`（或 `-y`），脚本将自动确认安装计划、跳过交互询问，并在安装完成时优雅退出（不阻塞等待 `exec zsh`）。
+可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`（或通过 `--without-tmux` / `--no-tmux` 显式跳过系统已装 tmux 的配置部署）。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。在需要静默免确认执行时，可显式传入 `--yes`（或 `-y`），脚本将自动确认安装计划、跳过交互询问，并在安装完成时优雅退出（不阻塞等待 `exec zsh`）。
 
 ### 严格幂等性与零重复保障 (Idempotency)
 
 安装器内部实现了严格的幂等性检查：
+- **核心依赖预检与按需提权**：当系统核心命令（`zsh git curl unzip tar file`）已全部就绪且无需安装额外系统包时，安装器实现纯用户态免 sudo 零冗余极速部署，不会重复触发系统包管理器与密码询问；若缺失组件则精准提示提权并自动补充 `ca-certificates` 等安全根证书；
 - **多别名智能识别**：对不同 Linux 发行版的别名（如 Debian 的 `fdfind` / `batcat`，Arch 的 `7zz`，Linux 的 `convert`，Wayland 的 `wl-copy` 等）均做了识别映射；
 - **拒绝重复调用**：只要系统中已安装相应工具，安装器**直接跳过**，绝不进行耗时的包管理器索引更新或重复事务；
 - **官方二进制安全降级**：若发行版官方仓库缺少对应包（如旧系统上的 eza、yazi、television、tre），安装器会自动从 GitHub Release 拉取对应架构的官方发布包，并验证可执行性后部署至 `~/.local/bin/`。

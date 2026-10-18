@@ -218,6 +218,7 @@ zsh-update
 | `--p10k-wizard` | `--p10k-style wizard` と同じ |
 | `--with-latest-nvim` | Homebrew を使わない `full` プロファイルで Neovim 公式リリースのダウンロードを要求。`basic` では単独で有効にならない |
 | `--with-vfox` / `--with-lazydocker` / `--with-lazygit` / `--with-tmux` | 対応する追加ツールを有効化 |
+| `--without-tmux` / `--no-tmux` | システムに tmux が導入済みであっても tmux とその設定の反映を明示的にスキップ |
 | `--lang zh` / `--lang en` | インストール・更新画面の言語。管理スクリプトは現在主に中国語 |
 | `--check-updates` | ネットワーク経由で確認してキャッシュへ書き込み。ソフトウェアの更新は行わない |
 | `--update` | 確認・同意後にサードパーティ製コンポーネントを更新。Linux のシステムパッケージは手動更新が必要 |

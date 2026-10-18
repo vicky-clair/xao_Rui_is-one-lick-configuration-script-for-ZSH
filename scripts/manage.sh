@@ -265,7 +265,8 @@ case "$ACTION" in
             version=$("$limiter" -k 1s 2s pdftoppm -v </dev/null 2>&1 || true)
             ;;
           yazi)
-            version=$(yazi -V 2>/dev/null || true)
+            # yazi 采用大写 -V 输出版本；通过 limiter 超时熔断与 </dev/null 隔离避免偶发挂起
+            version=$("$limiter" -k 1s 2s yazi -V </dev/null 2>&1 || true)
             ;;
           *)
             version=$("$limiter" -k 1s 2s "$tool" --version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -V </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -v </dev/null 2>&1 || true)

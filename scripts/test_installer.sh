@@ -23,7 +23,7 @@ for tool in curl wget git sudo brew; do
 done
 export PATH="$STAGE/bin:$PATH"
 cp "$ROOT/install.sh" "$STAGE/standalone/install.sh"
-for arg in '' --check-updates --update; do
+for arg in '' --check-updates --update --yes; do
   bash "$STAGE/standalone/install.sh" --dry-run --lang en ${arg:+"$arg"} > "$STAGE/dry.log"
 done
 [[ ! -e "$AUDIT_MARKER" && ! -e "$XDG_STATE_HOME" && ! -e "$XDG_CONFIG_HOME" ]] || fail 'dry run wrote state or invoked network'

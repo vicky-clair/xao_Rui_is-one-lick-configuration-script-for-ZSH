@@ -63,6 +63,7 @@ CHECK_UPDATES=0
 DO_UPDATE=0
 LANG_CHOICE="${ZSH_PROJECT_LANG:-zh}"
 LANG_SET=0
+ASSUME_YES=0
 BACKUP=''
 ROLLBACK=''
 SKIPPED=()
@@ -99,9 +100,9 @@ $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --retry-failed [TOOL] 重试失败组件，不重新部署配置
   --list-backups        列出安装与配置管理备份
   --diff-backup DIR     比较备份与当前配置
-  --restore-backup DIR  按 --scope zsh|tmux|all 恢复（默认 zsh）
+  --yes|-y              $(msg "非交互模式，对所有询问默认确认（适用自动化脚本与 CI）" "Assume yes for all prompts / non-interactive mode")
   --help|-h             $(msg "显示帮助" "Show help")
-$(msg "实际安装必须在交互终端确认，不提供无人值守默认授权。" "Actual installation must be confirmed interactively.")
+$(msg "实际安装必须在交互终端确认，或显式传入 --yes 参数。" "Actual installation must be confirmed interactively or via --yes.")
 EOF
 }
 
@@ -135,6 +136,10 @@ read_key() {
 
 ask() {
   local prompt=$1
+  if ((ASSUME_YES)); then
+    printf '%s [y/N] y\n' "$prompt"
+    return 0
+  fi
   printf '%s [y/N] ' "$prompt"
   local ans
   ans="$(read_key)"
@@ -205,6 +210,7 @@ install_nvim_tree() {
 while (($#)); do
   case "$1" in
     --dry-run) DRY_RUN=1 ;;
+    --yes|-y) ASSUME_YES=1 ;;
     --profile) (($# >= 2)) || die "$(msg '--profile 缺少值' '--profile requires value')"; PROFILE=$2; PROFILE_SET=1; shift ;;
     --p10k-style)
       (($# >= 2)) || die "$(msg '--p10k-style 缺少参数 (rainbow|lean|classic|wizard|skip)' '--p10k-style requires value (rainbow|lean|classic|wizard|skip)')"
@@ -256,7 +262,7 @@ fi
 [[ ! -e "${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project/disabled" || $CHECK_UPDATES == 1 || $DO_UPDATE == 1 ]] || die '项目配置已停用；请先 --enable，再重新安装或回退。'
 
 # 交互式语言选择菜单（若未通过命令行显式指定 --lang，按键即响应）
-if ((!DRY_RUN)) && [[ -t 0 ]] && ((!LANG_SET)) && [[ -z "$ROLLBACK" ]]; then
+if ((!DRY_RUN)) && [[ -t 0 ]] && ((!LANG_SET)) && ((!ASSUME_YES)) && [[ -z "$ROLLBACK" ]]; then
   printf '\n\033[1;36m🌐 Please select language / 请选择界面语言:\033[0m\n'
   printf '  1) 简体中文 (Chinese) [默认]\n'
   printf '  2) English\n'
@@ -658,33 +664,42 @@ fi
 
 # 6. 收集用户选项
 if ((!DRY_RUN)); then
-  [[ -t 0 ]] || die "$(msg '安装需要交互终端；查看计划请用 --dry-run' 'Installation requires interactive terminal; use --dry-run to view plan')"
+  [[ -t 0 ]] || ((ASSUME_YES)) || die "$(msg '安装需要交互终端；查看计划请用 --dry-run，自动化测试请用 --yes' 'Installation requires interactive terminal; use --dry-run to view plan or --yes for non-interactive') "
   if ((!PROFILE_SET)); then
-    if ask "$(msg '是否选择完整工具集？选 N 安装基础主题、补全、高亮和建议' 'Install full CLI toolchain? Select N for basic theme, completions, and suggestions')"; then PROFILE=full; fi
+    if ((ASSUME_YES)); then
+      # 显式非交互模式且未指定 profile 时，默认保持 basic
+      :
+    elif ask "$(msg '是否选择完整工具集？选 N 安装基础主题、补全、高亮和建议' 'Install full CLI toolchain? Select N for basic theme, completions, and suggestions')"; then
+      PROFILE=full
+    fi
   fi
   if ((!P10K_STYLE_SET)); then
-    printf '\n\033[1;36m🎨 %s:\033[0m\n' \
-      "$(msg '请选择 Powerlevel10k 终端主题配置方式' 'Select Powerlevel10k Prompt Configuration')"
-    printf '  1) %s\n' "$(msg '经典彩虹高颜值主题 (Rainbow) [默认推荐，开箱即用]' 'Classic Rainbow Theme [Recommended, ready-to-use]')"
-    printf '  2) %s\n' "$(msg '现代极简纯净主题 (Lean) [简约清爽]' 'Lean Pure Theme [Minimalist & clean]')"
-    printf '  3) %s\n' "$(msg '经典传统流线主题 (Classic) [传统箭头]' 'Classic Flow Theme [Traditional arrows]')"
-    printf '  4) %s\n' "$(msg '安装完成后启动官方配置向导 (p10k configure) [自由定制]' 'Interactive Setup Wizard (p10k configure) [Full customization]')"
-    printf '  5) %s\n' "$(msg '保持现有配置 / 暂不生成 ~/.p10k.zsh (Skip)' 'Keep existing ~/.p10k.zsh / Skip for now')"
-    printf '%s [1/2/3/4/5]: ' "$(msg '请按键选择' 'Enter choice')"
-    _p_key="$(read_key)"
-    case "$_p_key" in
-      2) echo "2"; P10K_STYLE="lean" ;;
-      3) echo "3"; P10K_STYLE="classic" ;;
-      4) echo "4"; P10K_STYLE="wizard" ;;
-      5) echo "5"; P10K_STYLE="skip" ;;
-      q|Q) echo "q"; info "$(msg "用户已中止操作。" "Operation aborted by user.")"; exit 0 ;;
-      *) echo "1"; P10K_STYLE="rainbow" ;;
-    esac
+    if ((ASSUME_YES)); then
+      P10K_STYLE="rainbow"
+    else
+      printf '\n\033[1;36m🎨 %s:\033[0m\n' \
+        "$(msg '请选择 Powerlevel10k 终端主题配置方式' 'Select Powerlevel10k Prompt Configuration')"
+      printf '  1) %s\n' "$(msg '经典彩虹高颜值主题 (Rainbow) [默认推荐，开箱即用]' 'Classic Rainbow Theme [Recommended, ready-to-use]')"
+      printf '  2) %s\n' "$(msg '现代极简纯净主题 (Lean) [简约清爽]' 'Lean Pure Theme [Minimalist & clean]')"
+      printf '  3) %s\n' "$(msg '经典传统流线主题 (Classic) [传统箭头]' 'Classic Flow Theme [Traditional arrows]')"
+      printf '  4) %s\n' "$(msg '安装完成后启动官方配置向导 (p10k configure) [自由定制]' 'Interactive Setup Wizard (p10k configure) [Full customization]')"
+      printf '  5) %s\n' "$(msg '保持现有配置 / 暂不生成 ~/.p10k.zsh (Skip)' 'Keep existing ~/.p10k.zsh / Skip for now')"
+      printf '%s [1/2/3/4/5]: ' "$(msg '请按键选择' 'Enter choice')"
+      _p_key="$(read_key)"
+      case "$_p_key" in
+        2) echo "2"; P10K_STYLE="lean" ;;
+        3) echo "3"; P10K_STYLE="classic" ;;
+        4) echo "4"; P10K_STYLE="wizard" ;;
+        5) echo "5"; P10K_STYLE="skip" ;;
+        q|Q) echo "q"; info "$(msg "用户已中止操作。" "Operation aborted by user.")"; exit 0 ;;
+        *) echo "1"; P10K_STYLE="rainbow" ;;
+      esac
+    fi
   fi
-  ((WITH_VFOX)) || { if command -v vfox >/dev/null 2>&1; then WITH_VFOX=1; elif ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
-  ((WITH_LAZYDOCKER)) || { if command -v lazydocker >/dev/null 2>&1; then WITH_LAZYDOCKER=1; elif ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
-  ((WITH_LAZYGIT)) || { if command -v lazygit >/dev/null 2>&1; then WITH_LAZYGIT=1; elif ask "$(msg '是否安装 lazygit Git 终端管理面板？' 'Install lazygit Git TUI panel?')"; then WITH_LAZYGIT=1; fi; }
-  ((WITH_TMUX)) || { if command -v tmux >/dev/null 2>&1; then WITH_TMUX=1; elif ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
+  ((WITH_VFOX)) || { if command -v vfox >/dev/null 2>&1; then WITH_VFOX=1; elif ((!ASSUME_YES)) && ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
+  ((WITH_LAZYDOCKER)) || { if command -v lazydocker >/dev/null 2>&1; then WITH_LAZYDOCKER=1; elif ((!ASSUME_YES)) && ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
+  ((WITH_LAZYGIT)) || { if command -v lazygit >/dev/null 2>&1; then WITH_LAZYGIT=1; elif ((!ASSUME_YES)) && ask "$(msg '是否安装 lazygit Git 终端管理面板？' 'Install lazygit Git TUI panel?')"; then WITH_LAZYGIT=1; fi; }
+  ((WITH_TMUX)) || { if command -v tmux >/dev/null 2>&1; then WITH_TMUX=1; elif ((!ASSUME_YES)) && ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
 fi
 
 # 选项收集完成后生成同一份清单，供检查、备份、部署校验和回退使用。
@@ -772,8 +787,8 @@ case "$FAMILY" in
     ;;
   apt)
     sudo apt-get update || true
-    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term x11-utils 2>/dev/null || \
-    sudo apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term x11-utils 2>/dev/null || \
+    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term
     ;;
   dnf)
     if command -v dnf >/dev/null 2>&1; then
@@ -849,7 +864,7 @@ optional_package() {
       ;;
     apt)
       if apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1; then
-        sudo apt-get install -y "$pkg" && return 0
+        sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" && return 0
       fi
       ;;
     dnf)
@@ -1566,7 +1581,7 @@ esac
 current_shell="${SHELL:-}"
 if [[ "$current_shell" == *zsh ]]; then
   info "$(msg "当前默认 Shell 已经是 Zsh ($current_shell)，无需修改。" "Current default shell is already Zsh ($current_shell); no change needed.")"
-elif ask "$(msg '是否将 Zsh 设为当前用户的默认登录 Shell？' 'Set Zsh as default login shell for current user?') "; then
+elif ((!ASSUME_YES)) && ask "$(msg '是否将 Zsh 设为当前用户的默认登录 Shell？' 'Set Zsh as default login shell for current user?') "; then
   zsh_bin=$(command -v zsh)
   if ! grep -Fxq "$zsh_bin" /etc/shells; then
     warn "$(msg "路径 $zsh_bin 不在 /etc/shells 列表中，正在请求权限添加..." "$zsh_bin not in /etc/shells, requesting permission to add...")"
@@ -1607,7 +1622,7 @@ if [[ "$P10K_STYLE" == wizard ]] && [[ -t 0 ]] && command -v zsh >/dev/null 2>&1
     fi
   done
 fi
-if [[ -t 0 ]] && command -v zsh >/dev/null 2>&1; then
+if [[ -t 0 ]] && ((!ASSUME_YES)) && command -v zsh >/dev/null 2>&1; then
   echo ""
   if ask "$(msg '是否现在立即进入全新的 Zsh 交互环境？' 'Start fresh Zsh session now?')"; then
     printf '\n\033[1;32m%s\033[0m\n' "$(msg '🚀 正在启动全新 Zsh 交互环境...' '🚀 Starting fresh Zsh environment...')"

@@ -21,11 +21,11 @@ jobs:
         shell: bash
         run: |
           if command -v apt-get >/dev/null; then
-            apt-get update && apt-get install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux bsdutils
+            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux bsdutils sudo curl file procps
           elif command -v dnf >/dev/null; then
-            dnf install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux
+            dnf install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux sudo curl file procps-ng
           else
-            pacman -Syu --noconfirm bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux
+            pacman -Syu --noconfirm bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux sudo curl file procps-ng
           fi
       - uses: actions/checkout@v4
       - name: Installer regression (mocked downloads and system changes)
@@ -34,3 +34,19 @@ jobs:
       - name: Configuration management regression
         shell: bash
         run: bash scripts/test_management.sh
+      - name: Live installation, idempotency, and health check
+        shell: bash
+        run: |
+          useradd -m -s /bin/bash testuser || true
+          mkdir -p /etc/sudoers.d
+          echo "testuser ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/testuser
+          chmod 0440 /etc/sudoers.d/testuser
+          # 模拟生产环境标准部署目录 ~/.zsh-project
+          cp -a "$GITHUB_WORKSPACE" /home/testuser/.zsh-project
+          chown -R testuser:testuser /home/testuser/.zsh-project
+          # 1. 首次全新安装测试（完整工具链 + 彩虹主题 + 自动化 --yes）
+          su - testuser -c "cd ~/.zsh-project && bash install.sh --profile full --p10k-style rainbow --lang zh --yes"
+          # 2. 第二次运行：严格验证幂等性（已有软件和依赖绝不重复安装，退出码为 0）
+          su - testuser -c "cd ~/.zsh-project && bash install.sh --profile full --p10k-style rainbow --lang zh --yes"
+          # 3. 运行环境体检
+          su - testuser -c "cd ~/.zsh-project && bash scripts/manage.sh --doctor"

@@ -356,7 +356,8 @@ fi
 # ========================================
 if [[ ${ZSH_PROJECT_TRE:-1} == 1 ]] && command -v tre &>/dev/null; then
   tre() {
-    command tre "$@" -e && [[ -f "/tmp/tre_aliases_$USER" ]] && source "/tmp/tre_aliases_$USER" 2>/dev/null
+    local _tre_alias="/tmp/tre_aliases_$USER"
+    command tre "$@" -e && [[ -f "$_tre_alias" && -O "$_tre_alias" && ! -L "$_tre_alias" ]] && source "$_tre_alias" 2>/dev/null
   }
   _zsh_startup_msg "%F{green}✓%f %F{cyan}tre%f 现代化目录树已集成 (命令: %F{yellow}tre%f, 支持 %F{yellow}-e%f 编号跳转)" "%F{green}✓%f %F{cyan}tre%f modern directory tree integrated (cmd: %F{yellow}tre%f, supports %F{yellow}-e%f editor jump)"
 fi
@@ -383,8 +384,13 @@ setopt hist_reduce_blanks
 unsetopt inc_append_history inc_append_history_time
 
 # 保持前缀历史搜索
-bindkey '^[[A' history-search-backward 2>/dev/null || true
-bindkey '^[[B' history-search-forward 2>/dev/null || true
+if (( ${+widgets[history-substring-search-up]} )); then
+  bindkey '^[[A' history-substring-search-up 2>/dev/null || true
+  bindkey '^[[B' history-substring-search-down 2>/dev/null || true
+else
+  bindkey '^[[A' history-search-backward 2>/dev/null || true
+  bindkey '^[[B' history-search-forward 2>/dev/null || true
+fi
 
 # ========================================
 # 14. 命令别名与工具集成
@@ -557,6 +563,7 @@ if [[ -o interactive ]]; then
     _elapsed_str_en=" %F{green}(took %F{yellow}${_elapsed}ms%F{green})%f"
   fi
   _zsh_startup_msg "\n%F{blue}========================================%f\n%F{green}✅ ZSH 环境加载完成！${_elapsed_str_zh}%f\n%F{blue}========================================%f\n" "\n%F{blue}========================================%f\n%F{green}✅ ZSH environment loaded successfully!${_elapsed_str_en}%f\n%F{blue}========================================%f\n"
+  unset _elapsed_str_zh _elapsed_str_en _elapsed
 fi
 
 typeset -g POWERLEVEL9K_INSTANT_PROMPT=off

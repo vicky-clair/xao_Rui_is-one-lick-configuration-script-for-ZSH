@@ -164,6 +164,7 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | `--p10k-wizard` | 等同于 `--p10k-style wizard` |
 | `--with-latest-nvim` | 在 `full` 且非 Homebrew 分支请求下载 Neovim 官方 Release；不在 `basic` 中独立生效 |
 | `--with-vfox` / `--with-lazydocker` / `--with-lazygit` / `--with-tmux` | 启用对应可选组件 |
+| `--without-tmux` / `--no-tmux` | 显式跳过 tmux 及其配置（即使系统已安装 tmux 也不启用） |
 | `--lang zh` / `--lang en` | 安装、更新界面语言；管理脚本当前主要为中文 |
 | `--check-updates` | 检测更新，联网并写缓存，不升级软件 |
 | `--update` | 检测、确认后更新第三方组件；Linux 系统包仍需手动升级 |

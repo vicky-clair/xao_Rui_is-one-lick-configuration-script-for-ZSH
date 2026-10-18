@@ -39,6 +39,31 @@
 - **更新维护**：启动时展示本地缓存，达到间隔后启动后台检测；升级通过单独命令确认执行。
 - **配置备份**：受管文件保存原内容、原存在状态和操作后哈希，恢复时检查后续修改。
 
+### Yazi 终端文件管理器与多媒体预览套件
+
+[Yazi](https://github.com/sxyazi/yazi) 是一款基于 Rust 开发的高性能异步终端文件管理器。在 `full` 完整配置下，安装器会自动安装并集成 Yazi 及其官方多媒体预览依赖套件：
+
+| 伴生工具 | 对应软件包/Formula | 在 Yazi 中的核心功能 |
+| :--- | :--- | :--- |
+| **ripgrep** (`rg`) | `ripgrep` | 毫秒级文本与文件内容实时搜索 (`search` / `find`) |
+| **fzf** (>= 0.53.0) | `fzf` | 交互式子目录快速过滤与模糊跳转 |
+| **zoxide** | `zoxide` | 基于历史频次的高效目录智能跳转 |
+| **jq** | `jq` | JSON 数据结构化解析与高亮预览 |
+| **ffmpeg** | `ffmpeg` / `ffmpeg-full` | 视频文件首帧缩略图提取与音频元信息抽取 |
+| **7-Zip** | `7zip` / `sevenzip` / `p7zip` | 压缩包 (zip/tar/7z/rar) 内容提取与目录树预览 |
+| **poppler** | `poppler-utils` / `poppler` | PDF 文档高分辨率矢量封面抽取与预览 (`pdftoppm`) |
+| **ImageMagick** | `imagemagick` / `ImageMagick` | 字体文件预览、苹果 HEIC 格式照片及 JPEG XL 高级图像格式 |
+| **resvg** | `resvg` | SVG 矢量图形终端栅格化预览 |
+| **xclip** / **wl-clipboard** | `xclip` / `wl-clipboard` | 系统剪贴板双向同步互通 (X11 与 Wayland 全支持) |
+| **Nerd Fonts** | `Symbols Nerd Font` | 文件与目录类型图标、Powerlevel10k 状态提示符符号 |
+
+### 严格幂等性与零重复保障 (Zero-Duplicate)
+
+安装脚本具备严格的**幂等性 (Idempotency)** 设计：
+- **多别名智能检测**：在调用系统包管理器前，先检测系统是否已有目标命令或其发行版等价别名（如 Debian/Ubuntu 下的 `fdfind` 代表 `fd`、`batcat` 代表 `bat`；Arch 下的 `7zz` 代表 `7z`；Linux 下的 `convert` 代表 `magick`；Wayland 下的 `wl-copy` 代表剪贴板工具）。
+- **零冗余开销**：如果对应命令已存在，安装器将**立即直接跳过**，绝不进行耗时的包管理器网络检索或加锁事务，确保反复运行绝不产生多余开销。
+- **优雅官方降级**：若系统发行版仓库确实未收录某个软件，安装器会自动从 GitHub 官方 Release 下载架构匹配的独立预编译二进制，校验后部署至 `~/.local/bin/`。
+
 ### 平台与依赖
 
 | 平台或组件 | 当前实现与边界 |
@@ -82,9 +107,12 @@ bash install.sh --profile full --p10k-style rainbow --lang zh
 
 # 或：完整工具集、tmux 与主题向导
 bash install.sh --profile full --with-tmux --p10k-wizard --lang zh
+
+# 或：全自动无人值守安装（适用于 CI/CD 自动化构建、Docker 容器或脚本一键部署）
+bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 ```
 
-以上是三种选择，不需要依次执行。安装前会显示计划并确认；是否修改默认登录 Shell、是否进入新 Zsh 会话会另外询问。检测到已安装的 vfox、lazydocker、lazygit 或 tmux 时会自动纳入安装选项，因此即使选择 `basic`，也要检查最终计划，尤其是 `.tmux.conf` 是否将被替换。
+以上是几种选择，不需要依次执行。交互模式下安装前会显示计划并确认（传入 `--yes` 或 `-y` 时默认全部自动确认）；是否修改默认登录 Shell、是否进入新 Zsh 会话会另外询问。检测到已安装的 vfox、lazydocker、lazygit 或 tmux 时会自动纳入安装选项，因此即使选择 `basic`，也要检查最终计划，尤其是 `.tmux.conf` 是否将被替换。
 
 安装器部署的是 **`templates/zshrc.zsh`**。根目录 `.zshrc` 是行为不同的参考配置，不要把直接复制它当作等价的安装或升级步骤。个人别名通常放入 `~/.zshrc.local`。
 
@@ -134,7 +162,7 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | `--retry-failed [TOOL]` | 重试失败清单或指定组件 |
 | `--list-backups` / `--diff-backup DIR` | 查看备份或差异 |
 | `--restore-backup DIR --scope zsh` | 按范围恢复；范围可为 `zsh`、`tmux`、`all` |
-| `--yes` | 仅管理与重试入口接受，显式跳过确认；普通安装/更新/回退不接受 |
+| `--yes` / `-y` | 全自动免交互确认模式；支持常规安装、CI/CD 自动化构建、管理与重试命令全部静默放行 |
 
 主题还支持 `--p10k-rainbow`、`--p10k-lean`、`--p10k-classic`、`--p10k-skip` 简写。
 
@@ -205,7 +233,6 @@ bash install.sh --rollback /实际安装备份目录
 使用前还需了解：
 
 - 安装器不支持自定义 `ZDOTDIR`，受管文件为符号链接或目录时拒绝自动替换。
-- 主安装器的 lazydocker 下载回退仍使用不含版本号的资产名，失败后可尝试 `--retry-failed lazydocker` 的版本化下载入口。
 - `failed-components` 是跳过包的记录，不是所有安装步骤和插件的完整健康报告；TPM 插件安装失败可能被忽略。
 - `--update` 没有统一配置快照或完整事务回退，TPM 和 FZF 的行为也不能概括为全部受本地修改保护。
 - 安装日志位于备份目录；安装失败时备份可能尚未生成完整哈希，不保证可直接自动回退。

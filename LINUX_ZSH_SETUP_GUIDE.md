@@ -61,19 +61,27 @@ bash install.sh --dry-run --profile basic --p10k-style skip --lang zh
 
 逐条检查结果；`SKIP` 不算通过，遇到 FAIL 先停止真实部署。
 
-选择基础或完整模式之一：
-
 ```bash
+# 基础配置
 bash install.sh --profile basic --p10k-style skip --lang zh
-```
 
-```bash
+# 完整工具集与彩虹主题（交互模式）
 bash install.sh --profile full --p10k-style rainbow --lang zh
+
+# 全自动无人值守安装（非交互模式，适用 CI/CD、Docker、云服务器自动化构建）
+bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 ```
 
 `skip` 保留 `.p10k.zsh`；`rainbow`、`lean`、`classic` 会备份并替换个人主题。希望自定义可使用 `--p10k-wizard`。不要默认反复安装会保留所有开关，选项文件会根据本次选择重新生成。
 
-可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。普通安装要求交互，不支持用 `--yes` 跳过。
+可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。在需要静默免确认执行时，可显式传入 `--yes`（或 `-y`），脚本将自动确认安装计划、跳过交互询问，并在安装完成时优雅退出（不阻塞等待 `exec zsh`）。
+
+### 严格幂等性与零重复保障 (Idempotency)
+
+安装器内部实现了严格的幂等性检查：
+- **多别名智能识别**：对不同 Linux 发行版的别名（如 Debian 的 `fdfind` / `batcat`，Arch 的 `7zz`，Linux 的 `convert`，Wayland 的 `wl-copy` 等）均做了识别映射；
+- **拒绝重复调用**：只要系统中已安装相应工具，安装器**直接跳过**，绝不进行耗时的包管理器索引更新或重复事务；
+- **官方二进制安全降级**：若发行版官方仓库缺少对应包（如旧系统上的 eza、yazi、television、tre），安装器会自动从 GitHub Release 拉取对应架构的官方发布包，并验证可执行性后部署至 `~/.local/bin/`。
 
 安装完成后记录备份目录。选择进入新会话前仍应检查报错与跳过包；“配置安装完成”不代表每个可选组件都安装成功。
 

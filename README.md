@@ -66,14 +66,17 @@ Run **one** of these options:
 # Essential shell setup; preserve your existing personal theme
 bash install.sh --profile basic --p10k-style skip --lang en
 
-# Full toolset with the Rainbow prompt
+# Full toolset with the Rainbow prompt (Interactive)
 bash install.sh --profile full --p10k-style rainbow --lang en
 
 # Full toolset, tmux, and the interactive prompt wizard
 bash install.sh --profile full --with-tmux --p10k-wizard --lang en
+
+# Automated unattended installation (Non-interactive mode for CI/CD, Docker, or scripts)
+bash install.sh --profile full --p10k-style rainbow --yes --lang en
 ```
 
-The installer shows a plan and asks for confirmation. Changing your login shell and opening a new Zsh session have separate prompts. Existing vfox, lazydocker, lazygit, or tmux installations are automatically included in the selected options, so review the final plan even with `basic`, especially whether `.tmux.conf` will be replaced.
+The installer shows a plan and asks for confirmation (automatically accepted when `--yes` or `-y` is passed). Changing your login shell and opening a new Zsh session have separate prompts in interactive mode. Existing vfox, lazydocker, lazygit, or tmux installations are automatically included in the selected options, so review the final plan even with `basic`, especially whether `.tmux.conf` will be replaced.
 
 > **Configuration source:** the installer deploys [`templates/zshrc.zsh`](templates/zshrc.zsh). The root `.zshrc` is a separate reference with different behavior. Put personal aliases in `~/.zshrc.local`.
 
@@ -116,6 +119,31 @@ If Git cloning fails and the raw-file fallback is used, it downloads only the Zs
 | **Configuration** | Feature switches, read-only health checks, explicit startup diagnostics, disable/enable, and failed-component retries |
 | **Updates** | Cached notices at startup, background checks when due, and a separate confirmed update command |
 | **Backups** | Original contents, original existence state, and post-operation hashes for managed files; restore checks for later edits |
+
+### Yazi & Multimedia Preview Companion Suite
+
+[Yazi](https://github.com/sxyazi/yazi) is an ultra-fast, asynchronous terminal file manager written in Rust. In the `full` profile, the installer sets up Yazi along with its official companion dependencies to unlock full multimedia and search features:
+
+| Tool | Package / Formula | Purpose in Yazi |
+| :--- | :--- | :--- |
+| **ripgrep** (`rg`) | `ripgrep` | File content searching (`search` / `find`) |
+| **fzf** (>= 0.53.0) | `fzf` | Interactive subtree directory filtering and fuzzy jumps |
+| **zoxide** | `zoxide` | Historical directory navigation and quick jumps |
+| **jq** | `jq` | JSON file inspection and formatted preview |
+| **ffmpeg** | `ffmpeg` / `ffmpeg-full` | Video thumbnail extraction and audio metadata preview |
+| **7-Zip** | `7zip` / `sevenzip` / `p7zip` | Archive file extraction, content listing, and tree structure preview |
+| **poppler** | `poppler-utils` / `poppler` | High-resolution PDF document cover/page rendering (`pdftoppm`) |
+| **ImageMagick** | `imagemagick` / `ImageMagick` | Font glyph previews, Apple HEIC photos, and JPEG XL image preview |
+| **resvg** | `resvg` | SVG vector graphics terminal rasterization |
+| **xclip** / **wl-clipboard** | `xclip` / `wl-clipboard` | Seamless system clipboard integration (X11 & Wayland) |
+| **Nerd Fonts** | `Symbols Nerd Font` | Filetype glyphs, directory icons, and Powerlevel10k status icons |
+
+### Idempotency & Zero-Duplicate Guarantees
+
+The installer enforces strict **Idempotency**:
+- **Multi-alias awareness**: checks distribution aliases (e.g., `fdfind` for `fd`, `batcat` for `bat`, `7zz` for `7z`, `convert` for `magick`, `wl-copy`/`xclip` for clipboard) before attempting any package installation.
+- **Zero redundant work**: if a software package or compatible binary is already installed on the system, the installer skips it immediately. It avoids invoking package manager network indexes or locks unnecessarily.
+- **Graceful fallback**: if a tool is not available in the distribution's package repositories, the installer automatically downloads and verifies the official upstream binary release into `~/.local/bin/`.
 
 ### Platforms & requirements
 
@@ -226,7 +254,7 @@ Choose one primary operation per invocation. See [Configuration management](CONF
 | `--retry-failed [TOOL]` | Retry the failed-component list or one specified tool |
 | `--list-backups` / `--diff-backup DIR` | List backups or inspect differences |
 | `--restore-backup DIR --scope zsh` | Restore a selected scope: `zsh`, `tmux`, or `all` |
-| `--yes` | Explicitly skip confirmation for management/retry entry points only; ordinary install/update/rollback do not accept it |
+| `--yes` / `-y` | Assume yes for all prompts; enables non-interactive, unattended installation (CI/CD, Docker, scripts) and management operations |
 
 Theme shortcuts are also available: `--p10k-rainbow`, `--p10k-lean`, `--p10k-classic`, and `--p10k-skip`.
 
@@ -246,7 +274,6 @@ Replace the example path with the `install-XXXXXXXX` backup directory printed du
 <summary><strong>Known limitations</strong></summary>
 
 - Custom `ZDOTDIR` is unsupported. The installer refuses automatic replacement when a managed file is a symlink or directory.
-- The main installer's lazydocker download fallback still uses an unversioned asset name. If it fails, try the versioned download path provided by `--retry-failed lazydocker`.
 - `failed-components` records skipped packages; it is not a complete health report for all installation steps and plugins. TPM plugin installation failures may be ignored.
 - `--update` has no unified configuration snapshot or complete transactional rollback. TPM and FZF operations are not universally protected against local changes.
 - Installation logs live in the backup directory. A failed installation may leave incomplete backup hashes, so automatic rollback is not guaranteed.

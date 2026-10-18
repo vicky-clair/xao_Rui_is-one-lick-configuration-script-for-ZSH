@@ -250,6 +250,10 @@ case "$ACTION" in
       for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch tv tre agrep rg jq ffmpeg 7z pdftoppm magick resvg; do
         command -v "$tool" >/dev/null || continue
         version=""
+        # 查询各命令行工具版本：不同工具对版本参数有严格要求
+        # - ffmpeg: 必须使用单短横线 `-version`（使用 `--version` 会报错）
+        # - 7z/7zz: 不支持 `--version`（会以退出码 7 失败），且 `-v` 是分卷压缩参数；查看版本输出最安全的是帮助参数 `-h`
+        # - pdftoppm: Poppler 工具集只接受 `-v`（传入 `--version` 会被当做未知选项）
         case "$tool" in
           ffmpeg)
             version=$("$limiter" -k 1s 2s ffmpeg -version 2>&1 || true)

@@ -86,7 +86,20 @@ has_nerd_font() {
   return 1
 }
 
-# 按实际命令判断可用性；ncurses-term 是终端数据包，交由包管理器确认。
+# ==============================================================================
+# 命令可用性与别名存在性检测函数 (Availability Check)
+# ==============================================================================
+# 遵循幂等性：若系统中已有可用命令或其发行版等价别名，返回 0 跳过重复安装
+# - neovim -> nvim
+# - wl-clipboard -> wl-copy
+# - ripgrep -> rg
+# - poppler -> pdftoppm (PDF 渲染器)
+# - 7zip -> 7z 或 7zz
+# - imagemagick -> magick 或 convert
+# - font-symbols-only-nerd-font -> has_nerd_font 字体库与字体目录扫描
+# - fd -> fd 或 fdfind
+# - bat -> bat 或 batcat
+# - xclip/wl-clipboard -> 只要系统中具备任一有效剪贴板后端 (wl-copy, xclip, xsel) 即判为满足
 available() {
   local component=$1 cmd=$1
   case "$component" in

@@ -75,6 +75,12 @@ fi
 UPDATES=()
 ALL_CHECKED=()
 
+# ==============================================================================
+# Git 仓库提交滞后检测函数 (Git Repo Update Checker)
+# ==============================================================================
+# 1. 自动定位当前追踪的远端分支（@{u}、origin/main 或 origin/master）；
+# 2. 严格受限超时拉取 (git fetch origin)，网络不通时迅速降级，绝不卡死终端；
+# 3. 计算 HEAD..$upstream 提交差额 (behind count)，精准判断是否有新版本发布。
 check_git_repo() {
   local name=$1 dir=$2
   [[ -d "$dir/.git" ]] || return 0

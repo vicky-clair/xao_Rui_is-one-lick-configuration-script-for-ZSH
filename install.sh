@@ -165,7 +165,22 @@ calc_sha256() {
   fi
 }
 
-# 安装新 Neovim 前验证完整目录；切换失败恢复旧目录与链接，不删除旧版本。
+# ==============================================================================
+# Neovim 独立目录原子替换函数 (Atomic Directory Swap)
+# ==============================================================================
+# 设计背景与安全保障机制：
+# 1. 为什么需要整树原子交换：
+#    Neovim 官方发布包包含 bin/、lib/、share/nvim/runtime 等完整目录树。
+#    直接解压覆盖容易由于旧动态库、旧 Lua 运行时残留造成段错误 (Segmentation Fault)。
+# 2. 隔离与前置功能自测：
+#    新版本先解压到临时目录 $stage/new 中，直接执行 "$stage/new/bin/nvim --version" 校验；
+#    只有可执行文件能够正常启动并返回 0，才允许执行后续的目录替换。
+# 3. 失败零破坏原子回退：
+#    使用 mv 进行原子重命名。若任何一步发生异常，立刻把原目录和原软链接还原，
+#    绝不删除旧版本，并将排查信息保存在 $stage 中。
+# 4. 软链接覆盖陷阱防护：
+#    若目标链接已存在且指向目录，直接 `mv new_link old_link` 会错误地把新链接移动进该目录；
+#    因此必须先将原链接移至 $stage/displaced-link，再把新链接原子移至目标位置。
 install_nvim_tree() {
   local source_dir=$1 stage target link old=0 had_link=0
   target="$HOME/.local/opt/nvim"
@@ -522,7 +537,16 @@ esac
 [[ -z "${ZDOTDIR:-}" || "$ZDOTDIR" == "$HOME" ]] || die "$(msg '检测到自定义 ZDOTDIR，请先手动适配；安装器不会覆盖其它配置目录' 'Custom ZDOTDIR detected; installer will not overwrite other directories')"
 [[ "$HOME" == /* && -d "$HOME" ]] || die "$(msg 'HOME 不是有效目录' 'HOME is not a valid directory')"
 
-# 4. 配置回退恢复逻辑
+# ==============================================================================
+# 4. 配置回退恢复逻辑 (Rollback & Restore)
+# ==============================================================================
+# 设计原则与防御性检查：
+# 1. 归属权校验：读取 manifest 文件，确保备份目录属于当前 $HOME，严防多用户/跨系统误操作；
+# 2. 状态与哈希双重比对：
+#    对受管文件（.zshrc、.zsh-project-options、.p10k.zsh、.tmux.conf）校验其 .state（present/absent）
+#    以及 .sha256 哈希值。如果安装后用户又手动修改了配置，哈希比对会识别出变动并主动拒绝恢复，
+#    避免粗暴覆盖用户的最新修改；
+# 3. 字节码失效清理：恢复配置后立即清理残留的 .zwc 编译文件，防止 Zsh 运行时继续执行旧配置。
 restore() {
   local dir=$1 file expected actual
   [[ -d "$dir" && ! -L "$dir" && -f "$dir/manifest" ]] || die "$(msg '备份目录或清单不存在' 'Backup directory or manifest does not exist')"
@@ -562,10 +586,19 @@ if [[ -n "$ROLLBACK" ]]; then
   exit 0
 fi
 
-# 5. 包管理器识别与适配
+# ==============================================================================
+# 5. 包管理器自动识别与适配 (Package Manager Detection)
+# ==============================================================================
+# 兼容 macOS 及各大主流 Linux 发行版体系：
+# - macOS: 优先检测系统已有 brew，自动映射 Apple Silicon (/opt/homebrew) 与 Intel (/usr/local)；
+# - Linux: 读取 /etc/os-release，映射至四大包管理器家族：
+#   * apt: Debian, Ubuntu, Linux Mint, Kali Linux, Pop!_OS, Deepin, UOS, Kylin 等
+#   * dnf/yum: Fedora, Red Hat Enterprise Linux, CentOS, Rocky Linux, AlmaLinux, Amazon Linux 等
+#   * pacman: Arch Linux, Manjaro, EndeavourOS, Artix, Garuda 等
+#   * zypper: openSUSE Leap, openSUSE Tumbleweed, SUSE Enterprise 等
 FAMILY=""
 if [[ "$OS" == Darwin ]]; then
-  # macOS Homebrew 识别
+  # macOS Homebrew 识别与环境变量初始化
   if command -v brew >/dev/null 2>&1; then
     FAMILY=brew
   elif [[ -x "/opt/homebrew/bin/brew" ]]; then
@@ -841,21 +874,40 @@ has_nerd_font() {
   return 1
 }
 
-# 可选软件包安装函数（具备严格幂等性检查，已有对应命令或发行版别名时自动跳过，杜绝重复安装）
+# ==============================================================================
+# 可选软件包安装函数：实现严格幂等性检查（Idempotency）与多别名自动识别
+# ==============================================================================
+# 设计原则：
+# 1. 目标命令或发行版特定别名（如 Debian 的 fdfind/batcat、Arch 的 7zz）只要存在，立即返回 0；
+# 2. 杜绝任何多余、重复的包管理器调用（避免耗时 apt/dnf/pacman 网络事务）；
+# 3. 若包管理器仓库中确实无此包，将其记录到 SKIPPED 数组并提示跳过，不阻断主流程。
 optional_package() {
   local cmd=$1 pkg=$2
+
+  # 1. 基础命令存在性检查：若已有目标命令，直接跳过安装
   [[ -n "$cmd" ]] && command -v "$cmd" >/dev/null 2>&1 && return 0
+
+  # 2. 发行版专用命令别名检测（避免因二进制名不同而触发重复安装）：
+  # - fd 在 Debian/Ubuntu/Fedora 系统下包名/二进制为 fdfind
   if [[ "$cmd" == fd ]] && command -v fdfind >/dev/null 2>&1; then return 0; fi
+  # - bat 在 Debian/Ubuntu 下为避免与现有工具冲突改名为 batcat
   if [[ "$cmd" == bat ]] && command -v batcat >/dev/null 2>&1; then return 0; fi
+  # - agrep 在 Debian/Ubuntu 下由 tre-agrep 提供
   if [[ "$cmd" == agrep ]] && command -v tre-agrep >/dev/null 2>&1; then return 0; fi
+  # - 7-Zip 在 Arch 等系统中二进制名称为 7zz 或 7z
   if [[ "$cmd" == 7z ]] && command -v 7zz >/dev/null 2>&1; then return 0; fi
+  # - ImageMagick v7 二进制为 magick，v6 或传统系统为 convert
   if [[ "$cmd" == magick ]] && command -v convert >/dev/null 2>&1; then return 0; fi
+  # - ripgrep 在某些发行版中别名为 rg 或 ripgrep
   if [[ "$cmd" == rg ]] && command -v ripgrep >/dev/null 2>&1; then return 0; fi
+  # - Linux 剪贴板驱动（wl-copy、xclip、xsel）：三者只要任意一个可用即视为满足要求
   if [[ "$cmd" == xclip || "$cmd" == wl-copy || "$cmd" == xsel ]]; then
     if command -v wl-copy >/dev/null 2>&1 || command -v xclip >/dev/null 2>&1 || command -v xsel >/dev/null 2>&1; then
       return 0
     fi
   fi
+
+  # 3. 按不同包管理器家族执行安装（仅在检测到缺失时调用）
   case "$FAMILY" in
     brew)
       if HOMEBREW_NO_AUTO_UPDATE=1 brew install "$pkg"; then
@@ -863,6 +915,7 @@ optional_package() {
       fi
       ;;
     apt)
+      # 预检软件包是否存在于 apt 缓存中，并强制非交互式防止 debconf 挂起
       if apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1; then
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" && return 0
       fi
@@ -879,6 +932,7 @@ optional_package() {
       fi
       ;;
     pacman)
+      # pacman 使用 --needed 标志，如果包已最新则自动跳过
       if pacman -Si "$pkg" >/dev/null 2>&1; then
         sudo pacman -S --needed --noconfirm "$pkg" && return 0
       fi
@@ -889,6 +943,8 @@ optional_package() {
       fi
       ;;
   esac
+
+  # 4. 仓库中无此包时安全记录并警告，保持向后兼容
   SKIPPED+=("$pkg")
   warn "$(msg "可选包未在仓库中找到：$pkg，已跳过安装。" "Optional package not found in repository: $pkg, skipped.")"
 }
@@ -897,9 +953,13 @@ optional_package() {
 if [[ "$PROFILE" == full ]]; then
   info "$(msg "正在安装完整工具集..." "Installing full modern CLI toolchain...")"
 
-  # --- Homebrew (macOS) 针对 Yazi 与全套工具：仅在缺失时安装，杜绝重复安装 ---
+  # ============================================================================
+  # Homebrew (macOS)：针对 Yazi 官方指南推荐的伴生依赖套件进行预检与批量部署
+  # 参见 Yazi 官方安装文档：https://yazi-rs.github.io/docs/installation/
+  # ============================================================================
   if [[ "$FAMILY" == brew ]]; then
     brew_missing=()
+    # 逐一核验 12 项组件是否已安装；仅把系统中真正缺失的项加入 brew_missing 数组
     command -v yazi >/dev/null 2>&1 || brew_missing+=(yazi)
     command -v ffmpeg >/dev/null 2>&1 || brew_missing+=(ffmpeg-full)
     (command -v 7z >/dev/null 2>&1 || command -v 7zz >/dev/null 2>&1) || brew_missing+=(sevenzip)
@@ -913,9 +973,11 @@ if [[ "$PROFILE" == full ]]; then
     (command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1) || brew_missing+=(imagemagick-full)
     has_nerd_font || brew_missing+=(font-symbols-only-nerd-font)
 
+    # 严格幂等：若所有组件均已安装，完全不执行 brew install，杜绝重复操作
     if ((${#brew_missing[@]} > 0)); then
       info "$(msg "检测到缺失的工具/伴生依赖: ${brew_missing[*]}，正在通过 Homebrew 安装..." "Missing tools/dependencies detected: ${brew_missing[*]}; installing via Homebrew...")"
       HOMEBREW_NO_AUTO_UPDATE=1 brew install "${brew_missing[@]}" 2>/dev/null || {
+        # 批量安装失败时，降级为逐个尝试安装并自动回退（如 ffmpeg-full -> ffmpeg）
         for _y_pkg in "${brew_missing[@]}"; do
           if [[ "$_y_pkg" == ffmpeg-full ]]; then
             HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg-full 2>/dev/null || HOMEBREW_NO_AUTO_UPDATE=1 brew install ffmpeg 2>/dev/null || true
@@ -928,7 +990,7 @@ if [[ "$PROFILE" == full ]]; then
           fi
         done
       }
-      # 强制链接 ffmpeg-full 与 imagemagick-full
+      # 强制链接带完整扩展格式支持的 ffmpeg 与 imagemagick
       HOMEBREW_NO_AUTO_UPDATE=1 brew link ffmpeg-full imagemagick-full -f --overwrite 2>/dev/null || true
     else
       success "$(msg "Yazi 及其全部推荐伴生依赖已安装，跳过重复安装。" "Yazi and all companion dependencies already installed; skipping redundant install.")"
@@ -938,7 +1000,9 @@ if [[ "$PROFILE" == full ]]; then
   fd_pkg=fd
   [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == zypper ]] && fd_pkg=fd-find
 
-  # 基础核心工具集：仅在未安装时执行
+  # ----------------------------------------------------------------------------
+  # 基础现代命令行工具集：仅在未安装时通过包管理器部署
+  # ----------------------------------------------------------------------------
   optional_package fzf fzf
   optional_package fd "$fd_pkg"
   optional_package bat bat
@@ -952,18 +1016,27 @@ if [[ "$PROFILE" == full ]]; then
   [[ "$FAMILY" == apt ]] && agrep_pkg=tre-agrep
   optional_package agrep "$agrep_pkg"
 
-  # Yazi 媒体与文本伴生依赖 (参考 Yazi 官方指南推荐安装，已有则自动跳过)
+  # ============================================================================
+  # Yazi 现代多媒体预览套件（依照 Yazi 官方指南要求，已有任意工具则自动跳过）
+  # 参见：https://yazi-rs.github.io/docs/installation/
+  # ============================================================================
+
+  # 1. 文本搜索与 JSON 语法格式化预览
   optional_package rg ripgrep
   optional_package jq jq
+
+  # 2. 视频与多媒体缩略图提取核心依赖
   optional_package ffmpeg ffmpeg
 
-  # 7-Zip (归档文件解压与预览，已有 7z 或 7zz 则自动跳过)
+  # 3. 归档文件（zip/tar/7z/rar/iso 等）解压与目录树内联预览
+  # 检查 7z 或 7zz 命令是否存在；缺失时按发行版优先级尝试安装
   if ! command -v 7z >/dev/null 2>&1 && ! command -v 7zz >/dev/null 2>&1; then
     case "$FAMILY" in
       brew)
         optional_package 7z sevenzip
         ;;
       apt)
+        # Debian/Ubuntu 优先安装新版 7zip，若无此包则自动回退安装 p7zip-full
         if ! optional_package 7z 7zip; then
           if optional_package 7z p7zip-full; then
             remove_skipped 7zip
@@ -971,6 +1044,7 @@ if [[ "$PROFILE" == full ]]; then
         fi
         ;;
       dnf)
+        # Fedora/RHEL 优先 7zip，次选 p7zip
         if ! optional_package 7z 7zip; then
           if optional_package 7z p7zip; then
             remove_skipped 7zip
@@ -990,7 +1064,7 @@ if [[ "$PROFILE" == full ]]; then
     esac
   fi
 
-  # Poppler (pdftoppm: PDF 封面与文档预览，已有 pdftoppm 则自动跳过)
+  # 4. Poppler (pdftoppm)：支持 PDF 文档封面高分辨率抽取与预览
   if ! command -v pdftoppm >/dev/null 2>&1; then
     case "$FAMILY" in
       brew)
@@ -1012,7 +1086,7 @@ if [[ "$PROFILE" == full ]]; then
     esac
   fi
 
-  # ImageMagick (图片缩略图、字体与高阶格式预览，已有 magick 或 convert 则自动跳过)
+  # 5. ImageMagick (magick/convert)：支持字体文件预览、HEIC 苹果照片及 JPEG XL 高级格式
   if ! command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; then
     case "$FAMILY" in
       brew)
@@ -1027,13 +1101,14 @@ if [[ "$PROFILE" == full ]]; then
     esac
   fi
 
-  # resvg (SVG 矢量图预览，已有 resvg 则自动跳过)
+  # 6. resvg：支持 SVG 矢量图形终端栅格化预览
   optional_package resvg resvg
 
-  # Linux 剪贴板支持 (xclip / wl-clipboard / xsel: 已有任意一个则自动跳过)
+  # 7. Linux 终端剪贴板支持（实现 Yazi 文件复制/剪切与系统剪贴板互通）
   if [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
     if ! command -v wl-copy >/dev/null 2>&1 && ! command -v xclip >/dev/null 2>&1 && ! command -v xsel >/dev/null 2>&1; then
       info "$(msg "检测到缺少 Linux 剪贴板工具，正在安装 xclip / wl-clipboard..." "Clipboard tool missing on Linux; installing xclip / wl-clipboard...")"
+      # 根据当前显示服务（Wayland 或 X11）动态优先选用对应的剪贴板后端
       if [[ "${XDG_SESSION_TYPE:-}" == wayland || -n "${WAYLAND_DISPLAY:-}" ]]; then
         optional_package wl-copy wl-clipboard || optional_package xclip xclip || optional_package xsel xsel
       else
@@ -1042,7 +1117,7 @@ if [[ "$PROFILE" == full ]]; then
     fi
   fi
 
-  # 图标字体检测与安装 (Nerd Fonts，已有则自动跳过)
+  # 8. 图标字体检测与自动部署 (Nerd Fonts)：已有任意 Nerd Font 则立即跳过
   if ! has_nerd_font; then
     if [[ "$FAMILY" == pacman ]]; then
       sudo pacman -S --needed --noconfirm ttf-nerd-fonts-symbols 2>/dev/null || sudo pacman -S --needed --noconfirm ttf-nerd-fonts-symbols-mono 2>/dev/null || true

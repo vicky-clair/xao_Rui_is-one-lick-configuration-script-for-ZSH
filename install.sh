@@ -1345,7 +1345,7 @@ if [[ "$PROFILE" == full ]]; then
   fi
 
   # --- YAZI 官方预编译发布包自动回退（Linux 使用 musl 静态编译版，macOS 使用 darwin 版）---
-  if (! command -v yazi >/dev/null 2>&1 || ! yazi --version >/dev/null 2>&1) && [[ -n "$YAZI_ARCH" ]]; then
+  if (! command -v yazi >/dev/null 2>&1 || ! { (command -v setsid >/dev/null 2>&1 && setsid yazi -V </dev/null >/dev/null 2>&1) || yazi -V </dev/null >/dev/null 2>&1; }) && [[ -n "$YAZI_ARCH" ]]; then
     info "$(msg "正在从 GitHub Release 下载官方发布版至 ~/.local/bin..." "Downloading official release to ~/.local/bin...")"
     yazi_stage=$(mktemp -d "$HOME/.yazi-tmp-XXXXXX")
     if [[ "$OS" == Darwin ]]; then

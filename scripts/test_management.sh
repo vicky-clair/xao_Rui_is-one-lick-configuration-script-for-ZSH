@@ -107,7 +107,7 @@ printf '#!/usr/bin/env bash\nexit 0\n' > "$STAGE/bin/fzf"
 for tool in brew sudo curl; do printf '#!/usr/bin/env bash\nexit 1\n' > "$STAGE/bin/$tool"; done
 chmod +x "$STAGE/bin/"*
 # 各环境统一隔离 PATH，避免宿主机全局/用户目录安装的外部工具（如 cargo/vfox/local bin）泄漏干扰断言
-export PATH="$STAGE/bin:/usr/bin:/bin"
+export PATH="$STAGE/bin:/usr/local/bin:/usr/bin:/bin"
 printf 'fzf\nlazydocker\n' > "$XDG_STATE_HOME/zsh-project/failed-components"
 cp "$HOME/.zshrc" "$STAGE/pre-retry"
 manage --retry-failed fzf --yes

@@ -56,6 +56,7 @@ WITH_VFOX=0
 WITH_LAZYDOCKER=0
 WITH_LAZYGIT=0
 WITH_TMUX=0
+WITHOUT_TMUX=0
 WITH_LATEST_NVIM=0
 P10K_STYLE=rainbow
 P10K_STYLE_SET=0
@@ -240,7 +241,8 @@ while (($#)); do
     --with-vfox) WITH_VFOX=1 ;;
     --with-lazydocker) WITH_LAZYDOCKER=1 ;;
     --with-lazygit) WITH_LAZYGIT=1 ;;
-    --with-tmux) WITH_TMUX=1 ;;
+    --with-tmux) WITH_TMUX=1; WITHOUT_TMUX=0 ;;
+    --without-tmux|--no-tmux) WITHOUT_TMUX=1; WITH_TMUX=0 ;;
     --check-updates) CHECK_UPDATES=1 ;;
     --update) DO_UPDATE=1 ;;
     --lang) (($# >= 2)) || die "$(msg '--lang 缺少语言代码 (zh|en)' '--lang requires value (zh|en)')"; LANG_CHOICE=$2; LANG_SET=1; shift ;;
@@ -732,7 +734,7 @@ if ((!DRY_RUN)); then
   ((WITH_VFOX)) || { if command -v vfox >/dev/null 2>&1; then WITH_VFOX=1; elif ((!ASSUME_YES)) && ask "$(msg '是否启用 vfox 版本管理（自动目录钩子默认关闭）？' 'Enable vfox version manager (auto directory hook disabled by default)?')"; then WITH_VFOX=1; fi; }
   ((WITH_LAZYDOCKER)) || { if command -v lazydocker >/dev/null 2>&1; then WITH_LAZYDOCKER=1; elif ((!ASSUME_YES)) && ask "$(msg '是否安装 lazydocker 容器终端管理（不配置 Docker）？' 'Install lazydocker container UI (Docker daemon not configured)?')"; then WITH_LAZYDOCKER=1; fi; }
   ((WITH_LAZYGIT)) || { if command -v lazygit >/dev/null 2>&1; then WITH_LAZYGIT=1; elif ((!ASSUME_YES)) && ask "$(msg '是否安装 lazygit Git 终端管理面板？' 'Install lazygit Git TUI panel?')"; then WITH_LAZYGIT=1; fi; }
-  ((WITH_TMUX)) || { if command -v tmux >/dev/null 2>&1; then WITH_TMUX=1; elif ((!ASSUME_YES)) && ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
+  ((WITHOUT_TMUX)) || ((WITH_TMUX)) || { if command -v tmux >/dev/null 2>&1; then WITH_TMUX=1; elif ((!ASSUME_YES)) && ask "$(msg '是否安装并配置 tmux 终端复用器（含全平台剪贴板互通与美化主题）？' 'Install and configure tmux terminal multiplexer (with clipboard & themes)?')"; then WITH_TMUX=1; fi; }
 fi
 
 # 选项收集完成后生成同一份清单，供检查、备份、部署校验和回退使用。
@@ -778,10 +780,24 @@ fi
 echo ""
 ask "$(msg '确认按以上计划安装并替换配置？' 'Confirm installation and replace configuration according to plan?')" || exit 0
 
-# 权限校验：Linux 依赖包管理器需要 sudo，macOS Homebrew 必须以普通用户运行
-if [[ "$FAMILY" != brew ]]; then
-  command -v sudo >/dev/null || die "$(msg '缺少 sudo，请先由管理员安装依赖' 'Missing sudo; please ask administrator to install dependencies')"
-  sudo -v
+# 权限与基础核心依赖前置检测（幂等性与零冗余开销保障）
+base_missing=()
+if [[ "$FAMILY" == brew ]]; then
+  command -v gtimeout >/dev/null 2>&1 || base_missing+=(coreutils)
+  for _base_cmd in zsh git curl unzip file; do
+    command -v "$_base_cmd" >/dev/null 2>&1 || base_missing+=("$_base_cmd")
+  done
+  command -v tar >/dev/null 2>&1 || base_missing+=(gnu-tar)
+else
+  for _base_cmd in zsh git curl unzip tar file; do
+    command -v "$_base_cmd" >/dev/null 2>&1 || base_missing+=("$_base_cmd")
+  done
+  if ((${#base_missing[@]} > 0)); then
+    command -v sudo >/dev/null || die "$(msg '缺少 sudo，请先由管理员安装依赖' 'Missing sudo; please ask administrator to install dependencies')"
+    sudo -v
+  elif sudo -n true 2>/dev/null; then
+    sudo -v 2>/dev/null || true
+  fi
 fi
 
 STATE_ROOT="${XDG_STATE_HOME:-$HOME/.local/state}/zsh-project"
@@ -808,33 +824,43 @@ case "$FAMILY" in
   brew)
     # Homebrew 核心依赖：探测缺失组件，使用 gnu-tar 替代系统中无此 formula 的 tar
     export HOMEBREW_NO_AUTO_UPDATE=1
-    brew_base_pkgs=()
-    command -v gtimeout >/dev/null 2>&1 || brew_base_pkgs+=(coreutils)
-    for _base_cmd in zsh git curl unzip file; do
-      command -v "$_base_cmd" >/dev/null 2>&1 || brew_base_pkgs+=("$_base_cmd")
-    done
-    command -v tar >/dev/null 2>&1 || brew_base_pkgs+=(gnu-tar)
-    if ((${#brew_base_pkgs[@]} > 0)); then
-      brew install "${brew_base_pkgs[@]}"
+    if ((${#base_missing[@]} > 0)); then
+      brew install "${base_missing[@]}"
     fi
     ;;
   apt)
-    sudo apt-get update || true
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term x11-utils 2>/dev/null || \
-    sudo DEBIAN_FRONTEND=noninteractive apt-get install -y zsh git curl ca-certificates coreutils unzip tar file ncurses-term
+    if ((${#base_missing[@]} > 0)); then
+      sudo apt-get update || true
+      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${base_missing[@]}" ncurses-term x11-utils 2>/dev/null || \
+      sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "${base_missing[@]}" ncurses-term
+    else
+      success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed, skipping redundant apt install.")"
+    fi
     ;;
   dnf)
-    if command -v dnf >/dev/null 2>&1; then
-      sudo dnf install -y zsh git curl ca-certificates coreutils unzip tar file
+    if ((${#base_missing[@]} > 0)); then
+      if command -v dnf >/dev/null 2>&1; then
+        sudo dnf install -y "${base_missing[@]}"
+      else
+        sudo yum install -y "${base_missing[@]}"
+      fi
     else
-      sudo yum install -y zsh git curl ca-certificates coreutils unzip tar file
+      success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed.")"
     fi
     ;;
   pacman)
-    sudo pacman -Syu --needed --noconfirm zsh git curl ca-certificates coreutils unzip tar file
+    if ((${#base_missing[@]} > 0)); then
+      sudo pacman -Syu --needed --noconfirm "${base_missing[@]}"
+    else
+      success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed.")"
+    fi
     ;;
   zypper)
-    sudo zypper install -y zsh git curl ca-certificates coreutils unzip tar file
+    if ((${#base_missing[@]} > 0)); then
+      sudo zypper install -y "${base_missing[@]}"
+    else
+      success "$(msg "基础核心依赖已全部就绪，无需重复调用包管理器。" "All core base dependencies already installed.")"
+    fi
     ;;
 esac
 
@@ -916,7 +942,7 @@ optional_package() {
       ;;
     apt)
       # 预检软件包是否存在于 apt 缓存中，并强制非交互式防止 debconf 挂起
-      if apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1; then
+      if (apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1) && sudo -n true 2>/dev/null; then
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" && return 0
       fi
       ;;
@@ -1246,7 +1272,7 @@ if [[ "$PROFILE" == full ]]; then
       if [[ "$FAMILY" == apt ]]; then
         ff_url="https://github.com/fastfetch-cli/fastfetch/releases/latest/download/fastfetch-linux-${FF_ARCH}.deb"
         if curl -fsSL --connect-timeout 10 -m 60 "$ff_url" -o "$ff_stage/fastfetch.deb" 2>/dev/null; then
-          if sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1 || (sudo apt-get install -fy >/dev/null 2>&1 && sudo dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1); then
+          if sudo -n true 2>/dev/null && (sudo -n dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1 || (sudo -n apt-get install -fy >/dev/null 2>&1 && sudo -n dpkg -i "$ff_stage/fastfetch.deb" >/dev/null 2>&1)); then
             success "$(msg "fastfetch 安装成功 (deb 软件包)" "fastfetch installed successfully via deb")"
             remove_skipped fastfetch
           fi
@@ -1553,6 +1579,7 @@ if ((WITH_TMUX)); then
   clone_missing https://github.com/tmux-plugins/tpm.git "$HOME/.tmux/plugins/tpm" tpm
   if [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]]; then
     cp "$SCRIPT_DIR/templates/tmux.conf" "$BACKUP/new.tmux.conf"
+    command rm -f "$HOME/.tmux.conf" 2>/dev/null || true
     install -m 600 "$BACKUP/new.tmux.conf" "$HOME/.tmux.conf"
     success "$(msg "已部署 ~/.tmux.conf" "Deployed ~/.tmux.conf successfully")"
   fi
@@ -1600,10 +1627,13 @@ zsh -n "$BACKUP/new.zshrc"
 zsh -n "$BACKUP/new.options"
 if [[ -f "$BACKUP/new.p10k.zsh" ]]; then
   zsh -n "$BACKUP/new.p10k.zsh"
+  command rm -f "$HOME/.p10k.zsh" 2>/dev/null || true
   install -m 600 "$BACKUP/new.p10k.zsh" "$HOME/.p10k.zsh"
 fi
 
+command rm -f "$HOME/.zsh-project-options" 2>/dev/null || true
 install -m 600 "$BACKUP/new.options" "$HOME/.zsh-project-options"
+command rm -f "$HOME/.zshrc" 2>/dev/null || true
 install -m 600 "$BACKUP/new.zshrc" "$HOME/.zshrc"
 
 # 清理旧的编译字节码（若存在，借鉴 zsh4humans 规范），防止 Zsh 继续读取失效旧缓存

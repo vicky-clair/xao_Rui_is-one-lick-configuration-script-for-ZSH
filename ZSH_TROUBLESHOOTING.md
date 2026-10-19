@@ -1,6 +1,6 @@
 # 故障排查与历史验证记录
 
-核对日期：2026-09-13。本文按当前脚本说明排查步骤，末尾保留早期 Debian 实测摘要。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，备份和开关见[配置管理](CONFIGURATION_MANAGEMENT.md)。
+核对日期：2026-10-19。本文按当前脚本说明排查步骤，末尾保留早期 Debian 实测摘要。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，备份和开关见[配置管理](CONFIGURATION_MANAGEMENT.md)。
 
 ## 先判断问题所在
 

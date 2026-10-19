@@ -1,6 +1,6 @@
 # 安装、手动部署与迁移指南
 
-核对日期：2026-09-13。默认配置位置为当前用户 HOME；使用自定义 ZDOTDIR 或 dotfiles 链接管理时，需要先设计适配方案，安装器不会自动覆盖其它配置目录。
+核对日期：2026-10-19。默认配置位置为当前用户 HOME；使用自定义 ZDOTDIR 或 dotfiles 链接管理时，需要先设计适配方案，安装器不会自动覆盖其它配置目录。
 
 首次使用建议按“环境检查 → 隔离测试 → 安装器部署 → 新会话验收”完成。手动部署是独立替代路线，不需要在安装器执行后再重复一次。参数总表见 [README](README.md)。
 
@@ -91,7 +91,7 @@ bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 | 环境 | 处理 |
 | --- | --- |
 | Debian / Ubuntu 等 APT 系统 | 刷新包索引、安装依赖；部分工具缺包时尝试 Release |
-| Fedora / RHEL 等 | 基础安装优先 DNF，缺失时使用 YUM；重试脚本的支持范围更窄 |
+| Fedora / RHEL 等 | 基础安装优先 DNF，缺失时使用 YUM；重试脚本亦全面支持 DNF 与 YUM 回退 |
 | Arch 系列 | 基础阶段包含 `pacman -Syu`，可能升级系统包，不只是安装配置 |
 | openSUSE | 通过 Zypper 安装；应用更新检测不覆盖 Zypper |
 | macOS | 使用 Homebrew；缺失时可交互引导安装。先确认实际运行的 Bash 版本并运行回归 |

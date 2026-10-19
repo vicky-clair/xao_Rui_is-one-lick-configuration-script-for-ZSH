@@ -1,8 +1,8 @@
 # Zsh 配置管理
 
-核对日期：2026-09-13。本文描述安装器部署的 `templates/zshrc.zsh`；根目录 `.zshrc` 的部分工具不受同样的开关控制，差异见[开发文档](DEVELOPMENT.md)。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)。
+核对日期：2026-10-19。本文描述安装器部署的 `templates/zshrc.zsh`；根目录 `.zshrc` 的部分工具不受同样的开关控制，差异见[开发文档](DEVELOPMENT.md)。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)。
 
-在完整项目目录中运行下列命令。涉及配置写入或组件安装时会询问确认。加 `--dry-run` 仅展示操作，不写文件、不联网、不执行用户配置。`--yes` 可显式跳过管理操作的确认，不适用于普通安装流程。
+在完整项目目录中运行下列命令。涉及配置写入或组件安装时会询问确认。加 `--dry-run` 仅展示操作，不写文件、不联网、不执行用户配置。`--yes` / `-y` 可显式跳过确认，适用于自动化部署与管理脚本。
 
 ## 停用与恢复
 
@@ -77,9 +77,11 @@ bash install.sh --retry-failed lazydocker
 bash install.sh --retry-failed lazygit
 bash install.sh --retry-failed television
 bash install.sh --retry-failed tre-command
+bash install.sh --retry-failed yazi
+bash install.sh --retry-failed poppler
 ```
 
-新安装将未完成的可选包写入状态目录的 `failed-components`。不带名称时重试清单；旧安装没有清单时可指定组件。支持 fzf、fd/fd-find、bat/batcat、eza、zoxide、yazi、neovim/nvim、fastfetch、television、tre-command、agrep、vfox、lazydocker、lazygit、tmux、xclip、wl-clipboard/wl-copy、ncurses-term。
+新安装将未完成的可选包写入状态目录的 `failed-components`。不带名称时重试清单；旧安装没有清单时可指定组件。全面支持 fzf、fd/fd-find、bat/batcat、eza、zoxide、yazi、neovim/nvim、fastfetch、television、tre-command、agrep、vfox、lazydocker、lazygit、tmux、xclip、wl-clipboard/wl-copy、ncurses-term，以及 Yazi 多媒体预览伴生套件（ripgrep、jq、ffmpeg、7zip、poppler、imagemagick、resvg、font-symbols-only-nerd-font）。
 
 重试先检查命令是否已在 PATH，否则调用系统包管理器安装。lazydocker、lazygit、television 与 tre-command 额外支持官方 Release 下载回退，按版本号和系统/架构拼接资产名。其余工具在仓库无包时仍会失败并保留记录；此入口不保证升级到特定版本，不重部署配置、主题或 SDK，也不配置 Docker。成功后仅移除对应失败项，其余失败保留。日志位于状态目录的 `retry-XXXXXXXX/组件.log`。
 

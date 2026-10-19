@@ -11,11 +11,18 @@ trap 'printf "测试目录：%s\n" "$STAGE"' EXIT
 fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$*"; }
 extract_function() { sed -n "/^$1() {/,/^}/p" "$ROOT/install.sh"; }
+# ------------------------------------------------------------------------------
+# 1. 语法检查：验证主安装器与更新检测脚本的 Bash 静态语法
+# ------------------------------------------------------------------------------
 bash -n "$ROOT/install.sh"
 bash -n "$ROOT/scripts/check_updates.sh"
 pass 'Bash syntax'
 
-# 任何联网/提权调用都留证据并失败；同时验证单文件缺模板的预演。
+# ------------------------------------------------------------------------------
+# 2. Dry-Run 预演路由隔离测试：
+# 确保在任意模式（普通、更新检测、升级、自动化）及缺少模板情况下，
+# --dry-run 均不写任何状态文件、不触发真实网络请求、不调用外部包管理或 sudo 提权
+# ------------------------------------------------------------------------------
 export AUDIT_MARKER="$STAGE/forbidden-call"
 for tool in curl wget git sudo brew; do
   printf '#!/usr/bin/env bash\necho "$0" >> "$AUDIT_MARKER"\nexit 1\n' > "$STAGE/bin/$tool"
@@ -29,6 +36,10 @@ done
 [[ ! -e "$AUDIT_MARKER" && ! -e "$XDG_STATE_HOME" && ! -e "$XDG_CONFIG_HOME" ]] || fail 'dry run wrote state or invoked network'
 pass 'all dry-run routes including missing templates'
 
+# ------------------------------------------------------------------------------
+# 3. Neovim 树形切换原子性：
+# 校验新下载的二进制可执行性；若校验失败立即阻断，确保旧版本不被破坏
+# ------------------------------------------------------------------------------
 eval "$(extract_function install_nvim_tree)"
 mkdir -p "$HOME/.local/opt/nvim" "$HOME/.local/bin" "$STAGE/nvim-good/bin" "$STAGE/nvim-bad/bin"
 echo original > "$HOME/.local/opt/nvim/original"
@@ -39,7 +50,10 @@ if install_nvim_tree "$STAGE/nvim-bad"; then fail 'invalid nvim accepted'; fi
 [[ -f "$HOME/.local/opt/nvim/original" ]] || fail 'old nvim lost during validation'
 pass 'invalid binary preserves old Neovim'
 
-# 模拟切换新目录失败，确认旧目录被恢复。
+# ------------------------------------------------------------------------------
+# 4. 目录切换故障原子回退：
+# 模拟重命名或目录切换失败，验证旧版 Neovim 目录与软链接能够完好恢复
+# ------------------------------------------------------------------------------
 if ln -s "$STAGE/nonexistent-target" "$STAGE/symlink-probe" 2>/dev/null; then
 mv() {
   if [[ "$1" == */new && "$2" == "$HOME/.local/opt/nvim" ]]; then return 1; fi
@@ -57,7 +71,10 @@ else
   printf 'SKIP: native dangling symlinks unavailable; run Neovim swap cases on Linux\n'
 fi
 
-# 回退函数与跳过列表函数直接使用生产实现；验证 Bash 3.2 空数组展开安全性与回退保护。
+# ------------------------------------------------------------------------------
+# 5. Bash 3.2 set -u (nounset) 空数组展开安全性验证：
+# 确保在 remove_skipped 清空数组后，不会因 Bash 3.2 限制触发 unbound variable 崩溃
+# ------------------------------------------------------------------------------
 eval "$(extract_function remove_skipped)"
 SKIPPED=()
 remove_skipped fzf
@@ -66,7 +83,11 @@ remove_skipped fzf
 ((${#SKIPPED[@]} == 0)) || fail 'remove_skipped did not clear single item'
 pass 'remove_skipped handles empty arrays under nounset'
 
-# 验证 optional_package 幂等性：命令或别名已存在时绝不触发包管理器
+# ------------------------------------------------------------------------------
+# 6. optional_package 幂等性与多别名自动检测：
+# 命令或发行版别名（如 fdfind, batcat, 7zz, convert, ripgrep, wl-copy）存在时，
+# 绝不重复调用包管理器；若包缺失则安全记录到 SKIPPED
+# ------------------------------------------------------------------------------
 eval "$(extract_function optional_package)"
 FAMILY=apt
 for fake_cmd in fd bat 7zz convert ripgrep wl-copy; do
@@ -86,7 +107,10 @@ fi
 ((${#SKIPPED[@]} > 0)) || fail 'optional_package did not record missing package to SKIPPED'
 pass 'optional_package idempotency, alias detection, and missing package handling'
 
-# 验证 has_nerd_font 字体检测幂等性
+# ------------------------------------------------------------------------------
+# 7. Nerd Font 图标字体检测幂等性测试：
+# 验证系统字体库与自定义目录的探测逻辑
+# ------------------------------------------------------------------------------
 eval "$(extract_function has_nerd_font)"
 font_mock_dir="$HOME/.local/share/fonts/NerdFonts"
 rm -rf "$font_mock_dir"
@@ -96,6 +120,10 @@ touch "$font_mock_dir/SymbolsNerdFont-Regular.ttf"
 has_nerd_font || fail 'has_nerd_font failed to detect installed Nerd Font'
 pass 'has_nerd_font detection'
 
+# ------------------------------------------------------------------------------
+# 8. 配置回退与用户二次修改防护测试：
+# 若安装后用户手动修改了主题或配置，校验和不符时拒绝回退，防止意外丢失用户修改
+# ------------------------------------------------------------------------------
 eval "$(extract_function calc_sha256)"
 eval "$(extract_function restore)"
 msg() { printf '%s' "$1"; }
@@ -120,7 +148,10 @@ restore "$backup"
 for file in .zshrc .zsh-project-options .p10k.zsh; do cmp "$HOME/$file" "$backup/$file" || fail 'rollback mismatch'; done
 pass 'theme rollback and post-install edit protection'
 
-# 三种预设只生成待部署文件；向导也不能提前删除当前个人配置。
+# ------------------------------------------------------------------------------
+# 9. 主题预设暂存与向导保护：
+# 三种内置主题预设只写入暂存文件；向导模式绝不提前删除已有配置
+# ------------------------------------------------------------------------------
 theme_block=$(sed -n '/^# 部署 Powerlevel10k/,/^esac$/p' "$ROOT/install.sh")
 BACKUP="$STAGE/theme-stage"
 mkdir -p "$BACKUP" "$HOME/powerlevel10k/config"
@@ -137,7 +168,10 @@ eval "$theme_block"
 cmp "$HOME/.p10k.zsh" "$backup/.p10k.zsh" || fail 'wizard deleted existing theme'
 pass 'presets stage changes and wizard preserves current theme'
 
-# 最终目标清单必须在选项收集之后执行，拒绝交互选中的目录目标。
+# ------------------------------------------------------------------------------
+# 10. 目标文件类型合法性校验：
+# 严防非法软链接或目录覆盖，确保目标为普通文件
+# ------------------------------------------------------------------------------
 validate_block=$(sed -n '/^target_files=(/,/^done$/p' "$ROOT/install.sh")
 mkdir -p "$HOME/.tmux.conf"
 if (WITH_TMUX=1; P10K_STYLE=skip; SCRIPT_DIR=$ROOT; eval "$validate_block"); then
@@ -145,14 +179,19 @@ if (WITH_TMUX=1; P10K_STYLE=skip; SCRIPT_DIR=$ROOT; eval "$validate_block"); the
 fi
 pass 'final tmux target validation'
 
-# 当前状态缓存必须在断网后保持原样。
+# ------------------------------------------------------------------------------
+# 11. 离线更新检测缓存保护：
+# 网络不通或探测超时时，保留现有更新缓存，绝不静默覆盖为空
+# ------------------------------------------------------------------------------
 mkdir -p "$XDG_STATE_HOME/zsh-project"
 echo pending > "$XDG_STATE_HOME/zsh-project/available_updates"
 if bash "$ROOT/scripts/check_updates.sh" -q; then fail 'offline check returned success'; fi
 grep -qx pending "$XDG_STATE_HOME/zsh-project/available_updates" || fail 'offline check erased pending updates'
 pass 'offline update check preserves cache'
 
-# 如本机提供 Zsh，执行模板语法与更新函数的真实 Zsh 回归。
+# ------------------------------------------------------------------------------
+# 12. Zsh 模板语法与更新检测辅助函数集成验证
+# ------------------------------------------------------------------------------
 if command -v zsh >/dev/null 2>&1; then
   zsh -n "$ROOT/templates/zshrc.zsh"
   mkdir -p "$XDG_STATE_HOME/zsh-project/scripts"
@@ -161,7 +200,10 @@ if command -v zsh >/dev/null 2>&1; then
   zsh -f -c 'source "$1"; zsh-check-updates' test "$STAGE/update-functions.zsh" | grep -qx UPDATE_CHECK_OK || fail 'update helper lost script path'
   pass 'Zsh syntax and update command after temporary variables are unset'
 
-  # 即使工具已在 PATH，关闭选项也不能激活它们或安装其别名。
+  # ------------------------------------------------------------------------------
+  # 13. 功能开关有效性防穿透测试：
+  # 即使相关 CLI 工具已在 PATH 中，选项关闭时绝不加载其别名或函数
+  # ------------------------------------------------------------------------------
   mkdir -p "$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting" "$HOME/powerlevel10k"
   : > "$HOME/.oh-my-zsh/oh-my-zsh.sh"
   : > "$HOME/powerlevel10k/powerlevel10k.zsh-theme"

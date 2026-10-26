@@ -59,6 +59,7 @@ bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 | 需求 | 文档 |
 | --- | --- |
 | 首次安装、手动部署与新会话验收 | [安装指南](LINUX_ZSH_SETUP_GUIDE.md) |
+| Tmux 生产力键位速查、剪贴板互通与实战技巧 | [Tmux 使用指南](TMUX_USAGE_GUIDE.md) |
 | 开关、停用恢复、失败组件重试、备份 | [配置管理](CONFIGURATION_MANAGEMENT.md) |
 | 启动报错、工具缺失、更新失败、终端显示异常 | [故障排查](ZSH_TROUBLESHOOTING.md) |
 | 模块职责、加载顺序、状态文件与维护约定 | [开发文档](DEVELOPMENT.md) |
@@ -303,6 +304,7 @@ bash install.sh --rollback /实际安装备份目录
 | `scripts/test_installer.sh` / `scripts/test_management.sh` | 当前隔离回归入口 |
 | `templates/zshrc.zsh` / `templates/tmux.conf` | 安装器实际部署的模板 |
 | `templates/zshrc.local.example` | 用户扩展示例 |
+| `TMUX_USAGE_GUIDE.md` | Tmux 现代化生产力键位速查、剪贴板互通与实战技巧指南 |
 | `.zshrc` / `.tmux.conf` | 根目录参考配置；`.zshrc` 与安装模板行为不同 |
 | `.zshenv` | 当前为空文件，安装器不部署它 |
 | `.github/workflows/tests.yml` | Linux 容器回归配置，结果以对应运行记录为准 |

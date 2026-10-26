@@ -310,6 +310,7 @@ The detailed guides below are currently written in Chinese. This README describe
 | Guide | What you'll find |
 | :--- | :--- |
 | [Installation guide](LINUX_ZSH_SETUP_GUIDE.md) | First installation, manual deployment, and new-session checks |
+| [Tmux productivity guide](TMUX_USAGE_GUIDE.md) | Tmux shortcuts cheat sheet, remote clipboard setup, and crash recovery |
 | [Configuration management](CONFIGURATION_MANAGEMENT.md) | Switches, disable/restore, component retries, and backups |
 | [Troubleshooting](ZSH_TROUBLESHOOTING.md) | Startup errors, missing tools, update failures, and terminal display issues |
 | [Development](DEVELOPMENT.md) | Module responsibilities, loading order, state files, and maintenance conventions |
@@ -326,6 +327,7 @@ The detailed guides below are currently written in Chinese. This README describe
 | `scripts/test_installer.sh` / `scripts/test_management.sh` | Current isolated regression entry points |
 | `templates/zshrc.zsh` / `templates/tmux.conf` | Templates actually deployed by the installer |
 | `templates/zshrc.local.example` | Personal-extension example |
+| `TMUX_USAGE_GUIDE.md` | Comprehensive Tmux productivity, shortcuts, and troubleshooting guide |
 | `.zshrc` / `.tmux.conf` | Root reference configurations; `.zshrc` behaves differently from the installed template |
 | `.zshenv` | Currently empty; not deployed by the installer |
 | `.github/workflows/tests.yml` | Linux container regression workflow; consult individual runs for results |

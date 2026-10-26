@@ -194,3 +194,10 @@ Tmux 的大部分内部快捷键需要**先按下前缀键**，松开后再按�
   * **macOS iTerm2**：需在 `Settings -> General -> Selection` 勾选 `Applications in terminal may access clipboard`。
   * **Alacritty / WezTerm**：原生支持，开箱即用。
   * 若遇到完全不支持 OSC 52 的旧客户端，请记住黄金法则：**按住 `Shift` 拖拽划选复制**！
+
+### 5. 全场景防卡死与低延迟架构说明
+* **鼠标划选防假死**：鼠标拖选完成后自动调用 `copy-pipe-and-cancel` 立即退出 Vi 模式，彻底杜绝了因停留在复制模式而导致键盘敲字被拦截的“假死”问题。
+* **xclip 挂起熔断**：针对 Linux 远程机器，为 `xclip` 增加了 `timeout 1s` 超时保护，防止 SSH X11 转发失效时整个剪贴板通道死锁挂起。
+* **精简环境 Terminfo 自动降级**：配置自动探测 `tmux-256color`，如果系统精简缺少该 terminfo，会自动优雅降级为全平台通用的 `screen-256color`，杜绝 `missing terminal` 崩溃。
+* **弱网与无网启动优化**：首次启动若需拉取 TPM，通过 `run -b` 异步在后台执行，绝不卡住终端交互，即使完全断网也能秒进 Shell。
+* **状态栏平滑刷新**：将状态栏刷新间隔设为 5 秒，大幅减轻远程高延迟网络下的转义字符通信开销与低配机器 CPU 占用。

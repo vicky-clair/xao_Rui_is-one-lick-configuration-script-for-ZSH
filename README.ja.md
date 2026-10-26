@@ -271,6 +271,7 @@ bash install.sh --rollback /path/to/install-XXXXXXXX
 | ガイド | 内容 |
 | :--- | :--- |
 | [インストールガイド](LINUX_ZSH_SETUP_GUIDE.md) | 初回インストール、手動配置、新しいセッションでの確認 |
+| [Tmux 利用ガイド](TMUX_USAGE_GUIDE.md) | Tmux ショートカットチートシート、リモートクリップボード設定、障害復元 |
 | [設定管理](CONFIGURATION_MANAGEMENT.md) | 機能の切り替え、無効化・復元、コンポーネントの再試行、バックアップ |
 | [トラブルシューティング](ZSH_TROUBLESHOOTING.md) | 起動エラー、ツールの不足、更新失敗、ターミナル表示の問題 |
 | [開発ドキュメント](DEVELOPMENT.md) | モジュールの役割、読み込み順序、状態ファイル、保守上の規約 |
@@ -287,6 +288,7 @@ bash install.sh --rollback /path/to/install-XXXXXXXX
 | `scripts/test_installer.sh` / `scripts/test_management.sh` | 現行の隔離回帰テストの入口 |
 | `templates/zshrc.zsh` / `templates/tmux.conf` | インストーラーが実際に配置するテンプレート |
 | `templates/zshrc.local.example` | 個人用拡張の例 |
+| `TMUX_USAGE_GUIDE.md` | Tmux の生産性、ショートカット、トラブルシューティングに関する包括的ガイド |
 | `.zshrc` / `.tmux.conf` | ルートの参考設定。`.zshrc` はインストール用テンプレートと動作が異なる |
 | `.zshenv` | 現在は空のファイル。インストーラーは配置しない |
 | `.github/workflows/tests.yml` | Linux コンテナの回帰テストワークフロー。結果は各実行記録を参照 |

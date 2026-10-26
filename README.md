@@ -210,11 +210,15 @@ The prefix is **`Ctrl+a`**. Press it first, then the key below.
 | `h` / `j` / `k` / `l` | Resize a pane left/down/up/right by 5 cells; keys are repeatable |
 | `r` | Reload `.tmux.conf`, including its commands and plugins |
 | `g` / `G` | Open lazygit in a popup / new window |
-| `[` | Enter copy mode: `v` starts selection, `Ctrl+v` toggles rectangle selection, `y` copies and exits |
-| `p` / `]` | Paste the tmux buffer |
+| `[` | Enter copy mode: `v` starts selection, `Ctrl+v` toggles rectangle selection, `Esc` exits copy mode, `y` copies and exits |
+| `p` / `]` | Paste the tmux buffer (use terminal shortcuts like `Ctrl+Shift+V` or `Cmd+V` to paste from local clipboard into remote session) |
 | `I` (`Shift+i`) | Install TPM plugins |
 
-Mouse selection uses `copy-pipe` and stays in copy mode; keyboard `y` uses `copy-pipe-and-cancel`. The configuration enables OSC 52 and tries local clipboard utilities. Copying to an SSH client's clipboard depends on terminal support, settings, and intermediate layers; see the [official tmux clipboard guide](https://github.com/tmux/tmux/wiki/Clipboard). Your outer terminal's native selection and paste shortcuts also remain available according to its settings.
+**Clipboard & Mouse Interaction Guide**:
+- **Automatic Exit from Copy Mode**: Mouse dragging release, double-click (word), triple-click (line), and keyboard `y` all use `copy-pipe-and-cancel`. Selected text is automatically copied to the clipboard and copy mode is exited immediately, eliminating input freeze issues.
+- **Exit Anytime**: Press `Esc` or **single-click** anywhere inside the pane to immediately exit copy mode and restore normal keyboard typing.
+- **Universal OSC 52 Passthrough**: Terminal features are wildcard-matched (`*:RGB:clipboard`) with `Ms` capabilities injected, enabling clipboard passthrough across Windows Terminal, iTerm2, Alacritty, and WezTerm without extra GUI utilities. Added 1-second timeout protection for `xclip` to prevent hangs from broken SSH X11 forwarding.
+- **Native Selection Tip**: Hold **`Shift`** while dragging with the mouse to bypass tmux mouse capture and use your local terminal emulator's native selection and copy.
 
 </details>
 

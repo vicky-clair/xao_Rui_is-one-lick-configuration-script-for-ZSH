@@ -186,15 +186,17 @@ infocmp tmux-256color
 
 检查外层 TERM 和目标机 terminfo，而不是盲目将所有场景的 TERM 设为 tmux-256color。缺少条目时按目标发行版安装相应终端数据库；该错误也可能来自错误的 TERM 值。
 
-复制问题先区分：
+复制与输入卡死问题排查：
 
-1. tmux 内按前缀再按 p 能否粘贴？能说明缓冲区复制成功。
-2. 本机桌面或远程客户端能否收到 OSC 52？检查终端设置和中间层支持。
-3. 本地剪贴板工具是否有可用桌面会话？wl-copy/xclip 存在不等于能访问宿主机剪贴板。
-
-本项目启用 set-clipboard，并设置复制管道回退；不能保证任意终端或多层 SSH 都可透传。详见[tmux 官方剪贴板说明](https://github.com/tmux/tmux/wiki/Clipboard)。也可使用终端自身的选择方式，常见为按住 Shift 拖选，但具体以客户端设置为准。
-
-鼠标松开跳回底部时，检查实际按键绑定是否仍为 `copy-pipe`，以及其它配置/插件是否覆盖。键盘 y 使用 `copy-pipe-and-cancel`，复制后退出复制模式是设计行为。
+1. **输入文字卡住、按键无响应，只有多次按 `Ctrl+C` 才恢复**：
+   - **根本原因**：tmux 开启了鼠标支持，鼠标拖选（或触控板误触微晃）触发了 `copy-mode-vi` 复制模式。如果配置使用的是 `copy-pipe` 而非 `copy-pipe-and-cancel`，鼠标松开后窗格仍停留在复制模式中，后续键盘输入的英文字母全部被当成 vi 移动命令截获吞并，表现为完全无法打字；按 `Ctrl+C` 触发了内部 `cancel` 退出复制模式后才恢复。
+   - **解决办法**：使用本项目最新配置，鼠标拖选（`MouseDragEnd1Pane`）、双击、三击及键盘 `y` 均绑定 `copy-pipe-and-cancel`；同时绑定鼠标单击（`MouseDown1Pane`）及 `Escape` 随时退出复制模式。
+2. **tmux 远程无法复制到本地客户端**：
+   - **检查 OSC 52 支持**：tmux 内运行 `printf "\033]52;c;%s\a" "$(printf 'test-osc52' | base64)"`，看本地剪贴板是否变为 `test-osc52`。若未生效，检查本地终端模拟器（如 iTerm2 需要开启剪贴板权限，Windows Terminal 需新版支持）。
+   - **通配终端特性**：本项目已配置 `set -as terminal-features ",*:RGB:clipboard"` 与 `set -as terminal-overrides ',*:Ms=\E]52;%p1%s;%p2%s\7'`，自动兼容各类现代终端。
+   - **xclip 挂起防护**：SSH 场景下若有残留或失效的 `$DISPLAY`，调用 `xclip` 可能长时间挂起。本项目已加入 `timeout 1s` 超时熔断保护。
+   - **原生终端选择兜底**：任何时候均可按住 **`Shift` 键**再用鼠标拖选，直接绕过 tmux 调用本地终端原生剪贴板。
+3. **tmux 内按前缀再按 p 能否粘贴**？能粘贴说明 tmux 内部缓冲区正常；从外部粘贴至远程请直接使用终端粘贴键（如 `Ctrl+Shift+V` 或 `Cmd+V`）。
 
 ## 10. Neovim 显示范围异常或出现转义字符
 

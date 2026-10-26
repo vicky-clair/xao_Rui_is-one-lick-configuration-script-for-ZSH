@@ -1,6 +1,6 @@
 # 安装、手动部署与迁移指南
 
-核对日期：2026-10-19。默认配置位置为当前用户 HOME；使用自定义 ZDOTDIR 或 dotfiles 链接管理时，需要先设计适配方案，安装器不会自动覆盖其它配置目录。
+核对日期：2026-10-26。默认配置位置为当前用户 HOME；使用自定义 ZDOTDIR 或 dotfiles 链接管理时，需要先设计适配方案，安装器不会自动覆盖其它配置目录。Tmux 使用指南详见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)。
 
 首次使用建议按“环境检查 → 隔离测试 → 安装器部署 → 新会话验收”完成。手动部署是独立替代路线，不需要在安装器执行后再重复一次。参数总表见 [README](README.md)。
 
@@ -74,7 +74,7 @@ bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 
 `skip` 保留 `.p10k.zsh`；`rainbow`、`lean`、`classic` 会备份并替换个人主题。希望自定义可使用 `--p10k-wizard`。不要默认反复安装会保留所有开关，选项文件会根据本次选择重新生成。
 
-可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`（或通过 `--without-tmux` / `--no-tmux` 显式跳过系统已装 tmux 的配置部署）。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。在需要静默免确认执行时，可显式传入 `--yes`（或 `-y`），脚本将自动确认安装计划、跳过交互询问，并在安装完成时优雅退出（不阻塞等待 `exec zsh`）。
+可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`（或通过 `--without-tmux` / `--no-tmux` 显式跳过系统已装 tmux 的配置部署；安装后使用技巧见 [Tmux 使用指南](TMUX_USAGE_GUIDE.md)）。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。在需要静默免确认执行时，可显式传入 `--yes`（或 `-y`），脚本将自动确认安装计划、跳过交互询问，并在安装完成时优雅退出（不阻塞等待 `exec zsh`）。
 
 ### 严格幂等性与零重复保障 (Idempotency)
 

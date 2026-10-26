@@ -1,6 +1,6 @@
 # Zsh 配置管理
 
-核对日期：2026-10-19。本文描述安装器部署的 `templates/zshrc.zsh`；根目录 `.zshrc` 的部分工具不受同样的开关控制，差异见[开发文档](DEVELOPMENT.md)。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)。
+核对日期：2026-10-26。本文描述安装器部署的 `templates/zshrc.zsh` 与 `templates/tmux.conf`；根目录 `.zshrc` 的部分工具不受同样的开关控制，差异见[开发文档](DEVELOPMENT.md)。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，Tmux 高级用法与快捷键详见[Tmux 使用指南](TMUX_USAGE_GUIDE.md)。
 
 在完整项目目录中运行下列命令。涉及配置写入或组件安装时会询问确认。加 `--dry-run` 仅展示操作，不写文件、不联网、不执行用户配置。`--yes` / `-y` 可显式跳过确认，适用于自动化部署与管理脚本。
 
@@ -46,7 +46,7 @@ bash install.sh --set auto-update=0
 | `vfox` | vfox 激活 | 关闭 |
 | `lazydocker` | lazydocker 别名 | 开启（检测到命令时生效） |
 | `lazygit` | lazygit 别名与 Ctrl+G 快捷键 | 开启（检测到命令时生效） |
-| `tmux` | tmux 别名 | 关闭 |
+| `tmux` | tmux 别名（详细快捷键与技巧见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)） | 关闭 |
 | `banner` | 启动横幅与成功信息；错误及更新提示仍显示 | 开启 |
 | `fastfetch` | 启动时显示系统信息，同时要求 `full=1` | 开启 |
 | `timer` | 横幅中的启动计时，同时要求 `banner=1` | 开启 |
@@ -55,7 +55,7 @@ bash install.sh --set auto-update=0
 | `tv-keys` | television 快捷键接管（开启时接管 Ctrl+T / Ctrl+R） | 关闭（默认保留 FZF 快捷键） |
 | `tre` | tre 现代化目录树集成（命令: `tre`，带 `-e` 编号跳转联动） | 开启（`full=1` 且检测到命令时生效） |
 
-开关不安装或卸载软件；`tmux=0` 不修改 `.tmux.conf`。更改后新开终端验证，不根据旧会话残留的别名判断。横幅、Fastfetch、计时开关以及下述扩展和快捷命令需要新版 `templates/zshrc.zsh`。旧安装仅更新项目源码不会自动替换家目录中的模板；普通 `--update` 也不重新部署模板。使用安装器重新部署时会备份配置，并按安装选项重写选项文件。
+开关不安装或卸载软件；`tmux=0` 不修改 `.tmux.conf`（详细使用指南见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)）。更改后新开终端验证，不根据旧会话残留的别名判断。横幅、Fastfetch、计时开关以及下述扩展和快捷命令需要新版 `templates/zshrc.zsh`。旧安装仅更新项目源码不会自动替换家目录中的模板；普通 `--update` 也不重新部署模板。使用安装器重新部署时会备份配置，并按安装选项重写选项文件。
 
 新版模板安装后支持快捷命令：
 

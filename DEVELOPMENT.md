@@ -86,7 +86,7 @@ Homebrew 准备和资源自举可能在第 6 步最终确认前发生。第 10 �
 | Neovim | 完整模式、非 Homebrew 分支中，缺失、版本低于脚本阈值 0.10 或显式指定参数时尝试下载 |
 | vfox | 包管理器失败后尝试官方用户安装脚本；不安装 SDK |
 | lazydocker / lazygit | 包管理器优先，下载回退行为存在差异，见下文限制 |
-| tmux | 安装软件、剪贴板依赖、TPM 和配置；TPM 首次异步克隆自举，内置 OSC 52 与 xclip 1秒熔断兜底、terminfo 自适应降级与复制模式防误锁机制；操作技巧详见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) |
+| tmux | 安装软件、剪贴板依赖、TPM 和配置；TPM 首次异步克隆自举并在完成后自动热重载，内置 127 报警防护、OSC 52 与 xclip 1秒熔断兜底、terminfo 自适应降级与复制模式防误锁机制；操作技巧详见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) |
 
 `install_nvim_tree()` 先验证暂存二进制，再切换目录与链接，保留旧版本，并在切换失败时尝试恢复。下载成功、可执行位存在或 `--version` 成功均不能证明所有运行库和插件兼容；安装器没有统一的发布资产签名/校验文件验证流程。
 

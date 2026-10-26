@@ -196,8 +196,53 @@ Tmux 的大部分内部快捷键需要**先按下前缀键**，松开后再按�
   * 若遇到完全不支持 OSC 52 的旧客户端，请记住黄金法则：**按住 `Shift` 拖拽划选复制**！
 
 ### 5. 全场景防卡死与低延迟架构说明
-* **鼠标划选防假死**：鼠标拖选完成后自动调用 `copy-pipe-and-cancel` 立即退出 Vi 模式，彻底杜绝了因停留在复制模式而导致键盘敲字被拦截的“假死”问题。
-* **xclip 挂起熔断**：针对 Linux 远程机器，为 `xclip` 增加了 `timeout 1s` 超时保护，防止 SSH X11 转发失效时整个剪贴板通道死锁挂起。
+* **鼠标划选防假死**：鼠标拖选完成后自动调用 `copy-pipe-and-cancel` 立即退出 Vi 模式，彻底杜绝了因停留在复制模式而导致键盘敲字被拦截吞掉的“假死”问题；单击任意空白处或按 `Esc` 均可秒退复制模式。
+* **xclip 挂起熔断与跨平台预检**：针对 Linux 远程机器，为 `xclip` 增加了 `timeout 1s` 超时保护，并加入了 `command -v timeout` 预检（兼容缺失 coreutils timeout 的 BSD/精简系统），防止 SSH X11 转发失效时整个剪贴板通道死锁挂起。
 * **精简环境 Terminfo 自动降级**：配置自动探测 `tmux-256color`，如果系统精简缺少该 terminfo，会自动优雅降级为全平台通用的 `screen-256color`，杜绝 `missing terminal` 崩溃。
-* **弱网与无网启动优化**：首次启动若需拉取 TPM，通过 `run -b` 异步在后台执行，绝不卡住终端交互，即使完全断网也能秒进 Shell。
+* **弱网与无网启动优化与防 127 报警**：首次启动若需拉取 TPM，通过 `run -b` 异步在后台执行，绝不卡住终端交互，即使完全断网也能秒进 Shell；TPM 启动行增加了 `[ -f .../tpm ]` 存在性守卫，彻底消除了全新机器首次克隆前的 `127` 报警代码。
+* **自举完成自动静默热重载**：后台异步克隆 TPM 及其插件完成后，会自动追加触发 `tmux source-file ~/.tmux.conf`，用户零手动干预即可自动生效 Tokyo Night 美化主题与全部插件。
 * **状态栏平滑刷新**：将状态栏刷新间隔设为 5 秒，大幅减轻远程高延迟网络下的转义字符通信开销与低配机器 CPU 占用。
+
+---
+
+## 11. 已有安装环境如何快速更新 Tmux 配置
+
+对于此前已经安装过本项目的电脑，如果需要获取最新的防卡顿、剪贴板熔断及 Terminfo 降级特性，推荐以下方式：
+
+### 方式一：单行命令在线极速更新（推荐，自动备份）
+
+在目标机器终端中直接执行：
+
+```bash
+# 自动备份旧配置 + 下载最新 templates/tmux.conf
+cp ~/.tmux.conf ~/.tmux.conf.bak.$(date +%Y%m%d%H%M%S) 2>/dev/null || true
+curl -fsSL https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/templates/tmux.conf -o ~/.tmux.conf
+
+# 立即热重载生效
+tmux source ~/.tmux.conf 2>/dev/null && echo "✓ Tmux 最新配置已部署并成功热重载！"
+```
+
+### 方式二：通过 Git 本地仓库更新
+
+如果本地保留有克隆仓库（默认目录为 `~/.zsh-project`）：
+
+```bash
+cd ~/.zsh-project
+git pull origin main
+cp ~/.tmux.conf ~/.tmux.conf.bak.$(date +%Y%m%d%H%M%S) 2>/dev/null || true
+cp templates/tmux.conf ~/.tmux.conf
+tmux source ~/.tmux.conf && echo "✓ Tmux 配置已同步为最新版本！"
+```
+
+### 方式三：使用安装器重新部署
+
+```bash
+cd ~/.zsh-project
+git pull origin main
+# --p10k-style skip 保留现有已选主题，--yes 免交互确认
+bash install.sh --profile full --with-tmux --p10k-style skip --yes
+```
+
+> **更新后快速验证**：
+> 1. 在 Tmux 内按 **`Ctrl + a` 然后按 `r`**，屏幕底部提示 `✓ ~/.tmux.conf reloaded successfully!` 即表示配置热重载成功。
+> 2. 按 **`Ctrl + a` 然后按 `I`（大写 i）**，TPM 插件管理器将自动拉取并安装最新插件生态。

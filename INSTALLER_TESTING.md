@@ -19,7 +19,7 @@
 | Yazi 多媒体预览套件 | 通过 | 通过 | `ripgrep`、`jq`、`ffmpeg`、`7z` / `7zz`、`pdftoppm`、`magick`、`resvg` 全部正确安装与挂载 |
 | 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 退出码 0，0 项异常 | 全部 23 项工具版本秒级读取，无悬空声明，无键盘挂死 |
 | 终端交互与会话冷启动 | 通过 (~303ms) | 通过 (**143ms**) | PTY 会话秒级极速自举，所有 14 项 CLI 工具挂载正常，Fastfetch 完整输出，无报错与警告 |
-| Tmux 终端复用器与 TPM | 通过 (tmux 3.5a) | 通过 (tmux 3.5a) | 经 2026-10-26 加固：防划选输入挂起（`copy-pipe-and-cancel`）、SSH 剪贴板防死锁（`timeout 1s xclip`）、Terminfo 智能降级、异步 TPM 引导及状态栏平滑刷新；配套 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 实机核验通过 |
+| Tmux 终端复用器与 TPM | 通过 (tmux 3.5a) | 通过 (tmux 3.5a) | 经 2026-10-26 深度加固：防划选输入挂起（`copy-pipe-and-cancel`）、SSH 剪贴板防死锁（`timeout 1s xclip` 与 `command -v timeout` 预检）、Terminfo 智能降级、TPM 异步引导与自举完成自动热重载（防 127 报警）；配套 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 实机核验通过 |
 | 启动性能分析 (`--profile-startup`) | 通过 | 通过 | 通过 `zprof` 完成函数级耗时诊断，详细性能明细输出完整 |
 
 ### 2. Debian 13 远程实机环境明细

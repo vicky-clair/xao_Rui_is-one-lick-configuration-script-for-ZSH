@@ -220,6 +220,8 @@ The prefix is **`Ctrl+a`**. Press it first, then the key below.
 - **Universal OSC 52 Passthrough**: Terminal features are wildcard-matched (`*:RGB:clipboard`) with `Ms` capabilities injected, enabling clipboard passthrough across Windows Terminal, iTerm2, Alacritty, and WezTerm without extra GUI utilities. Added 1-second timeout protection for `xclip` to prevent hangs from broken SSH X11 forwarding.
 - **Native Selection Tip**: Hold **`Shift`** while dragging with the mouse to bypass tmux mouse capture and use your local terminal emulator's native selection and copy.
 
+👉 **For advanced session management, Vim navigation, and crash recovery, see the [Tmux Productivity Guide (TMUX_USAGE_GUIDE.md)](TMUX_USAGE_GUIDE.md)**.
+
 </details>
 
 ## Configuration & maintenance

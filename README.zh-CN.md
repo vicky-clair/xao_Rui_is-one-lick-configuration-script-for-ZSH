@@ -258,6 +258,8 @@ bash "$bootstrap_dir/install.sh" --lang zh
 - **全平台终端剪贴板 (OSC 52)**：全局通配启用 `*:RGB:clipboard` 与 `Ms` 转义序列，无需安装图形工具即可在 Windows Terminal、iTerm2、Alacritty、WezTerm 等终端中透传剪贴板，并对 `xclip` 增加了 1 秒超时防护，避免 SSH X11 转发失效时连接挂起。
 - **终端原生选择技巧**：任何时候按住 **`Shift`** 键再用鼠标拖选，即可强制绕过 tmux 鼠标拦截，直接调用本地终端的原生选区与复制功能。
 
+👉 **更详细的会话管理、Vim 联动、断电恢复与实战技巧请参阅 [Tmux 生产力使用指南 (TMUX_USAGE_GUIDE.md)](TMUX_USAGE_GUIDE.md)**。
+
 ## 更新与重新部署
 
 | 目标 | 操作 | 影响 |

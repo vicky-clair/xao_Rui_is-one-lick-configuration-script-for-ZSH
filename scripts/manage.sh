@@ -155,12 +155,13 @@ option_key() {
   case "$1" in
     full) echo ZSH_PROJECT_FULL ;; vfox) echo ZSH_PROJECT_VFOX ;;
     lazydocker) echo ZSH_PROJECT_LAZYDOCKER ;; lazygit) echo ZSH_PROJECT_LAZYGIT ;; tmux) echo ZSH_PROJECT_TMUX ;;
+    tmux-auto) echo ZSH_PROJECT_TMUX_AUTO ;;
     banner) echo ZSH_PROJECT_BANNER ;; fastfetch) echo ZSH_PROJECT_FASTFETCH ;;
     timer) echo ZSH_PROJECT_TIMER ;; auto-update) echo ZSH_PROJECT_AUTO_CHECK_UPDATE ;;
     television|tv) echo ZSH_PROJECT_TELEVISION ;;
     tv-keys|tv-keybindings) echo ZSH_PROJECT_TV_KEYBINDINGS ;;
     tre) echo ZSH_PROJECT_TRE ;;
-    *) fail '可选项：full vfox lazydocker lazygit tmux banner fastfetch timer auto-update television tv-keys tre' ;;
+    *) fail '可选项：full vfox lazydocker lazygit tmux tmux-auto banner fastfetch timer auto-update television tv-keys tre' ;;
   esac
 }
 
@@ -224,9 +225,9 @@ case "$ACTION" in
   --configure)
     [[ -t 0 ]] || fail '配置菜单需要交互终端；脚本化设置请用 --set banner=0'
     echo '可选项（0=关闭，1=开启；不安装/卸载软件）：'
-    for name in full vfox lazydocker lazygit tmux banner fastfetch timer auto-update television tv-keys tre; do
+    for name in full vfox lazydocker lazygit tmux tmux-auto banner fastfetch timer auto-update television tv-keys tre; do
       key=$(option_key "$name"); default=0
-      case "$name" in banner|fastfetch|timer|auto-update|lazygit|lazydocker|television|tre) default=1 ;; esac
+      case "$name" in banner|fastfetch|timer|auto-update|lazygit|lazydocker|television|tre|tmux-auto) default=1 ;; esac
       printf '  %s=%s\n' "$name" "$(get_option "$key" "$default")"
     done
     read -r -p '输入一项设置，如 banner=0；直接回车取消：' choice

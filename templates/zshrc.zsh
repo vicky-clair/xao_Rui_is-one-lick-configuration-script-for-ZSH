@@ -516,3 +516,15 @@ if [[ ${ZSH_PROJECT_PROFILING:-0} == 1 ]]; then
   unfunction _zsh_profile_mark
   unset _zsh_profile_last
 fi
+
+# ========================================
+# Tmux 终端常驻与无缝重连 (Auto-Attach & Session Persistence)
+# ========================================
+# 当开启 tmux 时，在交互终端中自动接入或创建名为 main 的常驻会话；
+# 直接关闭终端窗口时会话与后台进程在服务器上完好保留，再次打开终端自动恢复现场！
+# 仅当在 Tmux 内显式输入 exit 彻底关闭所有窗口时，外层终端才正常退出。
+if [[ ${ZSH_PROJECT_TMUX:-0} == 1 && ${ZSH_PROJECT_TMUX_AUTO:-1} == 1 ]] && command -v tmux &>/dev/null; then
+  if [[ -z "$TMUX" && -t 0 && -t 1 && -z "${NVIM:-}" && -z "${VIM:-}" && ${ZSH_PROJECT_PROFILING:-0} != 1 && -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
+    tmux new-session -A -s main && exit 0
+  fi
+fi

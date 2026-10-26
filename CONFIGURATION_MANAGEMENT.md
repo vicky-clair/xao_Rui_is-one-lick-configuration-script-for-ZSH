@@ -46,7 +46,8 @@ bash install.sh --set auto-update=0
 | `vfox` | vfox 激活 | 关闭 |
 | `lazydocker` | lazydocker 别名 | 开启（检测到命令时生效） |
 | `lazygit` | lazygit 别名与 Ctrl+G 快捷键 | 开启（检测到命令时生效） |
-| `tmux` | tmux 别名（详细快捷键与技巧见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)） | 关闭 |
+| `tmux` | tmux 别名与基础集成（详细快捷键与技巧见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)） | 关闭 |
+| `tmux-auto` | 终端启动自动接入/常驻 `main` 会话（关闭终端后台不中断，下次登录无缝恢复现场） | 开启（要求 `tmux=1`） |
 | `banner` | 启动横幅与成功信息；错误及更新提示仍显示 | 开启 |
 | `fastfetch` | 启动时显示系统信息，同时要求 `full=1` | 开启 |
 | `timer` | 横幅中的启动计时，同时要求 `banner=1` | 开启 |

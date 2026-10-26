@@ -201,7 +201,15 @@ Tmux 的大部分内部快捷键需要**先按下前缀键**，松开后再按�
 * **精简环境 Terminfo 自动降级**：配置自动探测 `tmux-256color`，如果系统精简缺少该 terminfo，会自动优雅降级为全平台通用的 `screen-256color`，杜绝 `missing terminal` 崩溃。
 * **弱网与无网启动优化与防 127 报警**：首次启动若需拉取 TPM，通过 `run -b` 异步在后台执行，绝不卡住终端交互，即使完全断网也能秒进 Shell；TPM 启动行增加了 `[ -f .../tpm ]` 存在性守卫，彻底消除了全新机器首次克隆前的 `127` 报警代码。
 * **自举完成自动静默热重载**：后台异步克隆 TPM 及其插件完成后，会自动追加触发 `tmux source-file ~/.tmux.conf`，用户零手动干预即可自动生效 Tokyo Night 美化主题与全部插件。
-* **状态栏平滑刷新**：将状态栏刷新间隔设为 5 秒，大幅减轻远程高延迟网络下的转义字符通信开销与低配机器 CPU 占用。
+* **热重载重置防累积**：在配置开头使用 `set -su terminal-overrides` 与 `set -su terminal-features`，每次按 `Prefix + r` 热重载时均先重置为系统默认再注入真彩与剪贴板扩展，彻底杜绝了重复选项无限堆叠的漏洞。
+* **会话常驻防误退 (Persistence)**：显式设置 `destroy-unattached off`、`exit-empty off` 与 `detach-on-destroy off`，客户端断开或窗口关闭不会销毁后台会话。
+
+### 6. 会话常驻与终端关闭自动重连 (Persistence & Auto-Attach)
+* **默认常驻行为**：直接关闭终端窗口或网络意外中断时，Tmux 后台进程与运行中的任务（编译、下载、服务）均在服务器上完好保留，绝不中断。
+* **自动接入与恢复**：当开启 `tmux=1` 且 `tmux-auto=1` 时，打开终端会自动接入或创建名为 `main` 的常驻会话；直接关掉终端再重新进入，依然是在 tmux 中无缝恢复现场！
+* **退出行为**：只有在 tmux 窗口中主动敲击 `exit` 退出全部窗口，会话才彻底关闭，外层终端随后退出。
+* **手动脱离（保留后台）**：按 **`Ctrl + a` 然后按 `d`**（Detach）。
+* **开关控制**：若需要仅保留 tmux 快捷别名而不自动接入会话，可运行 `bash install.sh --set tmux-auto=0`（或在 `~/.zsh-project-options` 设置 `ZSH_PROJECT_TMUX_AUTO=0`）。
 
 ---
 

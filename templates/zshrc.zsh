@@ -353,8 +353,23 @@ if [[ ${ZSH_PROJECT_LAZYGIT:-1} == 1 ]] && command -v lazygit &>/dev/null; then
 fi
 
 if [[ ${ZSH_PROJECT_TMUX:-0} == 1 ]] && command -v tmux &>/dev/null; then
-  alias t="tmux"
-  alias ta="tmux attach -t"
+  # Tmux 常用别名与智能接入函数：
+  # t: 快速进入/创建默认 main 常驻会话；若传入参数则透传给 tmux 原生命令
+  t() {
+    if [[ $# -eq 0 ]]; then
+      tmux new-session -A -s main
+    else
+      tmux "$@"
+    fi
+  }
+  # ta: 智能挂载命令。无参数时默认挂载最近一次/main 会话；带参数时挂载指定名称会话
+  ta() {
+    if [[ $# -eq 0 ]]; then
+      tmux attach 2>/dev/null || tmux new-session -A -s main
+    else
+      tmux attach -t "$@"
+    fi
+  }
   alias tls="tmux ls"
   alias tn="tmux new -s"
 fi
@@ -520,12 +535,16 @@ fi
 # ========================================
 # Tmux 终端常驻与无缝重连 (Auto-Attach & Session Persistence)
 # ========================================
-# 当开启 tmux 时，在交互终端中自动接入或创建名为 main 的常驻会话；
-# 直接关闭终端窗口时会话与后台进程在服务器上完好保留，再次打开终端自动恢复现场！
-# 在 Tmux 内输入 exit 或按 Ctrl+a d 脱离后，会自动进入正常原生终端，不会直接退出窗口。
+# 1. 自动接入与恢复：开启 tmux 时，启动交互终端自动接入或创建名为 main 的常驻会话；
+# 2. 会话后台保活：直接关闭终端窗口或网络意外断开时，Tmux 后台进程与运行中的任务完好保留，再次打开自动恢复现场！
+# 3. 平稳退回原生终端：在 Tmux 内输入 exit 或按 Ctrl+a d 脱离后，会自动平稳回到正常原生终端，绝不会闪退关闭窗口；
+# 4. 再次快速进入：在原生终端中输入 t 即可随时重新回到 main 会话。
 if [[ ${ZSH_PROJECT_TMUX:-0} == 1 && ${ZSH_PROJECT_TMUX_AUTO:-1} == 1 ]] && command -v tmux &>/dev/null; then
+  # 预检守卫：避免在已进入 tmux、本次会话已接入过、非交互终端、Vim/Neovim 内部终端、性能分析或测试环境下重复启动
   if [[ -z "$TMUX" && -z "${ZSH_PROJECT_TMUX_ATTACHED:-}" && -t 0 && -t 1 && -z "${NVIM:-}" && -z "${VIM:-}" && ${ZSH_PROJECT_PROFILING:-0} != 1 && -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
+    # 标记当前终端已完成 tmux 接入流程，防止退出 tmux 回到原生终端时或重载 zshrc 时死循环拉起 tmux
     export ZSH_PROJECT_TMUX_ATTACHED=1
+    # -A 参数表示：若 main 会话已存在则直接接入恢复现场；若不存在则自动新建
     tmux new-session -A -s main
   fi
 fi

@@ -194,7 +194,7 @@ These shortcuts refer to the installed template and require the corresponding to
 | `lg` / `Ctrl+G` | Open lazygit |
 | `lzd` | Open lazydocker |
 | `gst` / `man command` | OMZ Git status alias / manual pages; colors depend on the pager and terminal |
-| `t` / `ta name` / `tls` / `tn name` | tmux / attach session / list sessions / create session |
+| `t` / `ta [name]` / `tls` / `tn name` | attach main / attach session / list sessions / create session |
 | `zsh-config` | Configuration menu; also accepts management arguments such as `--doctor` or `--set banner=0` |
 | `zsh-check-updates` / `zsh-update` | Check for / install third-party updates |
 
@@ -213,6 +213,13 @@ The prefix is **`Ctrl+a`**. Press it first, then the key below.
 | `[` | Enter copy mode: `v` starts selection, `Ctrl+v` toggles rectangle selection, `Esc` exits copy mode, `y` copies and exits |
 | `p` / `]` | Paste the tmux buffer (use terminal shortcuts like `Ctrl+Shift+V` or `Cmd+V` to paste from local clipboard into remote session) |
 | `I` (`Shift+i`) | Install TPM plugins |
+
+**Session Persistence & Auto-Attach**:
+- **Background Persistence**: Closing terminal windows or unexpected disconnections leaves background processes and sessions running safely on the server.
+- **Auto-Attach & Resume**: When `tmux` is enabled, launching a terminal automatically connects or creates the `main` session, seamlessly restoring your workspace.
+- **Smooth Exit & Detach**: Inside tmux, typing `exit` or pressing `Ctrl+a d` (Detach) gracefully returns to the native shell prompt rather than closing the window. Type `t` in the native terminal to jump back anytime.
+  - **Keep workspace active**: Detach via `Ctrl+a d` or close the terminal window directly.
+  - **Terminate session completely**: Type `exit` inside the tmux pane.
 
 **Clipboard & Mouse Interaction Guide**:
 - **Automatic Exit from Copy Mode**: Mouse dragging release, double-click (word), triple-click (line), and keyboard `y` all use `copy-pipe-and-cancel`. Selected text is automatically copied to the clipboard and copy mode is exited immediately, eliminating input freeze issues.

@@ -234,7 +234,7 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | `lg` / Ctrl+G | lazygit Git 面板 |
 | `lzd` | lazydocker 容器面板 |
 | `gst` / `man 命令` | OMZ Git 状态别名 / 手册；颜色取决于分页器和终端 |
-| `t` / `ta 名称` / `tls` / `tn 名称` | tmux / 连接会话 / 列出会话 / 新建会话 |
+| `t` / `ta [名称]` / `tls` / `tn 名称` | 接入 main / 挂载会话 / 列出会话 / 新建会话 |
 | `zsh-config` | 配置菜单；可附加 `--doctor`、`--set banner=0` 等管理参数 |
 | `zsh-check-updates` / `zsh-update` | 手动检测 / 更新第三方组件 |
 
@@ -252,6 +252,13 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | `[` | 进入复制模式（`v` 开始选择，`Ctrl+v` 切换矩形选择，`Esc` 退出复制模式，`y` 复制并退出） |
 | `p` / `]` | 粘贴 tmux 内部缓冲区（若从本机向远程粘贴，请使用终端的快捷键如 `Ctrl+Shift+V` 或 `Cmd+V`） |
 | `I`（Shift+i） | TPM 安装插件 |
+
+**会话常驻保活与自动重连 (Persistence & Auto-Attach)**：
+- **常驻保活**：直接关闭终端窗口或网络意外断开时，Tmux 后台进程与运行中的任务（编译、下载、服务）完好保留，绝不中断。
+- **自动接入恢复**：开启 `tmux` 时，打开终端自动接入或创建 `main` 会话，无缝恢复工作现场。
+- **平稳退回原生终端**：在 tmux 内部输入 `exit` 或按 `Ctrl+a d`（脱离）后，**平稳退回原生普通终端（Zsh Prompt），绝不会闪退关闭窗口**。在原生终端输入 `t` 即可随时重新接入；
+  - **想保留现场下次用**：按 `Ctrl+a d` 脱离或直接关闭终端窗口；
+  - **想彻底结束销毁**：在窗格中输入 `exit`。
 
 **剪贴板与鼠标交互指南**：
 - **复制直通本地**：鼠标拖选松开、双击（选词）、三击（选行）或键盘 `y` 均使用 `copy-pipe-and-cancel`，自动写入系统剪贴板并**立即退出复制模式**，彻底根除停留在复制模式导致后续键盘打字假死卡住的故障。

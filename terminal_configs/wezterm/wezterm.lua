@@ -77,7 +77,4 @@ config.scrollback_lines = 10000
 -- 禁用自动检查更新弹窗（通过系统包管理器统一维护）
 config.check_for_updates = false
 
--- 复制时自动去除多余行尾空白
-config.trim_trailing_spaces_when_copying = true
-
 return config

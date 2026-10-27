@@ -18,22 +18,25 @@
 
 ## ⚡ 30 秒极速上手
 
-在目标机器的普通用户终端中执行以下命令（遇到包管理操作会自动请求 sudo，请勿以 root 运行）：
+> [!IMPORTANT]
+> **安全运行提示**：请在目标机器的**普通用户**终端中直接运行（遇到系统包管理操作时安装器会自动按需请求 `sudo` 提权）。**切勿使用 `sudo bash install.sh` 或在 root 用户下运行**，避免导致普通用户家目录配置文件权限被 root 占用污染！
+>
+> 💡 **终端字体建议**：Powerlevel10k 彩虹流线提示符与 Yazi/Tmux 状态栏图标需要 **Nerd Font** 矢量图标字体支持（推荐 [JetBrainsMono Nerd Font](https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip)）。若在 SSH 远程连接或本地终端中发现图标显示为小方框乱码，只需在您本机终端软件（Windows Terminal、iTerm2、WezTerm 等）设置中将字体切换为 Nerd Font 即可瞬间完美显示！
 
 ```bash
-# 1. 克隆项目仓库
+# 1. 克隆项目仓库至用户目录
 git clone https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git "$HOME/.zsh-project"
 cd "$HOME/.zsh-project"
 
 # 2. 挑选适合您的安装模式执行：
 
-# 🚀 【推荐方案】完整版：14+ 现代 CLI 工具链 + P10k 经典彩虹流线主题 + Tmux 增强
-bash install.sh --profile full --p10k-style rainbow --lang zh
+# 🚀 【推荐全能方案】完整版：全套现代 CLI 工具链 + P10k 经典彩虹流线主题 + Tmux 增强 + 现代终端配置
+bash install.sh --profile full --p10k-style rainbow --with-tmux --with-terminals --lang zh
 
-# ⚡ 【轻量方案】基础版：仅 OMZ + 3 个核心插件（补全/建议/高亮），保留现有个人主题
+# ⚡ 【轻量基础方案】基础版：仅 OMZ + 3 个核心插件（极速补全/自动建议/语法高亮），保留现有个人主题
 bash install.sh --profile basic --p10k-style skip --lang zh
 
-# 🤖 【自动化】CI / Docker / 无人值守全自动安装（所有提示默认确认）
+# 🤖 【自动化免交互】CI / Docker / 云服务器无人值守全自动安装（所有提示默认确认）
 bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 ```
 

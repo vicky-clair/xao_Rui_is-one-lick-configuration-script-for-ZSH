@@ -74,7 +74,7 @@ bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 
 `skip` 保留 `.p10k.zsh`；`rainbow`、`lean`、`classic` 会备份并替换个人主题。希望自定义可使用 `--p10k-wizard`。不要默认反复安装会保留所有开关，选项文件会根据本次选择重新生成。
 
-可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`（或通过 `--without-tmux` / `--no-tmux` 显式跳过系统已装 tmux 的配置部署；安装后使用技巧见 [Tmux 使用指南](TMUX_USAGE_GUIDE.md)）。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。在需要静默免确认执行时，可显式传入 `--yes`（或 `-y`），脚本将自动确认安装计划、跳过交互询问，并在安装完成时优雅退出（不阻塞等待 `exec zsh`）。
+可按需附加 `--with-vfox`、`--with-lazydocker`、`--with-lazygit`、`--with-tmux`（或通过 `--without-tmux` / `--no-tmux` 显式跳过系统已装 tmux 的配置部署；安装后使用技巧见 [Tmux 使用指南](TMUX_USAGE_GUIDE.md)），以及 `--with-terminals`（或 `--with-terminal-configs`，自动备份并部署 WezTerm 与 Alacritty 现代终端的 Tokyo Night 主题配置，含中文字体回退优化）。已有的这些命令会自动影响安装选项，最终计划可能包含 `.tmux.conf` 替换。在需要静默免确认执行时，可显式传入 `--yes`（或 `-y`），脚本将自动确认安装计划、跳过交互询问，并在安装完成时优雅退出（不阻塞等待 `exec zsh`）。
 
 ### 严格幂等性与零重复保障 (Idempotency)
 

@@ -125,7 +125,11 @@ available() {
   case "$component" in
     neovim) cmd=nvim ;;
     wl-clipboard) cmd=wl-copy ;;
-    ncurses-term) return 1 ;;
+    ncurses-term)
+      infocmp tmux-256color >/dev/null 2>&1 && return 0
+      [[ -e /usr/share/terminfo/t/tmux-256color || -e /lib/terminfo/t/tmux-256color ]] && return 0
+      return 1
+      ;;
     television) cmd=tv ;;
     tre-command) cmd=tre ;;
     agrep)

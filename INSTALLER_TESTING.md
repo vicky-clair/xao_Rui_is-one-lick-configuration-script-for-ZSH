@@ -12,22 +12,22 @@
 | --- | --- | --- | --- |
 | 六个正式 Bash 脚本语法 | 通过 | 通过 | `bash -n` 静态解析检查，全数通过 |
 | Zsh 模板与配置语法检查 | 通过 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
-| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、`.tmux.conf` 模板一致性、`optional_package` 与 `retry_tools.sh normalize()` 白名单对齐、`tmux >= 3.2` 版本解析器边界测试、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
+| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、`.tmux.conf` 模板一致性、`optional_package` 与 `retry_tools.sh normalize()` 白名单对齐、`tmux >= 3.2` 版本解析器边界测试、SHA-256 供应链安全校验器 (Test 7b)、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
 | `bash scripts/test_management.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Zsh 开关（含 television、tv-keys、tre）、差异恢复、失败重试隔离、控制终端诊断全数通过 |
-| 生产实际安装部署 | 通过 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux` 实机部署成功，跳过包数量为 0，受管配置与备份完整生效 |
+| 生产实际安装部署 | 通过 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux --with-terminals` 实机部署成功，跳过包数量为 0，受管配置与备份完整生效 |
 | 现代终端与 Nerd 字体安装 | 通过 | 通过 | 字体与图形协议环境就绪，支持 `--with-terminals` 自动部署 WezTerm / Alacritty 配置，自动安装或识别 Nerd Font 图标字体 |
 | Yazi 多媒体预览套件 | 通过 | 通过 | `ripgrep`、`jq`、`ffmpeg`、`7z` / `7zz`、`pdftoppm`、`magick`、`resvg` 全部正确安装与挂载 |
-| 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 退出码 0，0 项异常 | 全部 23 项工具版本秒级读取（含 `tmux -V` 适配），无悬空声明，无键盘挂死 |
+| 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 退出码 0，0 项异常 | 全部 24 项工具版本秒级读取（含 `tmux -V` 适配），无悬空声明，无键盘挂死 |
 | 终端交互与会话冷启动 | 通过 (~303ms) | 通过 (**143ms**) | PTY 会话秒级极速自举，所有 14 项 CLI 工具挂载正常，Fastfetch 完整输出，无报错与警告 |
-| Tmux 终端复用器与 TPM | 通过 (tmux 3.8，含 10-27 审计修复实测) | 通过 (tmux 3.5a，含 10-26 加固) | 经 2026-10-26/10-27 深度加固：安装器前置 `tmux >= 3.2` 版本检查、PATH 幂等去重注入（支持 macOS Homebrew / Intel / Linuxbrew，连续 `source-file` 0 重复）、`%hidden CLIPBOARD_PIPE` 消除重复管道、防划选输入挂起（`copy-pipe-and-cancel`）、SSH 剪贴板防死锁（`timeout 1s xclip`）、Terminfo 智能降级、TPM 路径显式锚定与异步引导热重载；配套 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 实机核验通过 |
+| Tmux 终端复用器与 TPM | 通过 (tmux 3.8，含 10-27 审计修复实测) | 通过 (tmux 3.5a，含 10-27 加固) | 经 2026-10-26/10-27 深度加固：安装器前置 `tmux >= 3.2` 版本检查、PATH 幂等去重注入（支持 macOS Homebrew / Intel / Linuxbrew，连续 `source-file` 0 重复）、`%hidden CLIPBOARD_PIPE` 消除重复管道、防划选输入挂起（`copy-pipe-and-cancel`）、SSH 剪贴板防死锁（`timeout 1s xclip`）、Terminfo 智能降级、TPM 路径显式锚定与异步引导热重载；配套 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 实机核验通过 |
 | 启动性能分析 (`--profile-startup`) | 通过 | 通过 | 通过 `zprof` 完成函数级耗时诊断，详细性能明细输出完整 |
 
 ### 2. Debian 13 远程实机环境明细
 
 - **测试主机与内核**：ATOPNUC AG50 (Intel N5095A 4核 @ 2.90GHz), Linux 6.12.107+deb13-amd64, Debian GNU/Linux 13 (trixie) x86_64
 - **目标用户与权限**：`hailan20251015`，具备 `sudo` 与 `docker` 用户组，默认登录 Shell 确认为 `/bin/zsh` (Zsh 5.9)
-- **部署模式**：`--profile full --p10k-style rainbow --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux --lang zh`
-- **安全备份存档**：已保存至 `~/.local/state/zsh-project/install-WG8EDTNK`
+- **部署模式**：`--profile full --p10k-style rainbow --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux --with-terminals --lang zh`
+- **安全备份存档**：已保存至 `~/.local/state/zsh-project/install-Gug8DW0W`
 - **安装耗时与结果**：网络包管理器事务与插件安装一次性完成，跳过项为 `none`，新会话启动耗时仅 143ms。
 
 本次测试现场保留在 `/var/folders/.../zsh-installer-tests.*` 和 `zsh-management-tests.*`。这些是测试运行的临时路径，不是需要部署的仓库资源。

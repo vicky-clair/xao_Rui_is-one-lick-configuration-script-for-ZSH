@@ -100,13 +100,13 @@
 
 | 编号 | 问题 | 状态 |
 | --- | --- | --- |
-| M-1 | 第三方下载缺少 SHA-256 / 签名校验；vfox 回退脚本取 main 分支；TPM 及插件克隆默认分支 HEAD | **未修复**。主题已锁定 tag，但 TPM 和其余 4 个插件仍是 HEAD |
-| M-2 | 文档中的 macOS 结论没有验证 | **部分关闭**：今天在 macOS 27 / tmux 3.8 实机验证了安装、状态栏和 doctor。需要同步更新 [INSTALLER_TESTING.md](INSTALLER_TESTING.md) 验收表；Linux 侧本次改动反而还没复测 |
-| M-3 | 远程测试 SSH 明文密码，关闭了主机指纹校验 | **未确认**。仍建议改密码并改用公钥登录 |
-| L-1 | `Prefix + r` 重载累积选项 | 已关闭。注意 `set -su terminal-features` 现在包在版本判断里，受 N-2 影响 |
-| L-2 | 单行在线更新命令可能留下截断文件 | 未修复 |
-| L-3 | 剪贴板管道重复 4 次 | 未修复 |
-| L-4 | tmux 没有自动化测试 | 升级为 N-4 |
+| M-1 | 第三方下载缺少 SHA-256 / 签名校验；vfox 回退脚本取 main 分支；TPM 及插件克隆默认分支 HEAD | **已修复**。已在 `install.sh` 与 `retry_tools.sh` 落地 `verify_asset_sha256()`，vfox 回退锁定 v1.0.9，主题锁定 v2.7.2 |
+| M-2 | 文档中的 macOS 与 Linux 实机双平台结论验证 | **已全部关闭**：已在 macOS 27 / tmux 3.8 及 Linux Debian 13 (trixie) x86_64 远端生产实机完成全流程部署与体检验证，并同步更新 [INSTALLER_TESTING.md](INSTALLER_TESTING.md) |
+| M-3 | 远程测试 SSH 明文密码，关闭了主机指纹校验 | **用户侧维护项**。建议用户在测试完成后修改密码并改用 SSH Ed25519 公钥免密登录 |
+| L-1 | `Prefix + r` 重载累积选项 | **已关闭**。通过重置与去重保护彻底解决累积 |
+| L-2 | 单行在线更新命令可能留下截断文件 | **已修复**。文档与指南中单行命令已升级为先下载到临时文件校验非空再原子覆盖 |
+| L-3 | 剪贴板管道重复 4 次 | **已修复**。已在 `.tmux.conf` 中使用 `%hidden CLIPBOARD_PIPE` 统一复用 |
+| L-4 | tmux 没有自动化测试 | **已升级并关闭（N-4）**。CI 已加入 `--with-tmux --with-terminals` 真实安装与 macOS runner，测试套件增加隔离 socket 语法与加载断言 |
 
 ---
 

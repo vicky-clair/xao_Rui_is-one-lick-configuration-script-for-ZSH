@@ -164,10 +164,44 @@ has_nerd_font || fail 'has_nerd_font failed to detect installed Nerd Font'
 pass 'has_nerd_font detection'
 
 # ------------------------------------------------------------------------------
+# 7b. 下载资产 SHA-256 校验和验证器 (verify_asset_sha256) 边界测试：
+# 覆盖匹配哈希通过、篡改哈希拦截、独立哈希文件校验
+# ------------------------------------------------------------------------------
+eval "$(extract_function calc_sha256)"
+eval "$(extract_function verify_asset_sha256)"
+sha_test_dir="$STAGE/sha-test"
+mkdir -p "$sha_test_dir"
+printf 'test payload\n' > "$sha_test_dir/test_asset.tar.gz"
+test_hash=$(calc_sha256 "$sha_test_dir/test_asset.tar.gz")
+printf '%s  test_asset.tar.gz\n' "$test_hash" > "$sha_test_dir/valid_checksums.txt"
+printf 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  test_asset.tar.gz\n' > "$sha_test_dir/invalid_checksums.txt"
+_orig_curl=$(declare -f curl 2>/dev/null || true)
+curl() {
+  local out="" url=""
+  while (($#)); do
+    case "$1" in
+      -o) out=$2; shift ;;
+      http://*) url=$1 ;;
+    esac
+    shift
+  done
+  if [[ "$url" == http://valid* ]]; then
+    cp "$sha_test_dir/valid_checksums.txt" "$out"
+  elif [[ "$url" == http://invalid* ]]; then
+    cp "$sha_test_dir/invalid_checksums.txt" "$out"
+  fi
+}
+verify_asset_sha256 "$sha_test_dir/test_asset.tar.gz" "http://valid" "test_asset.tar.gz" "$sha_test_dir" || fail 'valid sha256 rejected'
+if verify_asset_sha256 "$sha_test_dir/test_asset.tar.gz" "http://invalid" "test_asset.tar.gz" "$sha_test_dir"; then
+  fail 'forged sha256 accepted'
+fi
+unset -f curl
+pass 'verify_asset_sha256 accepts valid and rejects forged checksums'
+
+# ------------------------------------------------------------------------------
 # 8. 配置回退与用户二次修改防护测试：
 # 若安装后用户手动修改了主题或配置，校验和不符时拒绝回退，防止意外丢失用户修改
 # ------------------------------------------------------------------------------
-eval "$(extract_function calc_sha256)"
 eval "$(extract_function restore)"
 msg() { printf '%s' "$1"; }
 die() { printf '%s\n' "$*" >&2; exit 1; }

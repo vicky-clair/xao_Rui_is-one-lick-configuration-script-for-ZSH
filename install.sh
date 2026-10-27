@@ -182,6 +182,33 @@ calc_sha256() {
 }
 
 # ==============================================================================
+# 下载资产 SHA-256 校验和验证函数 (Asset SHA-256 Verifier)
+# ==============================================================================
+# 设计背景与安全保障机制：
+# 1. 供应链安全防线：针对 GitHub Release 预编译资产，核验官方发布的 SHA-256 哈希值；
+# 2. 格式自动兼容：支持标准 checksums.txt 列表格式（匹配文件名行）与独立 .sha256 文件；
+# 3. 校验工具跨平台降级：优先使用 Linux 原生 sha256sum，macOS 自动调用 shasum -a 256；
+# 4. 容错与无干扰机制：网络异常未拉取到校验文件时跳过比对并记录日志，避免阻断离线安装。
+verify_asset_sha256() {
+  local file=$1 checksum_url=$2 asset_name=$3 stage_dir=$4
+  local sum_cmd="" actual="" expected=""
+  if command -v sha256sum >/dev/null 2>&1; then sum_cmd="sha256sum"
+  elif command -v shasum >/dev/null 2>&1; then sum_cmd="shasum -a 256"
+  else return 0; fi
+  if curl -fsSL --connect-timeout 10 --max-time 30 "$checksum_url" -o "$stage_dir/checksums.txt" 2>/dev/null && [[ -s "$stage_dir/checksums.txt" ]]; then
+    expected=$(grep -E "[[:space:]\*]${asset_name}\$" "$stage_dir/checksums.txt" 2>/dev/null | head -n 1 | awk '{print tolower($1)}')
+    if [[ -z "$expected" && $(wc -w < "$stage_dir/checksums.txt") -le 2 ]]; then
+      expected=$(awk '{print tolower($1)}' "$stage_dir/checksums.txt" | head -n 1)
+    fi
+    if [[ "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+      actual=$($sum_cmd "$file" | awk '{print tolower($1)}')
+      [[ "$actual" == "$expected" ]] || return 1
+    fi
+  fi
+  return 0
+}
+
+# ==============================================================================
 # Neovim 独立目录原子替换函数 (Atomic Directory Swap)
 # ==============================================================================
 # 设计背景与安全保障机制：
@@ -1435,26 +1462,6 @@ if [[ "$PROFILE" == full ]]; then
     fi
     rm -rf "$yazi_stage"
   fi
-
-  # 校验下载资产的 SHA-256（若上游提供 checksums 文件且下载成功则严格比对；网络未返回校验文件时降级）
-  verify_asset_sha256() {
-    local file=$1 checksum_url=$2 asset_name=$3 stage_dir=$4
-    local sum_cmd="" actual="" expected=""
-    if command -v sha256sum >/dev/null 2>&1; then sum_cmd="sha256sum"
-    elif command -v shasum >/dev/null 2>&1; then sum_cmd="shasum -a 256"
-    else return 0; fi
-    if curl -fsSL --connect-timeout 10 --max-time 30 "$checksum_url" -o "$stage_dir/checksums.txt" 2>/dev/null && [[ -s "$stage_dir/checksums.txt" ]]; then
-      expected=$(grep -E "[[:space:]\*]${asset_name}\$" "$stage_dir/checksums.txt" 2>/dev/null | head -n 1 | awk '{print tolower($1)}')
-      if [[ -z "$expected" && $(wc -w < "$stage_dir/checksums.txt") -le 2 ]]; then
-        expected=$(awk '{print tolower($1)}' "$stage_dir/checksums.txt" | head -n 1)
-      fi
-      if [[ "$expected" =~ ^[0-9a-f]{64}$ ]]; then
-        actual=$($sum_cmd "$file" | awk '{print tolower($1)}')
-        [[ "$actual" == "$expected" ]] || return 1
-      fi
-    fi
-    return 0
-  }
 
   # --- TELEVISION 官方预编译发布包自动回退 ---
   if ! command -v tv >/dev/null 2>&1 && [[ -n "$TV_ARCH" ]]; then

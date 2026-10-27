@@ -46,7 +46,10 @@ The message `vfox 初始化失败或超时，本次已跳过` means vfox initial
 
 ## Quick start
 
-Run these commands as your normal user on the target Linux or macOS machine. Linux package installation uses `sudo` when needed; do not run `sudo bash install.sh`.
+> [!IMPORTANT]
+> **Safety Notice**: Run these commands as your **normal user** on the target Linux or macOS machine. The script requests `sudo` automatically when installing system packages. **Never run `sudo bash install.sh` or execute as root**, which would pollute home directory file ownership with root permissions!
+>
+> 💡 **Font Requirement**: The Powerlevel10k Rainbow prompt and Yazi/Tmux status bar icons require a **Nerd Font** (recommended: [JetBrainsMono Nerd Font](https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip)). If icons render as boxes or question marks over SSH or in local terminals, simply set your terminal emulator font (Windows Terminal, iTerm2, WezTerm, etc.) to any Nerd Font!
 
 ### 1. Clone and preview
 
@@ -65,16 +68,16 @@ If you already have a checkout, use that directory. Inspect the logs if tests fa
 Run **one** of these options:
 
 ```bash
-# Essential shell setup; preserve your existing personal theme
+# 🚀 Recommended All-in-One: Full toolset + Rainbow prompt + Tmux + Modern terminal configs
+bash install.sh --profile full --p10k-style rainbow --with-tmux --with-terminals --lang en
+
+# ⚡ Lightweight: Essential shell setup (OMZ + 3 core plugins); preserve your existing theme
 bash install.sh --profile basic --p10k-style skip --lang en
 
-# Full toolset with the Rainbow prompt (Interactive)
-bash install.sh --profile full --p10k-style rainbow --lang en
-
-# Full toolset, tmux, and the interactive prompt wizard
+# 🎨 Custom Prompt: Full toolset, tmux, and interactive official prompt configuration wizard
 bash install.sh --profile full --with-tmux --p10k-wizard --lang en
 
-# Automated unattended installation (Non-interactive mode for CI/CD, Docker, or scripts)
+# 🤖 Automated Unattended Installation: Non-interactive mode for CI/CD, Docker, or scripts
 bash install.sh --profile full --p10k-style rainbow --yes --lang en
 ```
 

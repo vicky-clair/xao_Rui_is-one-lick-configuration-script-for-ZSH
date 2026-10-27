@@ -1577,7 +1577,18 @@ fi
 if ((WITH_TMUX)); then
   info "$(msg "正在安装 tmux 及终端剪贴板依赖..." "Installing tmux and clipboard dependencies...")"
   optional_package tmux tmux || true
-  if [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
+  if [[ "$FAMILY" == brew ]]; then
+    # macOS 系统内置 /bin/bash 为 3.2，而 tokyo-night 等现代 Tmux 主题脚本依赖 Bash >= 4.2 (declare -g 及关联数组)
+    # 自动补充现代 Homebrew bash，确保底部状态栏美化主题脚本正常解析与渲染
+    _bash_major=0
+    if command -v bash >/dev/null 2>&1; then
+      _bash_major=$(bash -c 'echo "${BASH_VERSINFO[0]:-0}"' 2>/dev/null || echo 0)
+    fi
+    if (( _bash_major < 4 )); then
+      info "$(msg "检测到当前 Bash 版本低于 4.0，正在通过 Homebrew 安装现代 Bash 以支持 Tmux 主题..." "Bash < 4.0 detected; installing modern Bash via Homebrew for Tmux theme...")"
+      HOMEBREW_NO_AUTO_UPDATE=1 brew install bash 2>/dev/null || true
+    fi
+  elif [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
     optional_package xclip xclip || true
     optional_package wl-copy wl-clipboard || true
     [[ "$FAMILY" == apt ]] && { optional_package "" ncurses-term || true; }

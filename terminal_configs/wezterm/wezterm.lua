@@ -12,6 +12,7 @@ local config = wezterm.config_builder()
 -- 中文平滑回退至现代黑体 Noto Sans CJK SC / 文泉驿微米黑，彻底告别字符缺失或竖向错位
 config.font = wezterm.font_with_fallback {
   { family = 'JetBrainsMono Nerd Font', weight = 'Regular' },
+  { family = 'PingFang SC' },
   { family = 'Noto Sans CJK SC', weight = 'Regular' },
   { family = 'WenQuanYi Micro Hei Mono' },
   { family = 'Noto Color Emoji' },

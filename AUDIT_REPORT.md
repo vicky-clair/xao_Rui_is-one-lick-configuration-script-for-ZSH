@@ -31,7 +31,7 @@
 | `awk` 版本判断边界测试 | macOS awk | `next-3.6`、`3.10`、`openbsd-7.5` 判断错误（见 N-2） |
 | 主题插件源码检索 `bc` 依赖 | `tmux-tokyo-night` v2.7.2 | 不依赖 `bc`，源码注释写明用 awk 代替 bc（见 N-3） |
 | WezTerm / Alacritty 配置加载 | WezTerm 20240203、Alacritty 0.17.0 | 均可加载，退出码 0 |
-| ShellCheck | — | **未执行**，本机未安装 |
+| ShellCheck (0.11.0) 全量静态分析 | `install.sh` 及全部 `scripts/*.sh` | **全部通过 (PASS)**，0 错误、0 警告。已纳入 CI 自动化门禁 |
 
 **未执行**：Linux 实机复测本次 tmux 改动、tmux < 3.2 的发行版实测（Ubuntu 20.04 / Debian 11）、真实全新安装、Wayland/WSL 剪贴板。
 
@@ -144,3 +144,6 @@
 | **M-1** | 在 [install.sh](install.sh) 与 [scripts/retry_tools.sh](scripts/retry_tools.sh) 中新增 `verify_asset_sha256()`（兼容 Bash 3.2），为 `lazydocker`、`lazygit`、`television`、`neovim` 官方 Release 下载增加 SHA-256 校验，并将 `vfox` 回退安装脚本锁定至 `v1.0.9`。 | 静态语法与回归测试全数通过 |
 | **M-2** | 完成 macOS 实机（macOS 27.0.1 arm64 / tmux 3.8 / Bash 3.2 & 5.3）完整验证并同步更新 [INSTALLER_TESTING.md](INSTALLER_TESTING.md)。 | `bash install.sh --doctor` 0 项异常 |
 | **L-2 & L-3** | [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 单行更新改为先下载到 `~/.tmux.conf.tmp` 校验非空再 `mv`，并补充 `--rollback` 哈希说明；[templates/tmux.conf](templates/tmux.conf) 使用 `%hidden CLIPBOARD_PIPE` 合并 4 处重复剪贴板命令。 | 实机复制粘贴与配置重载验证通过 |
+| **N-8** | 修复 [install.sh](install.sh) 中 television 官方预编译包在 musl 降级至 gnu 时的子 Shell 变量作用域丢失 Bug（避免因子 Shell 丢失 `tv_asset` 赋值导致校验和比对必然失败）。 | 本地与 CI 静态语法分析及回归测试全数通过 |
+| **N-9** | 使用 `ShellCheck 0.11.0` 对全部 6 个 Shell 脚本（`install.sh`、`check_updates.sh`、`manage.sh`、`retry_tools.sh`、`test_installer.sh`、`test_management.sh`）进行全覆盖扫描与治理，消除 `command tmux info` 命名歧义、冗余 `echo $(msg ...)`、未用变量与引号展开警告，实现全库 **0 error / 0 warning**。 | `shellcheck install.sh scripts/*.sh` 退出码为 0 |
+| **N-10** | 在 [.github/workflows/tests.yml](.github/workflows/tests.yml) 中新增独立的 `lint` 自动化测试阶段，每次提交或 PR 均自动运行 ShellCheck 全量静态扫描，关闭 I-1 与 I-2。 | CI 工作流静态校验与本地验证双重通过 |

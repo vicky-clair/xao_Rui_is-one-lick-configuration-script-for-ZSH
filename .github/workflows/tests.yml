@@ -7,6 +7,13 @@ on:
 permissions:
   contents: read
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run ShellCheck static analysis
+        run: shellcheck install.sh scripts/*.sh
+
   linux:
     runs-on: ubuntu-latest
     strategy:

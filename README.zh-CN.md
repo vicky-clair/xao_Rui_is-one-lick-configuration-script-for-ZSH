@@ -305,6 +305,125 @@ bash install.sh --rollback /实际安装备份目录
 
 更多具体边界及后续维护事项见[开发文档](DEVELOPMENT.md)。
 
+## 配置文件、环境变量与选项清单
+
+项目将用户功能开关持久化存储在 `~/.zsh-project-options`（纯键值对，不执行任意代码），在 Zsh 启动时按需读取。可以通过 `bash install.sh --set KEY=0|1` 或 `zsh-config` 交互菜单修改。
+
+| 配置键名 | 取值范围 | 默认值 | 作用说明 |
+| :--- | :--- | :--- | :--- |
+| `ZSH_PROJECT_FULL` | `0` 或 `1` | `0` (basic) / `1` (full) | 是否启用完整工具链功能别名与集成（FZF、Yazi、television、tre、eza 等） |
+| `ZSH_PROJECT_VFOX` | `0` 或 `1` | `0` | 是否在 Zsh 启动时激活 vfox 多版本工具管理器 |
+| `ZSH_PROJECT_LAZYDOCKER` | `0` 或 `1` | `1` | 是否挂载 lazydocker 容器面板命令别名 (`lzd`) |
+| `ZSH_PROJECT_LAZYGIT` | `0` 或 `1` | `1` | 是否挂载 lazygit Git 面板命令别名 (`lg`) 与全局快捷键 (`Ctrl+G`) |
+| `ZSH_PROJECT_TMUX` | `0` 或 `1` | `0` (默认未选) / `1` (传 `--with-tmux`) | 是否启用 tmux 辅助别名 (`t`、`ta`、`tls`、`tn`) 及跨平台剪贴板别名 |
+| `ZSH_PROJECT_TMUX_AUTO` | `0` 或 `1` | `1` | 开启 tmux 时，启动交互终端是否自动接入或创建 `main` 会话 |
+| `ZSH_PROJECT_BANNER` | `0` 或 `1` | `1` | 终端启动时是否显示欢迎横幅与工具加载状态 |
+| `ZSH_PROJECT_FASTFETCH` | `0` 或 `1` | `1` | 终端启动时是否自动运行 Fastfetch 打印系统硬件与发行版状态 |
+| `ZSH_PROJECT_TIMER` | `0` 或 `1` | `1` | 终端启动时是否统计并显示高精度初始化耗时 |
+| `ZSH_PROJECT_AUTO_CHECK_UPDATE` | `0` 或 `1` | `1` | 是否启用定期后台异步检测更新（非阻塞） |
+| `ZSH_PROJECT_CHECK_INTERVAL_DAYS`| 正整数 | `7` | 后台检测更新的触发间隔天数（天） |
+| `ZSH_PROJECT_TELEVISION` | `0` 或 `1` | `1` | 是否启用 television (`tv`) 现代模糊搜索器集成 |
+| `ZSH_PROJECT_TV_KEYBINDINGS` | `0` 或 `1` | `0` | 是否允许 television 接管 Ctrl+T / Ctrl+R 等原生快捷键 |
+| `ZSH_PROJECT_TRE` | `0` 或 `1` | `1` | 是否启用 tre 现代目录树包装别名 |
+
+### 全局运行时环境变量
+
+- `ZSH_PROJECT_DIR`：可选指定项目脚本根目录。未设置时自动采用 `${XDG_STATE_HOME:-~/.local/state}/zsh-project/scripts`。
+- `ZSH_PROJECT_PROFILING`：设为 `1` 时在终端启动时通过 `zsh/zprof` 记录各阶段微秒级耗时。
+- `POWERLEVEL9K_INSTANT_PROMPT`：默认设置为 `off`，确保 Fastfetch、横幅和工具提示能够完整输出，杜绝输出被截断或与提示符重叠的问题。
+
+---
+
+## 本地测试、开发与 Docker 容器运行
+
+本项目配备了完整的自动化测试与代码质量验证套件，可直接在本地开发环境或隔离容器中执行。
+
+### 1. 本地测试与质量检查命令
+
+```bash
+# 1. ShellCheck 静态代码质量分析（CI 强力卡点，全库 0 错误 0 警告）
+shellcheck install.sh scripts/*.sh
+
+# 2. Bash 与 Zsh 原生语法解析校验
+bash -n install.sh scripts/*.sh
+zsh -n templates/zshrc.zsh .zshrc
+
+# 3. 安装器隔离回归测试（模拟各种异常下载、幂等性、包名白名单与边界场景）
+bash scripts/test_installer.sh
+
+# 4. 配置管理器隔离回归测试（模拟配置快照、哈希校验、备份回滚与安全锁）
+bash scripts/test_management.sh
+
+# 5. 运行只读环境体检（检查 24 项 CLI 工具、版本读取与路径有效性）
+bash scripts/manage.sh --doctor
+```
+
+### 2. Docker 隔离容器验证
+
+您可以在任何已安装 Docker 的宿主机上，无需污染本机环境，一键体验与测试全套安装：
+
+```bash
+# 启动 Ubuntu 24.04 隔离容器进行极速验证
+docker run --rm -it ubuntu:24.04 bash -c "
+  apt-get update && apt-get install -y git sudo curl ca-certificates zsh tmux
+  useradd -m -s /bin/bash testuser && echo 'testuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+  su - testuser -c '
+    git clone https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git ~/.zsh-project
+    cd ~/.zsh-project
+    bash install.sh --profile full --with-tmux --with-terminals --p10k-style rainbow --yes --lang zh
+    zsh
+  '
+"
+```
+
+---
+
+## 常见错误与故障排查速查
+
+| 现象 / 错误提示 | 根本原因 | 推荐解决方案 |
+| :--- | :--- | :--- |
+| 提示符图标显示为方框或乱码 (`?`、`□`) | 当前宿主机终端缺少 Nerd Font 矢量图标字体 | 在终端软件（Windows Terminal/iTerm2/WezTerm）设置中将字体切换为 **JetBrainsMono Nerd Font**。 |
+| `vfox 初始化失败或超时，本次已跳过` | vfox 首次安装未初始化或环境缺少网络 | 运行 `vfox --version` 检查，如需重试安装可执行 `bash install.sh --retry-failed vfox`。 |
+| `macOS 当前 Bash 版本 (3.2) < 4.0` 警告 | macOS 自带的 `/bin/bash` 停留在 2007 年的 3.2 版 | 运行 `brew install bash` 安装现代 Bash。本项目安装器与脚本原生兼容 Bash 3.2，但 Tmux 某些主题组件依赖现代特性。 |
+| Tmux 内部无法使用系统剪贴板 | 远程 SSH 会话未启用 OSC 52 或缺少 X11/Wayland 转发 | 本项目 Tmux 配置已默认开启 OSC 52 终端透传。在 Windows Terminal、iTerm2 或 WezTerm 中直接鼠标拖选或按 `y` 即可自动同步至本机剪贴板。 |
+
+> 更多启动报错、插件冲突、历史记录丢失等详细疑难杂症，请查阅完整专著：[Zsh 排错与故障诊断指南 (ZSH_TROUBLESHOOTING.md)](ZSH_TROUBLESHOOTING.md)。
+
+---
+
+## 贡献指南与问题反馈
+
+欢迎为本项目提交 Issue 或 Pull Request！
+
+1. **Fork 本仓库** 并基于 `main` 分支拉取您的功能分支 (`git checkout -b feature/awesome-feature`)。
+2. **规范提交代码**：
+   - 保证代码符合项目现有架构规范；
+   - 在关键逻辑处添加规范的中文注释；
+   - 运行 `shellcheck install.sh scripts/*.sh` 确保静态检查通过；
+   - 运行 `bash scripts/test_installer.sh` 与 `bash scripts/test_management.sh` 确保测试全部 PASS。
+3. **提交与推送**：提交信息请遵循 Conventional Commits 规范（如 `feat(...)`、`fix(...)`、`docs(...)`）。
+4. **发起 Pull Request**：详细说明改动动机、测试结果及兼容性验证。
+
+Bug 反馈与功能建议：[GitHub Issues 页面](https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/issues)
+
+---
+
+## 开源许可证与致谢
+
+本项目采用 **MIT 开源许可证** 授权。详情参见 [LICENSE](LICENSE)（遵循 MIT 许可条款）。
+
+### 第三方生态与开源致谢
+
+本项目由衷感谢以下卓越的开源项目及其社区贡献者：
+
+- [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh)：极其流行且成熟的 Zsh 配置管理框架；
+- [Powerlevel10k](https://github.com/romkatv/powerlevel10k)：极致性能与极致美观的 Zsh 主题；
+- [Yazi](https://github.com/sxyazi/yazi)：基于 Rust 构建的现代化极速终端文件管理器；
+- [tmux](https://github.com/tmux/tmux) & [tmux-tokyo-night](https://github.com/fabioluciano/tmux-tokyo-night)：强大的终端复用器与高颜值主题；
+- [fzf](https://github.com/junegunn/fzf)、[eza](https://github.com/eza-community/eza)、[bat](https://github.com/sharkdp/bat)、[zoxide](https://github.com/ajeetdsouza/zoxide)、[fastfetch](https://github.com/fastfetch-cli/fastfetch)、[television](https://github.com/alexpasmantier/television)、[tre-command](https://github.com/dduan/tre)、[vfox](https://github.com/version-fox/vfox)、[neovim](https://github.com/neovim/neovim)：现代命令行生产力工具的基石。
+
+---
+
 ## 文件结构
 
 | 文件 / 目录 | 用途 |
@@ -315,8 +434,16 @@ bash install.sh --rollback /实际安装备份目录
 | `scripts/test_installer.sh` / `scripts/test_management.sh` | 当前隔离回归入口 |
 | `templates/zshrc.zsh` / `templates/tmux.conf` | 安装器实际部署的模板 |
 | `templates/zshrc.local.example` | 用户扩展示例 |
+| `terminal_configs/` | WezTerm 与 Alacritty 现代终端推荐配置文件及中文字体回退链 |
+| `AUDIT_REPORT.md` | 项目安全与质量工程审计报告 |
+| `LINUX_ZSH_SETUP_GUIDE.md` | Linux 与 macOS 全流程环境安装与配置指南 |
 | `TMUX_USAGE_GUIDE.md` | Tmux 现代化生产力键位速查、剪贴板互通与实战技巧指南 |
+| `CONFIGURATION_MANAGEMENT.md` | 选项开关、快照备份与受管文件状态机制 |
+| `DEVELOPMENT.md` | 开发规范、模块架构图、加载生命周期与边界约定 |
+| `INSTALLER_TESTING.md` | 验收测试套件规范与双平台实机复测记录 |
+| `ZSH_TROUBLESHOOTING.md` | Zsh 终端疑难杂症全景故障排查指南 |
 | `.zshrc` / `.tmux.conf` | 根目录参考配置；`.zshrc` 与安装模板行为不同 |
-| `.zshenv` | 当前为空文件，安装器不部署它 |
-| `.github/workflows/tests.yml` | Linux 容器回归配置，结果以对应运行记录为准 |
+| `.zshenv` | 环境变量占位文件，安装器不部署它 |
+| `.github/workflows/tests.yml` | GitHub Actions 多平台矩阵回归与 ShellCheck 静态分析 CI 工作流 |
 | `assets/` | 项目展示截图 |
+

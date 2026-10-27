@@ -264,6 +264,115 @@ bash install.sh --rollback /path/to/install-XXXXXXXX
 
 </details>
 
+## 設定オプションと実行時環境
+
+ユーザー機能の切り替えは `~/.zsh-project-options` にプレーンなキーと値のペアとして安全に保持されます（任意のコード実行は行われません）。Zsh 起動時にオンデマンドで読み込まれ、`bash install.sh --set KEY=0|1` または `zsh-config` メニューからいつでも調整可能です。
+
+| 設定キー | 設定値 | デフォルト | 機能と説明 |
+| :--- | :--- | :--- | :--- |
+| `ZSH_PROJECT_FULL` | `0` または `1` | `0` (basic) / `1` (full) | フル CLI ツールチェーンエイリアスと統合（FZF、Yazi、television、tre、eza 等）を有効化 |
+| `ZSH_PROJECT_VFOX` | `0` または `1` | `0` | Zsh 起動時に vfox バージョンマネージャーをアクティブ化 |
+| `ZSH_PROJECT_LAZYDOCKER` | `0` または `1` | `1` | lazydocker コンテナ管理エイリアス (`lzd`) をマウント |
+| `ZSH_PROJECT_LAZYGIT` | `0` または `1` | `1` | lazygit Git TUI エイリアス (`lg`) とショートカット (`Ctrl+G`) をマウント |
+| `ZSH_PROJECT_TMUX` | `0` または `1` | `0` (通常) / `1` (`--with-tmux`) | tmux 補助エイリアス (`t`, `ta`, `tls`, `tn`) とクリップボード連携を有効化 |
+| `ZSH_PROJECT_TMUX_AUTO` | `0` または `1` | `1` | 対話型ターミナル起動時に `main` セッションへ自動接続または新規作成 |
+| `ZSH_PROJECT_BANNER` | `0` または `1` | `1` | ターミナル起動時のウェルカムバナーとツール読み込み状況を表示 |
+| `ZSH_PROJECT_FASTFETCH` | `0` または `1` | `1` | 起動時に Fastfetch を実行しシステム情報を表示 |
+| `ZSH_PROJECT_TIMER` | `0` または `1` | `1` | シェルの高精度起動時間を計測・表示 |
+| `ZSH_PROJECT_AUTO_CHECK_UPDATE` | `0` または `1` | `1` | バックグラウンド非同期更新検出を有効化（非ブロッキング） |
+| `ZSH_PROJECT_CHECK_INTERVAL_DAYS`| 正の整数 | `7` | 自動更新確認の間隔日数（日） |
+| `ZSH_PROJECT_TELEVISION` | `0` または `1` | `1` | television (`tv`) スマート曖昧検索ツールを有効化 |
+| `ZSH_PROJECT_TV_KEYBINDINGS` | `0` または `1` | `0` | television による Ctrl+T / Ctrl+R ショートカットの引き継ぎを許可 |
+| `ZSH_PROJECT_TRE` | `0` または `1` | `1` | tre ディレクトリツリーラッパーエイリアスを有効化 |
+
+---
+
+## ローカルテスト・開発および Docker コンテナ検証
+
+本プロジェクトには、隔離された回帰テストスイートと静的解析ルールが完全に用意されています。
+
+### 1. ローカルテストおよび静的解析コマンド
+
+```bash
+# 1. ShellCheck による全スクリプトの静的解析（0 エラー 0 警告必須）
+shellcheck install.sh scripts/*.sh
+
+# 2. Bash / Zsh 構文解析チェック
+bash -n install.sh scripts/*.sh
+zsh -n templates/zshrc.zsh .zshrc
+
+# 3. インストーラー隔離回帰テスト（モックダウンロード、シンボリックリンク交換、バージョン境界検証）
+bash scripts/test_installer.sh
+
+# 4. 設定マネージャー隔離回帰テスト（スナップショット、チェックサム、ロールバック保護）
+bash scripts/test_management.sh
+
+# 5. 読み取り専用環境診断（24 種類の CLI ツールおよびバージョン検出）
+bash scripts/manage.sh --doctor
+```
+
+### 2. 隔離 Docker コンテナでの動作確認
+
+ローカル環境を変更することなく、Docker コンテナで完全なインストールプロセスを体験・テストできます：
+
+```bash
+docker run --rm -it ubuntu:24.04 bash -c "
+  apt-get update && apt-get install -y git sudo curl ca-certificates zsh tmux
+  useradd -m -s /bin/bash testuser && echo 'testuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+  su - testuser -c '
+    git clone https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git ~/.zsh-project
+    cd ~/.zsh-project
+    bash install.sh --profile full --with-tmux --with-terminals --p10k-style rainbow --yes --lang en
+    zsh
+  '
+"
+```
+
+---
+
+## トラブルシューティング FAQ
+
+| 現象・エラー | 原因 | 推奨される解決策 |
+| :--- | :--- | :--- |
+| プロンプトのアイコンが四角 (`□`) や `?` に化ける | ホストターミナルに Nerd Font ベクターアイコンフォントが不足 | ターミナルソフト（Windows Terminal / iTerm2 / WezTerm）の設定でフォントを **JetBrainsMono Nerd Font** に変更してください。 |
+| `vfox の初期化に失敗またはタイムアウト` | vfox が初期化されていないかネットワーク環境の遅延 | `vfox --version` を実行するか、`bash install.sh --retry-failed vfox` で再試行してください。 |
+| `macOS Bash version (3.2) < 4.0` 警告 | macOS 標準の `/bin/bash` が 2007 年の古いバージョン 3.2 である | `brew install bash` を実行してください。スクリプト自体は Bash 3.2 と完全な互換性がありますが、Tmux の一部モダンテーマで新しい Bash が推奨されます。 |
+| Tmux 内部でシステムクリップボードが共有されない | リモート SSH セッションで OSC 52 または X11 転送が未設定 | 本設定では OSC 52 透過が標準有効化されています。Windows Terminal、iTerm2、WezTerm 上でマウスドラッグまたは `y` キーを押すだけでローカルクリップボードへ自動コピーされます。 |
+
+> 詳しい起動エラー、プラグインの競合、復旧手順は [ZSH_TROUBLESHOOTING.md](ZSH_TROUBLESHOOTING.md) をご覧ください。
+
+---
+
+## コントリビューションとフィードバック
+
+プルリクエストや Issue の報告を歓迎します。
+
+1. **本リポジトリを Fork** し、`main` からブランチを作成 (`git checkout -b feature/awesome-feature`)。
+2. **コードの品質基準**:
+   - Bash 3.2 互換性を保持する。
+   - `shellcheck install.sh scripts/*.sh` で 0 警告を維持する。
+   - `bash scripts/test_installer.sh` および `bash scripts/test_management.sh` で全テスト PASS を確認する。
+3. **コミット**: Conventional Commits 規約（`feat(...)`、`fix(...)`、`docs(...)`）に従ってください。
+4. **プルリクエストの作成**: 変更内容とテスト結果を明記してください。
+
+フィードバック・問題報告: [GitHub Issues](https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/issues)
+
+---
+
+## ライセンスと謝辞
+
+本プロジェクトは **MIT ライセンス** のもとで公開されています。詳細は [LICENSE](LICENSE) を参照してください。
+
+### オープンソースへの謝辞
+
+- [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh)
+- [Powerlevel10k](https://github.com/romkatv/powerlevel10k)
+- [Yazi](https://github.com/sxyazi/yazi)
+- [tmux](https://github.com/tmux/tmux) & [tmux-tokyo-night](https://github.com/fabioluciano/tmux-tokyo-night)
+- [fzf](https://github.com/junegunn/fzf), [eza](https://github.com/eza-community/eza), [bat](https://github.com/sharkdp/bat), [zoxide](https://github.com/ajeetdsouza/zoxide), [fastfetch](https://github.com/fastfetch-cli/fastfetch), [television](https://github.com/alexpasmantier/television), [tre-command](https://github.com/dduan/tre), [vfox](https://github.com/version-fox/vfox), [neovim](https://github.com/neovim/neovim)
+
+---
+
 ## ドキュメント
 
 以下の詳細ガイドは現在、中国語で記述されています。この README は現行の `install.sh`、`scripts/`、`templates/` の実装に基づいています。対応を目指すプラットフォームと実際の検証結果は分けて記録しています。
@@ -276,6 +385,7 @@ bash install.sh --rollback /path/to/install-XXXXXXXX
 | [トラブルシューティング](ZSH_TROUBLESHOOTING.md) | 起動エラー、ツールの不足、更新失敗、ターミナル表示の問題 |
 | [開発ドキュメント](DEVELOPMENT.md) | モジュールの役割、読み込み順序、状態ファイル、保守上の規約 |
 | [テストと検証](INSTALLER_TESTING.md) | 隔離された回帰テスト、実機確認、検証済みの範囲 |
+| [監査レポート](AUDIT_REPORT.md) | セキュリティおよびエンジニアリング品質監査レポート |
 
 <details>
 <summary><strong>リポジトリの構成</strong></summary>
@@ -288,12 +398,18 @@ bash install.sh --rollback /path/to/install-XXXXXXXX
 | `scripts/test_installer.sh` / `scripts/test_management.sh` | 現行の隔離回帰テストの入口 |
 | `templates/zshrc.zsh` / `templates/tmux.conf` | インストーラーが実際に配置するテンプレート |
 | `templates/zshrc.local.example` | 個人用拡張の例 |
-| `TMUX_USAGE_GUIDE.md` | Tmux の生産性、ショートカット、トラブルシューティングに関する包括的ガイド |
+| `terminal_configs/` | WezTerm および Alacritty の推奨ターミナル設定とフォールバック |
+| `AUDIT_REPORT.md` | セキュリティおよびエンジニアリング品質監査レポート |
+| `LINUX_ZSH_SETUP_GUIDE.md` | Linux / macOS 全工程環境インストール・設定ガイド |
+| `TMUX_USAGE_GUIDE.md` | Tmux 活用ガイド、ショートカット、クリップボード連携、実用テクニック |
+| `CONFIGURATION_MANAGEMENT.md` | オプション切り替え、スナップショットバックアップ、管理ファイル機構 |
+| `DEVELOPMENT.md` | 開発規約、モジュールアーキテクチャ、読み込みライフサイクル |
+| `INSTALLER_TESTING.md` | 検証テストスイート仕様および実機テスト記録 |
+| `ZSH_TROUBLESHOOTING.md` | Zsh ターミナルの総合トラブルシューティングガイド |
 | `.zshrc` / `.tmux.conf` | ルートの参考設定。`.zshrc` はインストール用テンプレートと動作が異なる |
-| `.zshenv` | 現在は空のファイル。インストーラーは配置しない |
-| `.github/workflows/tests.yml` | Linux コンテナの回帰テストワークフロー。結果は各実行記録を参照 |
+| `.zshenv` | 現在は空のプレースホルダー。インストーラーは配置しない |
+| `.github/workflows/tests.yml` | Linux コンテナ回帰および ShellCheck 静的解析 CI ワークフロー |
 | `assets/` | プロジェクトのスクリーンショット |
-| `scratch/`、`*.before-fix`、`.zhistory`、`.zsh_history` | 過去の監査資料、バックアップ、コマンド記録。新しいマシンへの配置には使用しない |
 
 </details>
 

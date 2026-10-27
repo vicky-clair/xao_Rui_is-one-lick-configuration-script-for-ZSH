@@ -119,6 +119,7 @@ EOF
 die() { printf '\033[1;31m%s: %s\033[0m\n' "$(msg '错误' 'Error')" "$*" >&2; exit 1; }
 
 # 普通信息提示：输出蓝色高亮前缀 ℹ
+# shellcheck disable=SC2032
 info() { printf '\033[1;34mℹ %s\033[0m\n' "$*"; }
 
 # 成功信息提示：输出绿色高亮前缀 ✓
@@ -368,7 +369,7 @@ if ((DO_UPDATE)); then
       done < "$AVAILABLE_FILE"
       echo ""
       if ! ask "$(msg "是否基于已有缓存清单继续尝试升级？" "Proceed with update using cached list?")"; then
-        echo "$(msg "已取消更新。" "Update cancelled.")"
+        printf '%s\n' "$(msg "已取消更新。" "Update cancelled.")"
         exit 0
       fi
     else
@@ -382,7 +383,7 @@ if ((DO_UPDATE)); then
 
     echo ""
     if ! ask "$(msg "是否确认现在更新以上有新版本的组件？" "Confirm updating the above components now?")"; then
-      echo "$(msg "已取消更新。" "Update cancelled.")"
+      printf '%s\n' "$(msg "已取消更新。" "Update cancelled.")"
       exit 0
     fi
   fi
@@ -721,6 +722,7 @@ if [[ "$OS" == Darwin ]]; then
   fi
 elif [[ "$OS" == Linux ]]; then
   if [[ -r /etc/os-release ]]; then
+    # shellcheck source=/dev/null
     . /etc/os-release
     ID_LOWER="${ID:-}"
     ID_LIKE_LOWER="${ID_LIKE:-}"
@@ -1477,8 +1479,17 @@ if [[ "$PROFILE" == full ]]; then
         tv_asset="tv-${tv_version}-${TV_ARCH}-unknown-linux-musl.tar.gz"
       fi
       tv_asset_url="https://github.com/alexpasmantier/television/releases/download/${tv_tag}/${tv_asset}"
-      if curl -fsSL --connect-timeout 10 -m 60 "$tv_asset_url" -o "$tv_stage/tv.tar.gz" 2>/dev/null || \
-         ([[ "$OS" != Darwin ]] && { tv_asset="tv-${tv_version}-${TV_ARCH}-unknown-linux-gnu.tar.gz"; curl -fsSL --connect-timeout 10 -m 60 "https://github.com/alexpasmantier/television/releases/download/${tv_tag}/${tv_asset}" -o "$tv_stage/tv.tar.gz" 2>/dev/null; }); then
+      tv_downloaded=0
+      if curl -fsSL --connect-timeout 10 -m 60 "$tv_asset_url" -o "$tv_stage/tv.tar.gz" 2>/dev/null; then
+        tv_downloaded=1
+      elif [[ "$OS" != Darwin ]]; then
+        # 若 musl 架构包下载失败，自动降级至 gnu 预编译架构包，并同步更新资产文件名与校验路径
+        tv_asset="tv-${tv_version}-${TV_ARCH}-unknown-linux-gnu.tar.gz"
+        if curl -fsSL --connect-timeout 10 -m 60 "https://github.com/alexpasmantier/television/releases/download/${tv_tag}/${tv_asset}" -o "$tv_stage/tv.tar.gz" 2>/dev/null; then
+          tv_downloaded=1
+        fi
+      fi
+      if (( tv_downloaded == 1 )); then
         if verify_asset_sha256 "$tv_stage/tv.tar.gz" "https://github.com/alexpasmantier/television/releases/download/${tv_tag}/${tv_asset}.sha256" "$tv_asset" "$tv_stage"; then
           tar -xzf "$tv_stage/tv.tar.gz" -C "$tv_stage" 2>/dev/null || true
           tv_bin=$(find "$tv_stage" -type f -name tv -perm -111 2>/dev/null | head -n 1)
@@ -1788,8 +1799,9 @@ if ((WITH_TMUX)); then
       fi
       success "$(msg "Tmux 插件初始化完成" "Tmux plugins initialized successfully")"
     fi
-    if command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
-      tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+    # shellcheck disable=SC2032,SC2033
+    if command -v tmux >/dev/null 2>&1 && command tmux info >/dev/null 2>&1; then
+      command tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
       info "$(msg "已热重载运行中的 Tmux 服务配置" "Reloaded active Tmux server configuration")"
     fi
   fi

@@ -11,6 +11,7 @@
 | 检查项目 | macOS (arm64 M1) 实测 | Linux Debian 13 (x86_64 远端实机) | 详细解释与验收边界 |
 | --- | --- | --- | --- |
 | 六个正式 Bash 脚本语法 | 通过 | 通过 | `bash -n` 静态解析检查，全数通过 |
+| ShellCheck (0.11.0) 静态分析 | 通过 | 通过 | `shellcheck install.sh scripts/*.sh` 全数通过，0 error 0 warning，已纳入 CI 门禁 |
 | Zsh 模板与配置语法检查 | 通过 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
 | `bash scripts/test_installer.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、`.tmux.conf` 模板一致性、`optional_package` 与 `retry_tools.sh normalize()` 白名单对齐、`tmux >= 3.2` 版本解析器边界测试、SHA-256 供应链安全校验器 (Test 7b)、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
 | `bash scripts/test_management.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Zsh 开关（含 television、tv-keys、tre）、差异恢复、失败重试隔离、控制终端诊断全数通过 |
@@ -39,12 +40,16 @@
 在项目根目录、Bash 环境执行：
 
 ```bash
+# 1. Bash 原生语法解析校验
 bash -n install.sh
 bash -n scripts/check_updates.sh
 bash -n scripts/manage.sh
 bash -n scripts/retry_tools.sh
 bash -n scripts/test_installer.sh
 bash -n scripts/test_management.sh
+
+# 2. ShellCheck 深度静态代码分析（CI 与本地均需 0 错误 0 警告）
+shellcheck install.sh scripts/*.sh
 ```
 
 存在 Zsh 的目标机另行执行：

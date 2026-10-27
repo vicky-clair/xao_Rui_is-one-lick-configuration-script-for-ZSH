@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # 配置管理隔离回归：使用临时 HOME 与命令替身，退出后保留现场供排查。
+# shellcheck disable=SC2016
 set -Eeuo pipefail
 case ${OSTYPE:-} in msys*|cygwin*) export PATH="/usr/bin:$PATH" ;; esac
 ROOT=$(cd "$(dirname "$0")/.." && pwd)

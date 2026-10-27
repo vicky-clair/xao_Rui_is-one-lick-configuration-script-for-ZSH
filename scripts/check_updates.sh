@@ -68,7 +68,7 @@ if ! run_with_timeout "$_probe_sec" curl -fsI --connect-timeout "$_probe_sec" ht
   if ((QUIET)); then
     exit 2
   else
-    echo "$(msg "提示：GitHub 网络探测响应较慢，正在尝试直接通过 Git 协议继续检测..." "Notice: GitHub connection slow; attempting to check updates via Git...")"
+    printf '%s\n' "$(msg "提示：GitHub 网络探测响应较慢，正在尝试直接通过 Git 协议继续检测..." "Notice: GitHub connection slow; attempting to check updates via Git...")"
   fi
 fi
 
@@ -248,7 +248,7 @@ check_apps
 
 # 不用不完整的检查覆盖上次结果，防止网络错误被当成“没有更新”。
 if ((CHECK_FAILED)); then
-  ((QUIET)) || echo "$(msg '部分检测失败，保留原缓存，请稍后重试。' 'Some checks failed; previous cache preserved. Retry later.')"
+  ((QUIET)) || printf '%s\n' "$(msg '部分检测失败，保留原缓存，请稍后重试。' 'Some checks failed; previous cache preserved. Retry later.')"
   exit 2
 fi
 
@@ -268,14 +268,14 @@ if ((!QUIET)); then
   echo "       $(msg 'Zsh 插件与工具检测结果' 'Zsh Plugins & Tools Update Check')       "
   echo "========================================"
   if ((${#UPDATES[@]} > 0)); then
-    echo "$(msg "💡 发现以下 ${#UPDATES[@]} 个组件可更新：" "💡 Found ${#UPDATES[@]} component(s) with updates available:")"
+    printf '%s\n' "$(msg "💡 发现以下 ${#UPDATES[@]} 个组件可更新：" "💡 Found ${#UPDATES[@]} component(s) with updates available:")"
     for item in "${UPDATES[@]}"; do
       echo "  • $item"
     done
     echo ""
-    echo "$(msg "提示：可运行 'bash install.sh --update' 或在 Zsh 中运行 'zsh-update' 进行升级。" "Tip: Run 'bash install.sh --update' or 'zsh-update' in Zsh to upgrade.")"
+    printf '%s\n' "$(msg "提示：可运行 'bash install.sh --update' 或在 Zsh 中运行 'zsh-update' 进行升级。" "Tip: Run 'bash install.sh --update' or 'zsh-update' in Zsh to upgrade.")"
   else
-    echo "$(msg "✅ 所有已安装的插件、主题与应用均为最新版本！" "✅ All installed plugins, themes, and CLI tools are up to date!")"
+    printf '%s\n' "$(msg "✅ 所有已安装的插件、主题与应用均为最新版本！" "✅ All installed plugins, themes, and CLI tools are up to date!")"
   fi
   echo "========================================"
 fi

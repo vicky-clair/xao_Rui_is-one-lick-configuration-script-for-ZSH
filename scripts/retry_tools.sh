@@ -71,6 +71,7 @@ fi
 FAMILY=''
 if [[ $(uname -s) == Darwin ]]; then FAMILY=brew
 elif [[ -r /etc/os-release ]]; then
+  # shellcheck source=/dev/null
   . /etc/os-release
   ID_LOWER="${ID:-}"
   ID_LIKE_LOWER="${ID_LIKE:-}"

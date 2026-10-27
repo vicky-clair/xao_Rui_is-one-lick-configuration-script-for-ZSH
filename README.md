@@ -314,6 +314,120 @@ See [Development](DEVELOPMENT.md) for additional boundaries and maintenance note
 
 </details>
 
+## Configuration Options & Runtime Environment
+
+User configuration toggles are safely stored in `~/.zsh-project-options` as plain key-value pairs (no code execution). They are read on demand during Zsh startup and can be adjusted anytime via `bash install.sh --set KEY=0|1` or `zsh-config`.
+
+| Option Key | Valid Values | Default | Purpose & Description |
+| :--- | :--- | :--- | :--- |
+| `ZSH_PROJECT_FULL` | `0` or `1` | `0` (basic) / `1` (full) | Enable full CLI toolchain aliases & integration (FZF, Yazi, television, tre, eza, etc.) |
+| `ZSH_PROJECT_VFOX` | `0` or `1` | `0` | Activate vfox version manager during Zsh startup |
+| `ZSH_PROJECT_LAZYDOCKER` | `0` or `1` | `1` | Mount lazydocker container management alias (`lzd`) |
+| `ZSH_PROJECT_LAZYGIT` | `0` or `1` | `1` | Mount lazygit Git TUI alias (`lg`) and global shortcut (`Ctrl+G`) |
+| `ZSH_PROJECT_TMUX` | `0` or `1` | `0` (default) / `1` (with `--with-tmux`) | Enable tmux helper aliases (`t`, `ta`, `tls`, `tn`) and cross-platform clipboard |
+| `ZSH_PROJECT_TMUX_AUTO` | `0` or `1` | `1` | Automatically attach to or create the `main` session on interactive terminal launch |
+| `ZSH_PROJECT_BANNER` | `0` or `1` | `1` | Display terminal startup welcome banner and loaded tool statuses |
+| `ZSH_PROJECT_FASTFETCH` | `0` or `1` | `1` | Automatically run Fastfetch to display OS & hardware information on startup |
+| `ZSH_PROJECT_TIMER` | `0` or `1` | `1` | Measure and print high-precision shell startup time |
+| `ZSH_PROJECT_AUTO_CHECK_UPDATE` | `0` or `1` | `1` | Enable periodic background asynchronous update checking (non-blocking) |
+| `ZSH_PROJECT_CHECK_INTERVAL_DAYS`| Positive int | `7` | Days between automatic update checks |
+| `ZSH_PROJECT_TELEVISION` | `0` or `1` | `1` | Enable television (`tv`) smart fuzzy finder integration |
+| `ZSH_PROJECT_TV_KEYBINDINGS` | `0` or `1` | `0` | Allow television to bind Ctrl+T and Ctrl+R shortcuts |
+| `ZSH_PROJECT_TRE` | `0` or `1` | `1` | Enable modern tre directory tree wrapper alias |
+
+### Global Runtime Environment Variables
+
+- `ZSH_PROJECT_DIR`: Optional root directory for project scripts. Defaults to `${XDG_STATE_HOME:-~/.local/state}/zsh-project/scripts`.
+- `ZSH_PROJECT_PROFILING`: Set to `1` to run detailed microsecond-level function profiling via `zsh/zprof`.
+- `POWERLEVEL9K_INSTANT_PROMPT`: Set to `off` by default to ensure Fastfetch, startup banners, and diagnostic notices print cleanly without being overwritten or displaced.
+
+---
+
+## Local Development, Testing & Docker Verification
+
+The project includes an isolated regression suite and strict static analysis rules.
+
+### 1. Test & Quality Verification Commands
+
+```bash
+# 1. ShellCheck static analysis across all scripts (0 errors, 0 warnings required)
+shellcheck install.sh scripts/*.sh
+
+# 2. Bash and Zsh syntax check
+bash -n install.sh scripts/*.sh
+zsh -n templates/zshrc.zsh .zshrc
+
+# 3. Installer regression suite (mocks downloads, symlink swaps, and boundary versions)
+bash scripts/test_installer.sh
+
+# 4. Management regression suite (verifies atomic snapshots, checksums, and locks)
+bash scripts/test_management.sh
+
+# 5. Read-only environment doctor check (verifies 24 CLI tools and version retrieval)
+bash scripts/manage.sh --doctor
+```
+
+### 2. Isolated Docker Container Verification
+
+You can test the entire installation in an isolated container without affecting your host system:
+
+```bash
+docker run --rm -it ubuntu:24.04 bash -c "
+  apt-get update && apt-get install -y git sudo curl ca-certificates zsh tmux
+  useradd -m -s /bin/bash testuser && echo 'testuser ALL=(ALL) NOPASSWD: ALL' >> /etc/sudoers
+  su - testuser -c '
+    git clone https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH.git ~/.zsh-project
+    cd ~/.zsh-project
+    bash install.sh --profile full --with-tmux --with-terminals --p10k-style rainbow --yes --lang en
+    zsh
+  '
+"
+```
+
+---
+
+## Troubleshooting FAQ
+
+| Issue / Error | Root Cause | Recommended Fix |
+| :--- | :--- | :--- |
+| Prompt icons render as rectangles or `?` | Missing Nerd Font vector icon font in host terminal | Switch your terminal font (Windows Terminal/iTerm2/WezTerm) to **JetBrainsMono Nerd Font**. |
+| `vfox initialization failed or timed out` | vfox uninitialized or missing network connection | Run `vfox --version` or retry with `bash install.sh --retry-failed vfox`. |
+| `macOS Bash version (3.2) < 4.0` warning | Default macOS `/bin/bash` is Apple's 2007 legacy Bash 3.2 | Run `brew install bash`. Installer scripts are natively compatible with 3.2, but some third-party tmux themes benefit from modern Bash. |
+| Remote Tmux clipboard synchronization issue | Remote SSH session missing OSC 52 or X11 forwarding | OSC 52 pass-through is enabled by default in our Tmux configuration. Mouse dragging or pressing `y` in Windows Terminal, iTerm2, or WezTerm copies directly to your local system clipboard. |
+
+> For comprehensive error diagnostics, plugin conflicts, and recovery procedures, see [ZSH_TROUBLESHOOTING.md](ZSH_TROUBLESHOOTING.md).
+
+---
+
+## Contributing & Feedback
+
+Contributions are warmly welcomed!
+
+1. **Fork the repository** and branch off `main` (`git checkout -b feature/awesome-feature`).
+2. **Follow code guidelines**:
+   - Ensure Bash scripts maintain Bash 3.2 compatibility where applicable.
+   - Run `shellcheck install.sh scripts/*.sh` to maintain 0 warnings.
+   - Run `bash scripts/test_installer.sh` and `bash scripts/test_management.sh` to ensure all tests PASS.
+3. **Commit**: Use Conventional Commits (`feat(...)`, `fix(...)`, `docs(...)`).
+4. **Pull Request**: Provide detailed rationale and test results.
+
+Feedback & Issues: [GitHub Issues](https://github.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/issues)
+
+---
+
+## License & Acknowledgments
+
+This project is licensed under the **MIT License**. See [LICENSE](LICENSE) for details.
+
+Special thanks to:
+- [Oh My Zsh](https://github.com/ohmyzsh/ohmyzsh)
+- [Powerlevel10k](https://github.com/romkatv/powerlevel10k)
+- [Yazi](https://github.com/sxyazi/yazi)
+- [tmux](https://github.com/tmux/tmux) & [tmux-tokyo-night](https://github.com/fabioluciano/tmux-tokyo-night)
+- [fzf](https://github.com/junegunn/fzf), [eza](https://github.com/eza-community/eza), [bat](https://github.com/sharkdp/bat), [zoxide](https://github.com/ajeetdsouza/zoxide), [fastfetch](https://github.com/fastfetch-cli/fastfetch), [television](https://github.com/alexpasmantier/television), [tre-command](https://github.com/dduan/tre), [vfox](https://github.com/version-fox/vfox), and [neovim](https://github.com/neovim/neovim).
+
+---
+
 ## Documentation
 
 The detailed guides below are currently written in Chinese. This README describes the current `install.sh`, `scripts/`, and `templates/` implementation; intended platform support and actual validation are recorded separately.
@@ -326,6 +440,7 @@ The detailed guides below are currently written in Chinese. This README describe
 | [Troubleshooting](ZSH_TROUBLESHOOTING.md) | Startup errors, missing tools, update failures, and terminal display issues |
 | [Development](DEVELOPMENT.md) | Module responsibilities, loading order, state files, and maintenance conventions |
 | [Testing & validation](INSTALLER_TESTING.md) | Isolated regression tests, real-machine checks, and verified scope |
+| [Audit Report](AUDIT_REPORT.md) | Comprehensive engineering and security audit report |
 
 <details>
 <summary><strong>Repository map</strong></summary>
@@ -338,10 +453,17 @@ The detailed guides below are currently written in Chinese. This README describe
 | `scripts/test_installer.sh` / `scripts/test_management.sh` | Current isolated regression entry points |
 | `templates/zshrc.zsh` / `templates/tmux.conf` | Templates actually deployed by the installer |
 | `templates/zshrc.local.example` | Personal-extension example |
+| `terminal_configs/` | WezTerm & Alacritty configurations and font fallback definitions |
+| `AUDIT_REPORT.md` | Security and engineering quality audit report |
+| `LINUX_ZSH_SETUP_GUIDE.md` | Complete Linux and macOS environment installation guide |
 | `TMUX_USAGE_GUIDE.md` | Comprehensive Tmux productivity, shortcuts, and troubleshooting guide |
+| `CONFIGURATION_MANAGEMENT.md` | Options, snapshots, backups, and state mechanism |
+| `DEVELOPMENT.md` | Development standards, architecture diagram, and loading cycle |
+| `INSTALLER_TESTING.md` | Acceptance test suite specification and dual-platform test records |
+| `ZSH_TROUBLESHOOTING.md` | Zsh terminal troubleshooting and diagnostic guide |
 | `.zshrc` / `.tmux.conf` | Root reference configurations; `.zshrc` behaves differently from the installed template |
-| `.zshenv` | Currently empty; not deployed by the installer |
-| `.github/workflows/tests.yml` | Linux container regression workflow; consult individual runs for results |
+| `.zshenv` | Currently empty placeholder; not deployed by the installer |
+| `.github/workflows/tests.yml` | Linux matrix regression and ShellCheck static analysis CI workflow |
 | `assets/` | Project screenshots |
 
 </details>

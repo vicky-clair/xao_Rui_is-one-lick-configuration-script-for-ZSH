@@ -1,6 +1,6 @@
 # 故障排查与历史验证记录
 
-核对日期：2026-10-19。本文按当前脚本说明排查步骤，末尾保留早期 Debian 实测摘要。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，备份和开关见[配置管理](CONFIGURATION_MANAGEMENT.md)。
+核对日期：2026-10-27。本文按当前脚本说明排查步骤，末尾保留早期 Debian 实测摘要。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，备份和开关见[配置管理](CONFIGURATION_MANAGEMENT.md)。
 
 ## 先判断问题所在
 
@@ -280,6 +280,14 @@ Debian 13 中 `/usr/bin/resize` 由 xterm 包提供，参见[官方文件清单]
   3. **插件更新**：按 `Ctrl + a` 然后按 `I`（大写 i）由 TPM 自动更新补齐插件。
   4. **台式机无电池优化**：若为台式机/工控机/云服务器，可编辑 `~/.tmux.conf` 将 `@theme_plugins` 中的 `battery` 移除，避免显示 `0%` 虚拟电池。
   5. **新系统说明**：在全新 Linux 系统上首次安装时，Tmux 无任何历史进程残留，启动即会自动置底并正常渲染所有模块，完全不会复现此问题。
+
+### (5) 编辑器（VS Code / IDE）打开多语言 Markdown（如 `README.ja.md`）卡顿或 CPU 飙升
+- **现象**：在 VS Code 或某些终端/编辑器中打开、保存或编辑包含大段日文的 Markdown 文档时，编辑器或 Extension Host 假死、光标无响应、CPU 飙升。
+- **原因**：Code Spell Checker (cSpell) 拼写检查插件将无空格分隔的大段日文识别为超长未知单词并递归计算建议词典，或表格对齐插件在处理 Nerd Font 4 字节 PUA 字符与全角日文字符混排时发生正则回溯。
+- **处理方式**：
+  1. 项目已在根目录内置 `.vscode/settings.json`，自动设置了 `"cSpell.ignorePaths": ["**/*.ja.md", ...]`。
+  2. 若在个人全局配置中启用了拼写检查，请在全局 `settings.json` 中对 `*.ja.md` 禁用拼写检查。
+  3. 确保文件统一采用 UTF-8 编码与 LF (`\n`) 换行符。
 
 ## 历史验证摘要
 

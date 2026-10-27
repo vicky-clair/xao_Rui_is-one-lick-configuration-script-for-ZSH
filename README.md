@@ -94,6 +94,15 @@ zsh
 
 Validate in a child shell first so you can exit back to your original terminal. Test feature switches in a new session; repeatedly running `source ~/.zshrc` does not reliably remove old aliases and hooks.
 
+### 4. Crucial Precautions & Best Practices
+
+1. **Never Run with `sudo` Directly**: Always run `bash install.sh` as your normal user. The script automatically requests `sudo` on demand when installing system packages. Running `sudo bash install.sh` pollutes your `$HOME` directory permissions with `root` ownership.
+2. **Terminal Font Configuration**: Powerlevel10k prompt arrows and Yazi/Tmux status icons require a **Nerd Font** (recommended: [JetBrainsMono Nerd Font](https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip)). If icons display as boxes (`□`) or question marks (`?`), simply set your terminal emulator font (Windows Terminal, iTerm2, WezTerm, Alacritty) to any Nerd Font.
+3. **Personal Customizations in `~/.zshrc.local`**: Never edit managed configuration files directly. Place your personal environment variables, aliases, and custom functions into `~/.zshrc.local`. The installer and `zsh-update` will **never** overwrite or modify this file.
+4. **New Session for Changes**: After changing toggles via `zsh-config` or `install.sh --set KEY=0|1`, restart your terminal or run `exec zsh`. Running `source ~/.zshrc` repeatedly does not cleanly purge old aliases and hooks.
+5. **Headless & Desktop Server Tmux Battery**: On desktops or cloud virtual machines without a physical battery, Linux `upower` may report a virtual `0%` battery. Edit `~/.tmux.conf`, remove `battery` from `@theme_plugins`, and press `Ctrl+a r` to hot-reload.
+6. **Encoding & Line Endings**: All configurations strictly use UTF-8 encoding with LF (`\n`) line endings. Do not save configuration files with Windows CRLF line endings.
+
 <details>
 <summary><strong>Alternative: download the standalone entry script</strong></summary>
 

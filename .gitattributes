@@ -5,5 +5,6 @@
 .zshrc text eol=lf
 .zshenv text eol=lf
 *.md text eol=lf
+*.json text eol=lf
 LICENSE text eol=lf
 templates/** text eol=lf

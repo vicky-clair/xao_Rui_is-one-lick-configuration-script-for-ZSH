@@ -1,0 +1,22 @@
+{
+  "files.eol": "\n",
+  "files.encoding": "utf8",
+  "cSpell.ignorePaths": [
+    "**/*.ja.md",
+    "**/*.log",
+    "**/.local/**",
+    "**/templates/**",
+    "**/.git/**"
+  ],
+  "[markdown]": {
+    "editor.wordWrap": "on",
+    "editor.quickSuggestions": {
+      "comments": "off",
+      "strings": "off",
+      "other": "off"
+    }
+  },
+  "[shellscript]": {
+    "files.eol": "\n"
+  }
+}

@@ -42,6 +42,15 @@ bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 
 安装完成后，直接打开新终端或输入 `exec zsh` 即可畅享极速终端！
 
+### 💡 核心注意事项与使用规范
+
+1. **普通用户权限运行（切勿加 sudo）**：请始终以普通用户身份直接执行 `bash install.sh`。安装器在需要安装系统包时会自动按需请求 `sudo` 提权。直接执行 `sudo bash install.sh` 会导致用户家目录的配置文件归属权被 `root` 占用，引发后续权限问题！
+2. **终端字体配置（Nerd Font）**：Powerlevel10k 彩虹流线提示符与 Yazi/Tmux 状态栏图标依赖矢量图标支持。推荐安装并选用 [JetBrainsMono Nerd Font](https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip)。若终端或 SSH 中图标显示为方框（`□`）或问号，只需在本地终端软件（Windows Terminal、iTerm2、WezTerm 等）设置中将字体选为该字体即可。
+3. **个人扩展写入 `~/.zshrc.local`**：请勿直接修改受管模板。个人的环境变量、命令别名与自定义函数请写入 `~/.zshrc.local`。安装器、更新器（`zsh-update`）与配置管理器（`zsh-config`）**绝不会**创建或覆盖该文件。
+4. **新会话生效原则**：调整配置开关（如 `zsh-config` 或 `install.sh --set KEY=0|1`）后，请新开终端或执行 `exec zsh` 重新加载。多次重复执行 `source ~/.zshrc` 无法彻底清理旧的别名与目录钩子。
+5. **无电池设备 Tmux 状态栏优化**：在台式机、工控机或云服务器上，Linux `upower` 可能虚拟出 `0%` 空电池。可编辑 `~/.tmux.conf` 移除 `@theme_plugins` 中的 `battery`，随后按下 `Ctrl + a r` 即刻热重载生效。
+6. **编码与换行符规范**：项目文件均严格采用 UTF-8 编码与 LF (`\n`) 换行符。在 Windows 编辑器中请勿将其转换为 CRLF，以免脚本在 Linux/macOS 环境下解析异常。
+
 ---
 
 ## 项目展示

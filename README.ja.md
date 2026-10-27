@@ -88,6 +88,15 @@ zsh
 
 最初は子シェルで検証すると、問題があっても終了して元のターミナルに戻れます。機能の切り替えは新しいセッションで確認してください。`source ~/.zshrc` を繰り返しても、古いエイリアスやフックが確実に取り除かれるわけではありません。
 
+### 4. 重要な注意事項とベストプラクティス
+
+1. **一般ユーザーでの実行（sudo は使用しない）**: 対象マシンで通常のユーザーとして `bash install.sh` を実行してください。システムパッケージのインストール時に必要に応じて自動で `sudo` を要求します。`sudo bash install.sh` で実行すると、ホームディレクトリの設定ファイルの所有権が `root` になり権限の問題が発生します。
+2. **Nerd Font の導入**: Powerlevel10k プロンプトや Yazi/Tmux 状態バーのアイコン表示には [JetBrainsMono Nerd Font](https://github.com/ryanoasis/nerd-fonts/releases/latest/download/JetBrainsMono.zip) などの Nerd Font が必要です。ターミナル（Windows Terminal、iTerm2、WezTerm 等）のフォント設定を変更してください。
+3. **個人用設定は `~/.zshrc.local` に記述**: 個人用の環境変数、エイリアス、関数は `~/.zshrc.local` に記述してください。インストーラーや更新機能（`zsh-update`）がこのファイルを上書きすることはありません。
+4. **新しいセッションでの反映**: 設定変更後は、新しいターミナルを開くか `exec zsh` を実行してください。`source ~/.zshrc` では古いエイリアスやフックが完全には解除されません。
+5. **デスクトップ・サーバー向け Tmux バッテリー非表示**: バッテリーのないデスクトップやクラウドサーバーでは、`~/.tmux.conf` の `@theme_plugins` から `battery` を削除し、Tmux 内で `Ctrl + a r` を押すことでアイコンを非表示にできます。
+6. **UTF-8 と LF 改行コード**: 設定ファイルは UTF-8 および LF (`\n`) 改行コードを維持してください。Windows の CRLF 改行コードで保存しないでください。
+
 <details>
 <summary><strong>別の方法: 単体の起動スクリプトをダウンロード</strong></summary>
 

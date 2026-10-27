@@ -830,7 +830,14 @@ else
   if ((${#base_missing[@]} > 0)); then
     needs_elevation=1
   elif [[ "$PROFILE" == full ]]; then
-    needs_elevation=1
+    for _tool in fzf eza zoxide yazi fastfetch nvim tv tre jq ffmpeg pdftoppm; do
+      command -v "$_tool" >/dev/null 2>&1 || { needs_elevation=1; break; }
+    done
+    command -v fd >/dev/null 2>&1 || command -v fdfind >/dev/null 2>&1 || needs_elevation=1
+    command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1 || needs_elevation=1
+    command -v rg >/dev/null 2>&1 || command -v ripgrep >/dev/null 2>&1 || needs_elevation=1
+    command -v 7z >/dev/null 2>&1 || command -v 7zz >/dev/null 2>&1 || needs_elevation=1
+    command -v magick >/dev/null 2>&1 || command -v convert >/dev/null 2>&1 || needs_elevation=1
   elif ((WITH_TMUX)) && ! command -v tmux >/dev/null 2>&1; then
     needs_elevation=1
   fi
@@ -838,8 +845,14 @@ else
   if ((needs_elevation)); then
     # 若当前已是 root 用户（例如在 Docker 容器中直接执行），无需依赖 sudo
     if [[ "${EUID:-$(id -u 2>/dev/null || echo 1)}" -ne 0 ]]; then
-      command -v sudo >/dev/null || die "$(msg '缺少 sudo，请先由管理员安装依赖' 'Missing sudo; please ask administrator to install dependencies')"
-      sudo -v
+      if sudo -n true 2>/dev/null; then
+        sudo -v 2>/dev/null || true
+      elif [[ -t 0 ]]; then
+        command -v sudo >/dev/null || die "$(msg '缺少 sudo，请先由管理员安装依赖' 'Missing sudo; please ask administrator to install dependencies')"
+        sudo -v
+      else
+        warn "$(msg '检测到非交互终端且无免密 sudo，跳过提权，优先使用已有与独立工具' 'Non-interactive environment without passwordless sudo; skipping elevation')"
+      fi
     fi
   elif sudo -n true 2>/dev/null; then
     # 纯配置模式且已有免密凭据时，顺带刷新，确保后续可选微调安全执行
@@ -990,7 +1003,7 @@ optional_package() {
       ;;
     apt)
       # 预检软件包是否存在于 apt 缓存中，并强制非交互式防止 debconf 挂起
-      if apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1; then
+      if (apt-cache show "$pkg" >/dev/null 2>&1 || apt-get install -s -qq "$pkg" >/dev/null 2>&1) && sudo -n true 2>/dev/null; then
         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y "$pkg" && return 0
       fi
       ;;

@@ -1,10 +1,10 @@
 # 项目审计报告
 
-审计日期：2026-10-27　｜　审计基线：commit `6155147`（本地 main，领先 `origin/main` 3 个提交，未推送）　｜　上次审计：2026-10-26 / `68cd8ce`
+审计日期：2026-10-27　｜　审计基线：commit `dc19e31`（与 `origin/main` 保持同步）　｜　上次审计：2026-10-26 / `68cd8ce`
 范围：`install.sh`、`scripts/`、`templates/`、根目录配置、`terminal_configs/`、CI 与文档
 
 > [!IMPORTANT]
-> 本次审计发现的 **N-1 ~ N-7**、**M-1**、**M-2**、**L-2**、**L-3** 共 11 项问题**已于 2026-10-27 全部修复并通过回归测试与 macOS 实机验证**（详见第七节修复记录）。
+> 本次审计发现的 **N-1 ~ N-13**、**M-1**、**M-2**、**L-2**、**L-3** 共 17 项问题**已于 2026-10-27 全部修复并通过回归测试与多环境验证**（详见第七节修复记录）。
 
 ---
 
@@ -14,7 +14,7 @@
 | --- | --- | --- | --- |
 | 严重 / 高 | 0 | 0 未修复 | 未发现可被直接利用的漏洞，仓库和提交历史中没有密钥 |
 | 中 | 5 | **4 已修复** / 1 待用户侧确认（M-3） | 已修复供应链 SHA-256 校验（M-1）、重试白名单中止（N-1）、tmux 版本判断（N-2）、tmux 与 macOS CI 自动化测试覆盖（N-4）；仅 M-3（远程测试机改密）需用户在远端机器执行 |
-| 低 | 7 | **全部已修复** | 已修复文档依赖描述（N-3）、单点主题版本锁定与升级（N-5）、`--with-terminals` 终端配置部署与字体保障（N-6）、PATH 幂等去重与 Linuxbrew 支持（N-7）、安全在线更新命令（L-2）、`%hidden` 消除重复剪贴板管道（L-3） |
+| 低 | 10 | **全部已修复** | 已修复文档依赖描述（N-3）、单点主题版本锁定与升级（N-5）、`--with-terminals` 终端配置部署与字体保障（N-6）、PATH 幂等去重与 Linuxbrew 支持（N-7）、安全在线更新命令（L-2）、`%hidden` 消除重复剪贴板管道（L-3）、官方 MIT LICENSE 补全（N-11）、Doctor 兼容多主题路径（N-12）、架构注释与测试文档对齐（N-13） |
 | 信息 | 4 | 已记录 | ShellCheck、CI 覆盖面、本地敏感文件、本地待推送提交 |
 | 已关闭 | 2 | **全部已关闭** | L-1（重载累积）、M-2（macOS 实机复测与 `INSTALLER_TESTING.md` 同步） |
 
@@ -147,3 +147,6 @@
 | **N-8** | 修复 [install.sh](install.sh) 中 television 官方预编译包在 musl 降级至 gnu 时的子 Shell 变量作用域丢失 Bug（避免因子 Shell 丢失 `tv_asset` 赋值导致校验和比对必然失败）。 | 本地与 CI 静态语法分析及回归测试全数通过 |
 | **N-9** | 使用 `ShellCheck 0.11.0` 对全部 6 个 Shell 脚本（`install.sh`、`check_updates.sh`、`manage.sh`、`retry_tools.sh`、`test_installer.sh`、`test_management.sh`）进行全覆盖扫描与治理，消除 `command tmux info` 命名歧义、冗余 `echo $(msg ...)`、未用变量与引号展开警告，实现全库 **0 error / 0 warning**。 | `shellcheck install.sh scripts/*.sh` 退出码为 0 |
 | **N-10** | 在 [.github/workflows/tests.yml](.github/workflows/tests.yml) 中新增独立的 `lint` 自动化测试阶段，每次提交或 PR 均自动运行 ShellCheck 全量静态扫描，关闭 I-1 与 I-2。 | CI 工作流静态校验与本地验证双重通过 |
+| **N-11** | 在仓库根目录正式创建标准 [LICENSE](LICENSE) (MIT License) 文件，补全版权人 `vicky-clair` 与年份信息，修复各语言 `README` 中 `[LICENSE](LICENSE)` 链接 404 问题。 | 协议文件校验与链接可达性核验通过 |
+| **N-12** | 优化 [scripts/manage.sh](scripts/manage.sh) 中的 `--doctor` 健康体检逻辑，同时适配 `$HOME/powerlevel10k/powerlevel10k.zsh-theme` 独立路径与 `$HOME/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme` OMZ 主题路径，消除路径误判。 | 两种路径在测试沙箱与体检中均准确识别 |
+| **N-13** | 完善根目录 [.zshrc](.zshrc) 头部架构与参考配置中文注释，消除用户对根目录配置与安装器模板的混淆；同步更新 [DEVELOPMENT.md](DEVELOPMENT.md) 与 [INSTALLER_TESTING.md](INSTALLER_TESTING.md) 中关于 CI 覆盖面（ShellCheck 与 macOS 阶段）及 `verify_asset_sha256()` 安全校验的最新说明。 | 文档与代码库实现 100% 保持一致 |

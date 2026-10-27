@@ -1,6 +1,6 @@
 # 开发与架构说明
 
-核对日期：2026-10-26。以仓库当前实现为准；操作入口见 [README](README.md)，验证记录见[测试与验收](INSTALLER_TESTING.md)。本页区分已经实现的行为和仍需改进的事项。
+核对日期：2026-10-27。以仓库当前实现为准；操作入口见 [README](README.md)，验证记录见[测试与验收](INSTALLER_TESTING.md)。本页区分已经实现的行为和仍需改进的事项。
 
 ## 模块职责
 
@@ -88,7 +88,7 @@ Homebrew 准备和资源自举可能在第 6 步最终确认前发生。第 10 �
 | lazydocker / lazygit | 包管理器优先，下载回退行为存在差异，见下文限制 |
 | tmux | 安装软件、剪贴板依赖、TPM 和配置；TPM 首次异步克隆自举并在完成后自动热重载，内置 127 报警防护、OSC 52 与 xclip 1秒熔断兜底、terminfo 自适应降级与复制模式防误锁机制；操作技巧详见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) |
 
-`install_nvim_tree()` 先验证暂存二进制，再切换目录与链接，保留旧版本，并在切换失败时尝试恢复。下载成功、可执行位存在或 `--version` 成功均不能证明所有运行库和插件兼容；安装器没有统一的发布资产签名/校验文件验证流程。
+`install_nvim_tree()` 先验证暂存二进制，再切换目录与链接，保留旧版本，并在切换失败时尝试恢复。下载成功、可执行位存在或 `--version` 成功均不能证明所有运行库和插件兼容；安装器与重试工具已全面落地 `verify_asset_sha256()` 校验机制，为 `lazydocker`、`lazygit`、`television` 与 `neovim` 等官方 Release 下载强制核验 SHA-256 校验和（支持官方 `checksums.txt` 与 `.sha256` 文件），有效防御上游镜像劫持与文件损坏。
 
 vfox 优先用 `timeout -k 1s 5s` 或 `gtimeout` 生成激活脚本，没有超时工具时直接运行。后续 `eval` 不在该超时保护内；成功后从 `chpwd_functions` 和 `precmd_functions` 移除 `_vfox_hook`，因此不再依靠这两个钩子自动切换 SDK。
 
@@ -150,6 +150,9 @@ Git 检查寻找 `.git` 目录、上游分支，必要时回退到 origin/master
 | 调整检查超时 | `check_updates.sh -t 15` 只作用本次检查；`--update` 会重新使用默认超时 |
 | 后台重试间隔 | 触发前已更新时间戳，失败后通常等待下一间隔；可随时手动运行 `zsh-check-updates` 强制刷新 |
 | 文件事务与锁 | 管理器与重试工具各自持有独立文件锁；不并发执行多个写操作 |
+| 供应链 SHA-256 校验 | **已全面加固**：落地 `verify_asset_sha256()`，官方 Release 下载均比对发布校验和 |
+| 现代终端配置部署 | **已新增完成**：提供 `--with-terminals` 部署 WezTerm 与 Alacritty 推荐配置及 Nerd Font 字体保障 |
+| CI 静态检查与 macOS 回归 | **已全面纳入**：CI 新增独立 `lint` 阶段执行 ShellCheck，新增 `macos-latest` 覆盖 Bash 3.2 兼容性 |
 | Git 本地修改保护 | 适用于更新检测中的 Git helper；自举/FZF 路径采用标准 git pull |
 | `resize` 依赖 | APT 安装器尝试 x11-utils 与 ncurses-term；Debian 13 的 resize 在 xterm 包中 |
 | 网络和性能 | 各平台首次拉取大量包时耗时取决于网络；已部署环境下终端启动控制在 ~300ms（极速优化） |

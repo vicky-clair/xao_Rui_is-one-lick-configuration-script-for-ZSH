@@ -4,4 +4,6 @@
 .tmux.conf text eol=lf
 .zshrc text eol=lf
 .zshenv text eol=lf
+*.md text eol=lf
+LICENSE text eol=lf
 templates/** text eol=lf

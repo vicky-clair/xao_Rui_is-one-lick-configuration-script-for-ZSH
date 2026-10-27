@@ -1,6 +1,6 @@
 # Zsh 配置管理
 
-核对日期：2026-10-26。本文描述安装器部署的 `templates/zshrc.zsh` 与 `templates/tmux.conf`；根目录 `.zshrc` 的部分工具不受同样的开关控制，差异见[开发文档](DEVELOPMENT.md)。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，Tmux 高级用法与快捷键详见[Tmux 使用指南](TMUX_USAGE_GUIDE.md)。
+核对日期：2026-10-27。本文描述安装器部署的 `templates/zshrc.zsh` 与 `templates/tmux.conf`；根目录 `.zshrc` 的部分工具不受同样的开关控制，差异见[开发文档](DEVELOPMENT.md)。首次部署见[安装指南](LINUX_ZSH_SETUP_GUIDE.md)，Tmux 高级用法与快捷键详见[Tmux 使用指南](TMUX_USAGE_GUIDE.md)。
 
 在完整项目目录中运行下列命令。涉及配置写入或组件安装时会询问确认。加 `--dry-run` 仅展示操作，不写文件、不联网、不执行用户配置。`--yes` / `-y` 可显式跳过确认，适用于自动化部署与管理脚本。
 

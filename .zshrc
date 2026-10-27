@@ -1,5 +1,8 @@
-# Linux / macOS / Debian / Zsh 5.9 交互配置。修改后先运行 zsh -n ~/.zshrc，再重新启动 Zsh。
-# 本文件不安装工具；工具缺失时通常跳过对应集成。详细说明见 README.md。
+# Linux / macOS / Debian / Zsh 5.9 交互配置（开发与自定义参考配置）。
+# 提示：安装器 (install.sh) 实际部署并维护的是 templates/zshrc.zsh。
+# 两者在部分工具的开关控制与默认行为上存在差异，具体说明详见 DEVELOPMENT.md。
+# 用户的个人别名、自定义函数与环境变量推荐放入 ~/.zshrc.local（安装与升级绝不覆盖）。
+# 本文件不安装工具；工具缺失时通常跳过对应集成。修改后可运行 zsh -n .zshrc 校验语法。
 [[ -o interactive ]] || return
 
 # 性能诊断仅在显式命令中启用，日常启动不输出性能明细。

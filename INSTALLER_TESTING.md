@@ -95,9 +95,12 @@ bash scripts/test_management.sh
 
 ### GitHub Actions
 
-[工作流](.github/workflows/tests.yml) 在 push、pull_request 和手动触发时配置以下容器：Debian 12、Debian 13、Ubuntu 24.04、Fedora latest、Arch latest。各容器先联网安装测试依赖，再运行两套隔离回归。
+[工作流](.github/workflows/tests.yml) 在 push、pull_request 和手动触发时自动化执行以下门禁检查：
+1. **lint 阶段**：全量运行 ShellCheck (0.11.0) 静态代码质量分析，严格要求全库 0 错误 0 警告；
+2. **linux 矩阵阶段**：在 Debian 12、Debian 13、Ubuntu 24.04、Fedora latest、Arch latest 容器中安装测试依赖、执行两套隔离回归，并进行带 `--with-tmux --with-terminals` 的真实安装、二次幂等性与 Tmux 隔离 socket 零报错断言测试；
+3. **macos 矩阵阶段**：在 `macos-latest` runner 上执行两套隔离回归，覆盖 macOS 原生 `/bin/bash` 3.2 与 Homebrew 现代 `bash` 的兼容性。
 
-Fedora/Arch 镜像标签会变化，不能仅凭发行版名称复现历史环境；记录对应提交、运行链接和版本输出。矩阵没有 macOS、Windows 或单独的 ARM runner，也没有覆盖所有安装器识别的衍生发行版。
+注：Fedora/Arch 镜像标签会动态滚动；矩阵目前未配置 Windows 原生环境或单独的私有 ARM runner，也没有覆盖所有安装器识别的衍生发行版。
 
 ## 第三层：目标机预演
 

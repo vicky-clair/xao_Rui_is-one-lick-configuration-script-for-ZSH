@@ -285,7 +285,21 @@ case "$ACTION" in
       else echo "WARN: $file 无法验证"; issues=$((issues+1)); fi
     done
     for path in .oh-my-zsh/oh-my-zsh.sh powerlevel10k/powerlevel10k.zsh-theme .oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh .oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh; do
-      if [[ -r "$HOME/$path" ]]; then echo "PASS: $path"; else echo "WARN: 缺少 $path"; issues=$((issues+1)); fi
+      if [[ "$path" == "powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+        if [[ -r "$HOME/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+          echo "PASS: powerlevel10k/powerlevel10k.zsh-theme"
+        elif [[ -r "$HOME/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+          echo "PASS: .oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme"
+        else
+          echo "WARN: 缺少 powerlevel10k/powerlevel10k.zsh-theme"
+          issues=$((issues+1))
+        fi
+      elif [[ -r "$HOME/$path" ]]; then
+        echo "PASS: $path"
+      else
+        echo "WARN: 缺少 $path"
+        issues=$((issues+1))
+      fi
     done
     if [[ -f "$HOME/.tmux.conf" ]]; then
       echo "PASS: .tmux.conf"

@@ -251,11 +251,23 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | `\|` / `-` | 左右分屏 / 上下分屏，继承当前目录 |
 | `c` / `m` | 新建窗口 / 最大化或还原窗格 |
 | `h` / `j` / `k` / `l` | 向左/下/上/右调整窗格 5 格，可连续按键 |
-| `r` | 重新加载 `.tmux.conf`，其中的命令与插件也会执行 |
+| `r` | 重新加载 `.tmux.conf`，其中的命令与插件也会立即热重载生效 |
 | `g` / `G` | lazygit 弹窗 / 在新窗口打开 lazygit |
 | `[` | 进入复制模式（`v` 开始选择，`Ctrl+v` 切换矩形选择，`Esc` 退出复制模式，`y` 复制并退出） |
 | `p` / `]` | 粘贴 tmux 内部缓冲区（若从本机向远程粘贴，请使用终端的快捷键如 `Ctrl+Shift+V` 或 `Cmd+V`） |
 | `I`（Shift+i） | TPM 安装插件 |
+
+**状态栏设计与全方位硬件监控 (Status Bar & Hardware Monitoring)**：
+- **位置常驻屏幕底部**：模板默认配置 `status-position bottom`，符合终端视线交互习惯。全新系统首次安装后直接开箱即用常驻在底部。
+- **配置即时热重载**：任何时候修改了 `~/.tmux.conf`，只需在 Tmux 中按下 **`Ctrl + a` 然后按 `r`**（或命令 `tmux source-file ~/.tmux.conf`），屏幕底部弹出绿色成功提示，修改立即生效，无需重启 Tmux 服务！
+- **Tokyo Night 实时监控模块**：右侧状态栏基于 `v2.7.2` 稳定版引擎，内置高颜值 Nerd Font 硬件仪表：
+  - `󰥔 时间`：实时日期与时刻
+  - `󰛳 网络`：网卡实时上下行收发速率（如 `↓1K ↑2K`）
+  - ` CPU`：核心实时运算负载百分比
+  - ` 内存`：物理 RAM 占用百分比
+  - `󰋊 磁盘`：根目录使用率
+  - `󰁹 电池`：笔记本电量与充电感知
+- **台式机/云服务器硬件适配提示**：如果机器为台式电脑、工控机、迷你主机或云服务器（无物理电池），Linux `upower` 服务可能会虚拟注册 `0%` 电池，只需编辑 `~/.tmux.conf` 将 `@theme_plugins` 中的 `battery` 删掉，然后按 `Ctrl + a r` 热重载，即可去除电池图标，保持状态栏清爽利落。
 
 **会话常驻保活与自动重连 (Persistence & Auto-Attach)**：
 - **常驻保活**：直接关闭终端窗口或网络意外断开时，Tmux 后台进程与运行中的任务（编译、下载、服务）完好保留，绝不中断。
@@ -270,7 +282,7 @@ bash "$bootstrap_dir/install.sh" --lang zh
 - **全平台终端剪贴板 (OSC 52)**：全局通配启用 `*:RGB:clipboard` 与 `Ms` 转义序列，无需安装图形工具即可在 Windows Terminal、iTerm2、Alacritty、WezTerm 等终端中透传剪贴板，并对 `xclip` 增加了 1 秒超时防护，避免 SSH X11 转发失效时连接挂起。
 - **终端原生选择技巧**：任何时候按住 **`Shift`** 键再用鼠标拖选，即可强制绕过 tmux 鼠标拦截，直接调用本地终端的原生选区与复制功能。
 
-👉 **更详细的会话管理、Vim 联动、断电恢复与实战技巧请参阅 [Tmux 生产力使用指南 (TMUX_USAGE_GUIDE.md)](TMUX_USAGE_GUIDE.md)**。
+👉 **更详细的会话管理、状态栏排查、Vim 联动、断电恢复与实战技巧请参阅 [Tmux 生产力使用指南 (TMUX_USAGE_GUIDE.md)](TMUX_USAGE_GUIDE.md)**。
 
 ## 更新与重新部署
 

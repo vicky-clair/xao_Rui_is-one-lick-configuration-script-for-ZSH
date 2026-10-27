@@ -211,11 +211,23 @@ The prefix is **`Ctrl+a`**. Press it first, then the key below.
 | `\|` / `-` | Split side by side / top and bottom, preserving the current directory |
 | `c` / `m` | Create a window / zoom or restore a pane |
 | `h` / `j` / `k` / `l` | Resize a pane left/down/up/right by 5 cells; keys are repeatable |
-| `r` | Reload `.tmux.conf`, including its commands and plugins |
+| `r` | Reload `.tmux.conf` immediately, re-evaluating commands and plugins |
 | `g` / `G` | Open lazygit in a popup / new window |
 | `[` | Enter copy mode: `v` starts selection, `Ctrl+v` toggles rectangle selection, `Esc` exits copy mode, `y` copies and exits |
 | `p` / `]` | Paste the tmux buffer (use terminal shortcuts like `Ctrl+Shift+V` or `Cmd+V` to paste from local clipboard into remote session) |
 | `I` (`Shift+i`) | Install TPM plugins |
+
+**Status Bar & Real-time Hardware Monitoring**:
+- **Positioned at Bottom**: Configured with `status-position bottom` by default for optimal ergonomics. Works out-of-the-box on clean installations.
+- **Instant Hot-Reload**: Whenever `~/.tmux.conf` is edited, simply press **`Ctrl + a` then `r`** (or run `tmux source-file ~/.tmux.conf`) to hot-reload without restarting the tmux server!
+- **Tokyo Night Dashboard**: Right-side status bar powered by the stable `v2.7.2` engine with crisp Nerd Font icons:
+  - `󰥔 Time`: Real-time date and clock
+  - `󰛳 Network`: Live network throughput (`↓1K ↑2K`)
+  - ` CPU`: Dynamic core utilization percentage
+  - ` Memory`: Physical RAM usage percentage
+  - `󰋊 Disk`: Root filesystem disk usage percentage
+  - `󰁹 Battery`: Laptop battery charge & charging state
+- **Desktop / Headless Server Tip**: On desktops, mini-PCs, or cloud servers without a physical battery, Linux `upower` may virtualize an empty `0%` battery. Remove `battery` from `@theme_plugins` in `~/.tmux.conf` and press `Ctrl + a r` to keep the status bar clean.
 
 **Session Persistence & Auto-Attach**:
 - **Background Persistence**: Closing terminal windows or unexpected disconnections leaves background processes and sessions running safely on the server.
@@ -230,7 +242,7 @@ The prefix is **`Ctrl+a`**. Press it first, then the key below.
 - **Universal OSC 52 Passthrough**: Terminal features are wildcard-matched (`*:RGB:clipboard`) with `Ms` capabilities injected, enabling clipboard passthrough across Windows Terminal, iTerm2, Alacritty, and WezTerm without extra GUI utilities. Added 1-second timeout protection for `xclip` to prevent hangs from broken SSH X11 forwarding.
 - **Native Selection Tip**: Hold **`Shift`** while dragging with the mouse to bypass tmux mouse capture and use your local terminal emulator's native selection and copy.
 
-👉 **For advanced session management, Vim navigation, and crash recovery, see the [Tmux Productivity Guide (TMUX_USAGE_GUIDE.md)](TMUX_USAGE_GUIDE.md)**.
+👉 **For advanced session management, status bar troubleshooting, Vim navigation, and crash recovery, see the [Tmux Productivity Guide (TMUX_USAGE_GUIDE.md)](TMUX_USAGE_GUIDE.md)**.
 
 </details>
 

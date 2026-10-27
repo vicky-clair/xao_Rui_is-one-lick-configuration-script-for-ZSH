@@ -261,3 +261,44 @@ bash install.sh --profile full --with-tmux --p10k-style skip --yes
 > **更新后快速验证**：
 > 1. 在 Tmux 内按 **`Ctrl + a` 然后按 `r`**，屏幕底部提示 `✓ ~/.tmux.conf reloaded successfully!` 即表示配置热重载成功。
 > 2. 按 **`Ctrl + a` 然后按 `I`（大写 i）**，TPM 插件管理器将自动拉取并安装最新插件生态。
+
+---
+
+## 12. 常见问题排查与注意事项 (FAQ & Troubleshooting)
+
+### Q1: 为什么我的终端状态栏显示在屏幕上方（top），而不是底部？
+* **原因分析**：Tmux 采用**客户端-服务端（C/S）守护进程**架构。如果您在此前启动过旧版本的 Tmux 服务，旧进程中可能继承了 `status-position top` 设置。当您修改了 `~/.tmux.conf` 之后断开 SSH 并重新连接时，终端仅仅是重新挂载（attach）到了现有的 Tmux 服务端进程上，**并不会自动重新读取磁盘上的配置文件**。
+* **解决办法**：
+  1. 在 Tmux 终端中直接按下快捷键：**`Ctrl + a` 紧接着按 `r`**（配置内绑定的热重载快捷键），屏幕底部会弹出 `✓ ~/.tmux.conf reloaded successfully!` 提示，状态栏会立刻回到最底部；
+  2. 或者在任意命令行执行：`tmux source-file ~/.tmux.conf`；
+  3. 若希望完全重置所有后台状态，可执行 `tmux kill-server` 后再输入 `t` 重新进入全新会话。
+* **新系统说明**：在一台全新的 Linux 系统上安装部署后，由于首次启动没有任何历史进程残留，Tmux 会直接读取最新配置，**从第一次启动开始就会常驻在最底部**，绝不会出现置顶问题。
+
+### Q2: 为什么状态栏右侧的 CPU、内存、网络吞吐等监控模块空白或不显示？
+* **原因分析**：
+  1. **运行态残留旧版失效路径**：早期版本的主题脚本通过 `bin/powerkit-render` 渲染，而本项目已锁版升级为稳定的 `fabioluciano/tmux-tokyo-night#v2.7.2`，新版底层已全面重构为 `src/render_plugins.sh`。若 Tmux 服务未执行热重载，旧进程会一直尝试调用不存在的文件报错，导致右侧状态栏彻底空白。
+  2. **插件尚未完成自举克隆**：若首次克隆时网络超时，插件可能尚未下载完全。
+* **解决办法**：
+  1. 执行热重载让最新配置生效：在 Tmux 内按 **`Ctrl + a` 然后按 `r`**（或命令 `tmux source-file ~/.tmux.conf`）；
+  2. 手动触发插件补全安装：在 Tmux 内按 **`Ctrl + a` 然后按 `I`（大写 i）**，TPM 插件管理器将自动拉取缺失插件并自动编译生效。
+
+### Q3: 为什么在台式机、迷你主机或云服务器上，状态栏会显示 `󰂃 0%` 电池图标？
+* **原因分析**：
+  状态栏默认启用了 `battery` 插件。如果机器是**台式机、工控机、迷你主机或云服务器**（没有内置物理锂电池），Linux 系统的 `upower` 服务通常会虚拟出一个名为 `DisplayDevice` 的空设备且报告电量为 `0%`，导致主题误以为存在一个电量耗尽的电池并显示出 `󰂃 0%` 图标。
+* **优化解决（推荐）**：
+  若您使用的是台式设备或服务器，无需显示电池，只需编辑 `~/.tmux.conf`（约第 190 行）：
+  ```tmux
+  # 将原来的：
+  set -g @theme_plugins 'datetime,battery,network,cpu,memory,disk'
+  # 修改为（移除 battery 即可）：
+  set -g @theme_plugins 'datetime,network,cpu,memory,disk'
+  ```
+  修改保存后，在 Tmux 中按 **`Ctrl + a` 然后按 `r`**，电池图标便会立即消失，右侧状态栏更加清爽。如果是笔记本电脑则无需修改，默认即可精确展示电池百分比和充电/放电状态。
+
+### Q4: 状态栏上的各种图标（如时钟、网卡、芯片、内存、硬盘）显示为小方块乱码怎么办？
+* **原因分析**：Tokyo Night 主题大量使用了现代 **Nerd Font** 图标字符（如 `󰥔`、`󰛳`、``、``、`󰋊`）。如果本地使用的终端（如 Windows Terminal、PuTTY、SecureCRT、系统默认终端）没有安装或没有正确配置 Nerd Font 字体，就会出现方块或问号乱码。
+* **解决办法**：
+  1. 在本地电脑下载并安装一款 Nerd Font（强烈推荐 **JetBrainsMono Nerd Font** 或 **FiraCode Nerd Font**）；
+  2. 打开本地终端的“设置” -> “外观/字体”，将字体更改为 `JetBrainsMono Nerd Font`；
+  3. 若使用 Windows Terminal 或 WezTerm，可在配置中将中文字体设为回退字体（如 `Microsoft YaHei`），即可兼顾精美编程英文字体、炫酷状态栏图标与完美中文显示。
+

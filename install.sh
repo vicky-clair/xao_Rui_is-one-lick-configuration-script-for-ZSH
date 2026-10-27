@@ -1648,6 +1648,9 @@ if ((WITH_TMUX)); then
   if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
     info "$(msg "正在自动下载并安装 Tmux 插件..." "Installing Tmux plugins automatically...")"
     bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
+    if [[ -d "$HOME/.tmux/plugins/tmux-tokyo-night" ]]; then
+      (cd "$HOME/.tmux/plugins/tmux-tokyo-night" && git checkout -q v2.7.2 2>/dev/null || true)
+    fi
     success "$(msg "Tmux 插件初始化完成" "Tmux plugins initialized successfully")"
   fi
 fi

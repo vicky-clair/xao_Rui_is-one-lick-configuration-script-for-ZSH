@@ -203,9 +203,9 @@ Tmux 的大部分内部快捷键需要**先按下前缀键**，松开后再按�
 * **自举完成自动静默热重载**：后台异步克隆 TPM 及其插件完成后，会自动追加触发 `tmux source-file ~/.tmux.conf`，用户零手动干预即可自动生效 Tokyo Night 美化主题与全部插件。
 * **热重载重置防累积**：在配置开头使用 `set -su terminal-overrides` 与 `set -su terminal-features`，每次按 `Prefix + r` 热重载时均先重置为系统默认再注入真彩与剪贴板扩展，彻底杜绝了重复选项无限堆叠的漏洞。
 * **会话常驻防误退 (Persistence)**：显式设置 `destroy-unattached off`、`exit-empty off` 与 `detach-on-destroy off`，客户端断开或窗口关闭不会销毁后台会话。
-* **macOS 状态栏主题与现代 Bash 保障**：`tmux-tokyo-night` 主题脚本使用了 Bash 4.2+ 的 `declare -gA` 特性。macOS 系统内置的 `/bin/bash` 停留在 3.2，安装器会自动通过 Homebrew 部署现代 Bash，并在配置顶部注入全局 PATH，彻底解决 Mac 机器上状态栏主题报错消失的问题。
-* **Linux 极简环境依赖补全**：安装器在启用 Tmux 时自动检测并补充 Linux 环境的 `bash`、`bc`（供状态栏硬件指标浮点计算）、`ncurses-term`（Terminfo 数据库）以及 `xclip`/`wl-clipboard` 剪贴板驱动。
-* **Tmux < 3.2 智能语法向下兼容**：配置内部对 `terminal-features` 与 `display-popup` 加入了动态版本探测，在 Ubuntu 20.04 或 Debian 11 等老旧 Linux LTS 环境下自动优雅降级，绝不出现 `unknown option` 或 `unknown command` 报警。
+* **macOS 状态栏主题与现代 Bash 保障**：`tmux-tokyo-night` 主题脚本使用了 Bash 4.2+ 的 `declare -gA` 特性。macOS 系统内置的 `/bin/bash` 停留在 3.2，安装器会自动通过 Homebrew 部署现代 Bash，并在配置顶部通过幂等去重逻辑将 `/opt/homebrew/bin`、`/usr/local/bin`、`/home/linuxbrew/.linuxbrew/bin` 与 `~/.local/bin` 注入全局 PATH，彻底解决 Mac 机器上状态栏主题报错消失的问题，且反复热重载绝不产生重复路径。
+* **Linux 极简环境依赖补全**：安装器在启用 Tmux 时自动检测并补充 Linux 环境的 `ncurses-term`（Terminfo 数据库）以及 `xclip`/`wl-clipboard` 剪贴板驱动。
+* **Tmux >= 3.2 版本预检**：配置使用了 Tmux 3.2+ 的 `terminal-features`、`display-popup` 与 `%hidden` 宏变量特性；安装器会在部署前自动校验 `tmux >= 3.2`（若版本过旧则保留原 `~/.tmux.conf` 并给出升级提示）。
 
 ### 6. 会话常驻与终端关闭自动重连 (Persistence & Auto-Attach)
 * **默认常驻行为**：直接关闭终端窗口或网络意外中断时，Tmux 后台进程与运行中的任务（编译、下载、服务）均在服务器上完好保留，绝不中断。
@@ -227,13 +227,15 @@ Tmux 的大部分内部快捷键需要**先按下前缀键**，松开后再按�
 在目标机器终端中直接执行：
 
 ```bash
-# 自动备份旧配置 + 下载最新 templates/tmux.conf
+# 自动备份旧配置 + 下载到临时文件校验非空后再原子替换 ~/.tmux.conf（防止断网截断原文件）
 cp ~/.tmux.conf ~/.tmux.conf.bak.$(date +%Y%m%d%H%M%S) 2>/dev/null || true
-curl -fsSL https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/templates/tmux.conf -o ~/.tmux.conf
+curl -fsSL https://raw.githubusercontent.com/vicky-clair/xao_Rui_is-one-lick-configuration-script-for-ZSH/main/templates/tmux.conf -o ~/.tmux.conf.tmp && [ -s ~/.tmux.conf.tmp ] && mv ~/.tmux.conf.tmp ~/.tmux.conf
 
 # 立即热重载生效
 tmux source ~/.tmux.conf 2>/dev/null && echo "✓ Tmux 最新配置已部署并成功热重载！"
 ```
+
+> **提示**：手动覆盖 `~/.tmux.conf` 会改变文件 SHA-256 哈希，后续若执行 `install.sh --rollback` 时安装器会将其识别为用户手动修改并拒绝回退该文件。若希望纳入安装器备份哈希追踪，请使用下方“方式三：使用安装器重新部署”。
 
 ### 方式二：通过 Git 本地仓库更新
 

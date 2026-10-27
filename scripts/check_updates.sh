@@ -85,9 +85,25 @@ check_git_repo() {
   local name=$1 dir=$2
   [[ -d "$dir/.git" ]] || return 0
 
-  # 若处于 detached HEAD（游离分支状态，如特定发布标签或固定版本），按锁定版本展示
+  # 若 ~/.tmux.conf 中对该插件显式锁定了特定分支/标签（如 @plugin '.../pname#v2.7.2'），比对当前版本与配置锁定版本
+  local pinned_ref="" current_tag=""
+  if [[ "$name" == tmux/* && -f "$HOME/.tmux.conf" ]]; then
+    local pname="${name#tmux/}"
+    pinned_ref=$(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"][^'\"]*\/${pname}#\([^'\"]*\)['\"].*/\1/p" "$HOME/.tmux.conf" 2>/dev/null | head -n 1)
+  fi
+  if [[ -n "$pinned_ref" ]]; then
+    current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+    if [[ "$current_tag" != "$pinned_ref" ]]; then
+      UPDATES+=("$(msg "[插件/主题] $name (锁定版本已变更为 $pinned_ref，当前为 ${current_tag:-unknown})" "[Plugin/Theme] $name (pinned version changed to $pinned_ref, current is ${current_tag:-unknown})")")
+      ALL_CHECKED+=("$name: $(msg "待切换至锁定版本 ($pinned_ref)" "update to pinned release ($pinned_ref)")")
+    else
+      ALL_CHECKED+=("$name: $(msg "已锁定版本 ($pinned_ref)" "pinned release ($pinned_ref)")")
+    fi
+    return 0
+  fi
+
+  # 若处于其它 detached HEAD（游离分支状态），按锁定版本展示
   if ! git -C "$dir" symbolic-ref -q HEAD >/dev/null 2>&1; then
-    local current_tag
     current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "pinned")
     ALL_CHECKED+=("$name: $(msg "已锁定版本 ($current_tag)" "pinned release ($current_tag)")")
     return 0

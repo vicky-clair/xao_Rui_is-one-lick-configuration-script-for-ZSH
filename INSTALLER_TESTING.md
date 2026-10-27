@@ -4,7 +4,7 @@
 
 ## 最近一次实机与隔离回归验证
 
-日期：2026-10-19 双平台基线；2026-10-26 增量复测。2026-10-19 已在 **macOS (arm64 Apple M1, macOS 27.0.1)** 与 **Debian GNU/Linux 13 (trixie) x86_64 远程实机** 双平台完成实机部署与全套隔离回归验证。2026-10-26 的 Tmux 防卡顿/剪贴板熔断加固**仅在 Debian 13 实机复测**，macOS 尚待复测（见 [AUDIT_REPORT.md](AUDIT_REPORT.md) M-2）。
+日期：2026-10-19 双平台基线；2026-10-26 增量复测；2026-10-27 双平台加固与审计修复复测。已在 **macOS (arm64 Apple M1, macOS 27.0.1, tmux 3.8)** 与 **Debian GNU/Linux 13 (trixie) x86_64 远程实机** 完成实机部署与全套隔离回归验证（见 [AUDIT_REPORT.md](AUDIT_REPORT.md)）。
 
 ### 1. 跨平台实机部署与验收结果表
 
@@ -12,14 +12,14 @@
 | --- | --- | --- | --- |
 | 六个正式 Bash 脚本语法 | 通过 | 通过 | `bash -n` 静态解析检查，全数通过 |
 | Zsh 模板与配置语法检查 | 通过 | 通过 | `zsh -n templates/zshrc.zsh .zshrc` 全数通过 |
-| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
+| `bash scripts/test_installer.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Bash 3.2 空数组 nounset 安全性、`.tmux.conf` 模板一致性、`optional_package` 与 `retry_tools.sh normalize()` 白名单对齐、`tmux >= 3.2` 版本解析器边界测试、原生悬空符号链接、回退保护及全套工具开关用例均通过 |
 | `bash scripts/test_management.sh` | 退出码 0，全量通过 | 退出码 0，全量通过 | Zsh 开关（含 television、tv-keys、tre）、差异恢复、失败重试隔离、控制终端诊断全数通过 |
 | 生产实际安装部署 | 通过 | 通过 | `install.sh --profile full --p10k-style rainbow --lang zh --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux` 实机部署成功，跳过包数量为 0，受管配置与备份完整生效 |
-| 现代终端与 Nerd 字体安装 | 通过 | 通过 | 字体与图形协议环境就绪，自动安装或识别 Symbols Nerd Font 图标字体 |
+| 现代终端与 Nerd 字体安装 | 通过 | 通过 | 字体与图形协议环境就绪，支持 `--with-terminals` 自动部署 WezTerm / Alacritty 配置，自动安装或识别 Nerd Font 图标字体 |
 | Yazi 多媒体预览套件 | 通过 | 通过 | `ripgrep`、`jq`、`ffmpeg`、`7z` / `7zz`、`pdftoppm`、`magick`、`resvg` 全部正确安装与挂载 |
-| 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 退出码 0，0 项异常 | 全部 23 项工具版本秒级读取，无悬空声明，无键盘挂死 |
+| 诊断健康检查 (`--doctor`) | 退出码 0，0 项异常 | 退出码 0，0 项异常 | 全部 23 项工具版本秒级读取（含 `tmux -V` 适配），无悬空声明，无键盘挂死 |
 | 终端交互与会话冷启动 | 通过 (~303ms) | 通过 (**143ms**) | PTY 会话秒级极速自举，所有 14 项 CLI 工具挂载正常，Fastfetch 完整输出，无报错与警告 |
-| Tmux 终端复用器与 TPM | 通过 (tmux 3.5a，10-19 基线；10-26 加固项待复测) | 通过 (tmux 3.5a，含 10-26 加固) | 经 2026-10-26 深度加固：防划选输入挂起（`copy-pipe-and-cancel`）、SSH 剪贴板防死锁（`timeout 1s xclip` 与 `command -v timeout` 预检）、Terminfo 智能降级、TPM 异步引导与自举完成自动热重载（防 127 报警）；配套 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 实机核验通过 |
+| Tmux 终端复用器与 TPM | 通过 (tmux 3.8，含 10-27 审计修复实测) | 通过 (tmux 3.5a，含 10-26 加固) | 经 2026-10-26/10-27 深度加固：安装器前置 `tmux >= 3.2` 版本检查、PATH 幂等去重注入（支持 macOS Homebrew / Intel / Linuxbrew，连续 `source-file` 0 重复）、`%hidden CLIPBOARD_PIPE` 消除重复管道、防划选输入挂起（`copy-pipe-and-cancel`）、SSH 剪贴板防死锁（`timeout 1s xclip`）、Terminfo 智能降级、TPM 路径显式锚定与异步引导热重载；配套 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 实机核验通过 |
 | 启动性能分析 (`--profile-startup`) | 通过 | 通过 | 通过 `zprof` 完成函数级耗时诊断，详细性能明细输出完整 |
 
 ### 2. Debian 13 远程实机环境明细

@@ -60,6 +60,7 @@ WITH_LAZYDOCKER=0    # 是否安装 lazydocker 容器终端面板 (0=否, 1=是)
 WITH_LAZYGIT=0       # 是否安装 lazygit Git 终端控制面板 (0=否, 1=是)
 WITH_TMUX=0          # 是否启用并部署 tmux 现代化配置 (0=否, 1=是)
 WITHOUT_TMUX=0       # 是否显式跳过 tmux 配置（即使系统已存在 tmux 也不加载）
+WITH_TERMINALS=0     # 是否部署 WezTerm 与 Alacritty 现代终端配置 (0=否, 1=是)
 WITH_LATEST_NVIM=0   # 是否从 GitHub Release 强制升级下载最新官方 Neovim
 P10K_STYLE=rainbow   # Powerlevel10k 主题预设风格 (rainbow/lean/classic/wizard/skip)
 P10K_STYLE_SET=0     # 标志用户是否通过命令行显式指定了主题风格
@@ -95,6 +96,7 @@ $(msg "用法：bash install.sh [选项]" "Usage: bash install.sh [options]")
   --with-lazygit        $(msg "请求安装 lazygit Git 终端管理面板" "Install lazygit Git TUI panel")
   --with-tmux           $(msg "请求安装并配置 tmux 终端复用器（含剪贴板互通与美化主题）" "Install and configure tmux terminal multiplexer (with clipboard & themes)")
   --without-tmux|--no-tmux $(msg "显式跳过 tmux 及其配置（即使系统已安装 tmux 也不启用）" "Explicitly skip tmux and its configuration even if installed")
+  --with-terminals      $(msg "部署 WezTerm 与 Alacritty 现代化终端推荐配置（含自动备份）" "Deploy WezTerm & Alacritty terminal configs (with automatic backup)")
   --check-updates       $(msg "检测已安装的 Zsh 插件与常用应用是否有新版本" "Check if installed plugins and CLI tools have new updates")
   --update              $(msg "交互式升级已安装的 Zsh/Tmux 插件、主题与包管理器工具" "Interactively update installed plugins, themes, and CLI tools")
   --lang zh|en          $(msg "界面语言（zh 为中文，en 为英文）" "UI language (zh for Chinese, en for English)")
@@ -256,6 +258,7 @@ while (($#)); do
     --with-lazygit) WITH_LAZYGIT=1 ;;
     --with-tmux) WITH_TMUX=1; WITHOUT_TMUX=0 ;;
     --without-tmux|--no-tmux) WITHOUT_TMUX=1; WITH_TMUX=0 ;;
+    --with-terminals|--with-terminal-configs) WITH_TERMINALS=1 ;;
     --check-updates) CHECK_UPDATES=1 ;;
     --update) DO_UPDATE=1 ;;
     --lang) (($# >= 2)) || die "$(msg '--lang 缺少语言代码 (zh|en)' '--lang requires value (zh|en)')"; LANG_CHOICE=$2; LANG_SET=1; shift ;;
@@ -372,9 +375,34 @@ if ((DO_UPDATE)); then
       warn "$(msg "$name 存在未提交的本地修改，跳过自动拉取以防止冲突。" "$name has uncommitted local changes; skipping pull to prevent conflicts.")"
       return 0
     fi
-    # 若处于 detached HEAD（游离分支状态，如锁定的 Release 标签 v2.7.2），避免 git pull 报错
+    # 若配置中显式锁定了特定分支/标签（如 @plugin '.../pname#v2.7.2'），优先同步至目标锁定版本
+    local pinned_ref="" current_tag=""
+    if [[ "$name" == tmux/* ]]; then
+      local pname="${name#tmux/}" _tconf="$HOME/.tmux.conf"
+      [[ -f "$_tconf" ]] || _tconf="$SCRIPT_DIR/templates/tmux.conf"
+      if [[ -f "$_tconf" ]]; then
+        pinned_ref=$(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"][^'\"]*\/${pname}#\([^'\"]*\)['\"].*/\1/p" "$_tconf" 2>/dev/null | head -n 1)
+      fi
+    fi
+    if [[ -n "$pinned_ref" ]]; then
+      current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+      if [[ "$current_tag" != "$pinned_ref" ]]; then
+        info "$(msg "正在将 $name 切换至锁定版本 $pinned_ref..." "Switching $name to pinned version $pinned_ref...")"
+        if git -C "$dir" fetch --tags -q origin 2>/dev/null && git -C "$dir" checkout -q "$pinned_ref" 2>/dev/null; then
+          UPDATED_OK+=("$name")
+          success "$(msg "$name 已同步至锁定版本 $pinned_ref" "$name synced to pinned version $pinned_ref")"
+        else
+          UPDATE_INCOMPLETE=1
+          UPDATED_FAIL+=("$name | $(msg "切换锁定版本 $pinned_ref 失败" "Failed to checkout $pinned_ref") | cd \"$dir\" && git fetch --tags && git checkout $pinned_ref")
+        fi
+      else
+        UPDATED_OK+=("$name ($(msg "已锁定版本" "pinned release"): $pinned_ref)")
+        info "$(msg "$name 处于配置锁定的发布版本 ($pinned_ref)，保持稳定。" "$name is at pinned release ($pinned_ref); kept intact.")"
+      fi
+      return 0
+    fi
+    # 若处于其它 detached HEAD（游离分支状态），避免 git pull 报错
     if ! git -C "$dir" symbolic-ref -q HEAD >/dev/null 2>&1; then
-      local current_tag
       current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "pinned")
       UPDATED_OK+=("$name ($(msg "已锁定版本" "pinned release"): $current_tag)")
       info "$(msg "$name 处于锁定发布版本 ($current_tag)，保持原样跳过自动拉取。" "$name is pinned to release ($current_tag); kept intact.")"
@@ -1408,6 +1436,26 @@ if [[ "$PROFILE" == full ]]; then
     rm -rf "$yazi_stage"
   fi
 
+  # 校验下载资产的 SHA-256（若上游提供 checksums 文件且下载成功则严格比对；网络未返回校验文件时降级）
+  verify_asset_sha256() {
+    local file=$1 checksum_url=$2 asset_name=$3 stage_dir=$4
+    local sum_cmd="" actual="" expected=""
+    if command -v sha256sum >/dev/null 2>&1; then sum_cmd="sha256sum"
+    elif command -v shasum >/dev/null 2>&1; then sum_cmd="shasum -a 256"
+    else return 0; fi
+    if curl -fsSL --connect-timeout 10 --max-time 30 "$checksum_url" -o "$stage_dir/checksums.txt" 2>/dev/null && [[ -s "$stage_dir/checksums.txt" ]]; then
+      expected=$(grep -E "[[:space:]\*]${asset_name}\$" "$stage_dir/checksums.txt" 2>/dev/null | head -n 1 | awk '{print tolower($1)}')
+      if [[ -z "$expected" && $(wc -w < "$stage_dir/checksums.txt") -le 2 ]]; then
+        expected=$(awk '{print tolower($1)}' "$stage_dir/checksums.txt" | head -n 1)
+      fi
+      if [[ "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+        actual=$($sum_cmd "$file" | awk '{print tolower($1)}')
+        [[ "$actual" == "$expected" ]] || return 1
+      fi
+    fi
+    return 0
+  }
+
   # --- TELEVISION 官方预编译发布包自动回退 ---
   if ! command -v tv >/dev/null 2>&1 && [[ -n "$TV_ARCH" ]]; then
     info "$(msg "系统仓库无 television，正在从 GitHub Release 下载官方发布版至 ~/.local/bin..." "television not in repo; downloading official release to ~/.local/bin...")"
@@ -1417,20 +1465,25 @@ if [[ "$PROFILE" == full ]]; then
     tv_version=${tv_tag#v}
     if [[ "$tv_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
       if [[ "$OS" == Darwin ]]; then
-        tv_asset_url="https://github.com/alexpasmantier/television/releases/download/${tv_tag}/tv-${tv_version}-${TV_ARCH}-apple-darwin.tar.gz"
+        tv_asset="tv-${tv_version}-${TV_ARCH}-apple-darwin.tar.gz"
       else
-        tv_asset_url="https://github.com/alexpasmantier/television/releases/download/${tv_tag}/tv-${tv_version}-${TV_ARCH}-unknown-linux-musl.tar.gz"
+        tv_asset="tv-${tv_version}-${TV_ARCH}-unknown-linux-musl.tar.gz"
       fi
+      tv_asset_url="https://github.com/alexpasmantier/television/releases/download/${tv_tag}/${tv_asset}"
       if curl -fsSL --connect-timeout 10 -m 60 "$tv_asset_url" -o "$tv_stage/tv.tar.gz" 2>/dev/null || \
-         ([[ "$OS" != Darwin ]] && curl -fsSL --connect-timeout 10 -m 60 "https://github.com/alexpasmantier/television/releases/download/${tv_tag}/tv-${tv_version}-${TV_ARCH}-unknown-linux-gnu.tar.gz" -o "$tv_stage/tv.tar.gz" 2>/dev/null); then
-        tar -xzf "$tv_stage/tv.tar.gz" -C "$tv_stage" 2>/dev/null || true
-        tv_bin=$(find "$tv_stage" -type f -name tv -perm -111 2>/dev/null | head -n 1)
-        if [[ -n "$tv_bin" && -x "$tv_bin" ]]; then
-          mkdir -p "$HOME/.local/bin"
-          install -m 755 "$tv_bin" "$HOME/.local/bin/tv"
-          success "$(msg "television (tv) 安装成功（位于 ~/.local/bin/tv）" "television (tv) installed successfully (in ~/.local/bin/tv)")"
-          remove_skipped television
-          remove_skipped tv
+         ([[ "$OS" != Darwin ]] && { tv_asset="tv-${tv_version}-${TV_ARCH}-unknown-linux-gnu.tar.gz"; curl -fsSL --connect-timeout 10 -m 60 "https://github.com/alexpasmantier/television/releases/download/${tv_tag}/${tv_asset}" -o "$tv_stage/tv.tar.gz" 2>/dev/null; }); then
+        if verify_asset_sha256 "$tv_stage/tv.tar.gz" "https://github.com/alexpasmantier/television/releases/download/${tv_tag}/${tv_asset}.sha256" "$tv_asset" "$tv_stage"; then
+          tar -xzf "$tv_stage/tv.tar.gz" -C "$tv_stage" 2>/dev/null || true
+          tv_bin=$(find "$tv_stage" -type f -name tv -perm -111 2>/dev/null | head -n 1)
+          if [[ -n "$tv_bin" && -x "$tv_bin" ]]; then
+            mkdir -p "$HOME/.local/bin"
+            install -m 755 "$tv_bin" "$HOME/.local/bin/tv"
+            success "$(msg "television (tv) 安装成功（位于 ~/.local/bin/tv）" "television (tv) installed successfully (in ~/.local/bin/tv)")"
+            remove_skipped television
+            remove_skipped tv
+          fi
+        else
+          warn "$(msg "television 校验和比对失败，已放弃安装。" "television SHA-256 verification failed; aborted.")"
         fi
       fi
     fi
@@ -1487,35 +1540,41 @@ if [[ "$PROFILE" == full ]]; then
     info "$(msg "正在从 GitHub Release 下载 Neovim 官方最新稳定版至 ~/.local/opt/nvim..." "Downloading latest official Neovim release from GitHub to ~/.local/opt/nvim...")"
     nvim_stage=$(mktemp -d "$HOME/.nvim-tmp-XXXXXX")
     if [[ "$OS" == Darwin ]]; then
-      nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim-macos-${NVIM_ARCH}.tar.gz"
+      nvim_asset="nvim-macos-${NVIM_ARCH}.tar.gz"
     else
-      nvim_url="https://github.com/neovim/neovim/releases/latest/download/nvim-linux-${NVIM_ARCH}.tar.gz"
+      nvim_asset="nvim-linux-${NVIM_ARCH}.tar.gz"
     fi
+    nvim_url="https://github.com/neovim/neovim/releases/latest/download/${nvim_asset}"
     if curl -fsSL --connect-timeout 10 -m 90 "$nvim_url" -o "$nvim_stage/nvim.tar.gz" 2>/dev/null; then
-      if tar -xzf "$nvim_stage/nvim.tar.gz" -C "$nvim_stage" 2>/dev/null; then
-        extracted_dir=$(find "$nvim_stage" -mindepth 1 -maxdepth 1 -type d \( -name "nvim-linux*" -o -name "nvim-macos*" \) 2>/dev/null | head -n 1)
-        if [[ -n "$extracted_dir" && -x "$extracted_dir/bin/nvim" ]]; then
-          if install_nvim_tree "$extracted_dir"; then
-            success 'Neovim 新版本已验证并安装。'
-            remove_skipped neovim
-            remove_skipped nvim
-          else
-            warn 'Neovim 更新失败；旧版本已保留或恢复，请查看暂存目录与日志。'
+      if verify_asset_sha256 "$nvim_stage/nvim.tar.gz" "https://github.com/neovim/neovim/releases/latest/download/shasum.txt" "$nvim_asset" "$nvim_stage"; then
+        if tar -xzf "$nvim_stage/nvim.tar.gz" -C "$nvim_stage" 2>/dev/null; then
+          extracted_dir=$(find "$nvim_stage" -mindepth 1 -maxdepth 1 -type d \( -name "nvim-linux*" -o -name "nvim-macos*" \) 2>/dev/null | head -n 1)
+          if [[ -n "$extracted_dir" && -x "$extracted_dir/bin/nvim" ]]; then
+            if install_nvim_tree "$extracted_dir"; then
+              success 'Neovim 新版本已验证并安装。'
+              remove_skipped neovim
+              remove_skipped nvim
+            else
+              warn 'Neovim 更新失败；旧版本已保留或恢复，请查看暂存目录与日志。'
+            fi
           fi
         fi
+      else
+        warn 'Neovim 校验和比对失败；已放弃覆盖现有版本。'
       fi
     fi
     rm -rf "$nvim_stage"
   fi
 fi
 
-# vfox 可选版本管理安装（优先包管理器，缺失时尝试官方用户态脚本）
+# vfox 可选版本管理安装（优先包管理器，缺失时尝试官方固定版本用户态脚本）
 if ((WITH_VFOX)) && ! command -v vfox >/dev/null 2>&1; then
   optional_package vfox vfox || true
   if ! command -v vfox >/dev/null 2>&1; then
     info "$(msg "系统仓库无 vfox，正在尝试通过官方脚本安装至用户目录..." "vfox not in repo; attempting official install script...")"
     vfox_stage=$(mktemp -d "$HOME/.vfox-tmp-XXXXXX")
-    if curl -fsSL --connect-timeout 10 -m 60 "https://raw.githubusercontent.com/version-fox/vfox/main/install.sh" -o "$vfox_stage/install.sh" 2>/dev/null; then
+    vfox_pin_tag="v1.0.9"
+    if curl -fsSL --connect-timeout 10 -m 60 "https://raw.githubusercontent.com/version-fox/vfox/${vfox_pin_tag}/install.sh" -o "$vfox_stage/install.sh" 2>/dev/null; then
       if bash "$vfox_stage/install.sh" --user >/dev/null 2>&1; then
         success "$(msg "vfox 官方脚本安装成功" "vfox installed successfully via official script")"
         remove_skipped vfox
@@ -1535,18 +1594,23 @@ if ((WITH_LAZYDOCKER)) && ! command -v lazydocker >/dev/null 2>&1; then
     lzd_os="Linux"
     [[ "$OS" == Darwin ]] && lzd_os="Darwin"
     lzd_stage=$(mktemp -d "$HOME/.lzd-tmp-XXXXXX")
-    # 动态获取最新 Release 标签与版本号，拼接符合官方规范的资产文件名
+    # 动态获取最新 Release 标签与版本号，拼接符合官方规范的资产文件名并校验 checksums.txt
     lzd_latest_url=$(curl -fsSL --connect-timeout 10 --max-time 30 -o /dev/null -w '%{url_effective}' https://github.com/jesseduffield/lazydocker/releases/latest 2>/dev/null) || true
     lzd_tag=${lzd_latest_url##*/}
     lzd_version=${lzd_tag#v}
     if [[ "$lzd_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      lzd_url="https://github.com/jesseduffield/lazydocker/releases/download/${lzd_tag}/lazydocker_${lzd_version}_${lzd_os}_${lzd_arch}.tar.gz"
+      lzd_asset="lazydocker_${lzd_version}_${lzd_os}_${lzd_arch}.tar.gz"
+      lzd_url="https://github.com/jesseduffield/lazydocker/releases/download/${lzd_tag}/${lzd_asset}"
       if curl -fsSL --connect-timeout 10 -m 90 "$lzd_url" -o "$lzd_stage/lzd.tar.gz" 2>/dev/null; then
-        if tar -xzf "$lzd_stage/lzd.tar.gz" -C "$lzd_stage" lazydocker 2>/dev/null && [[ -x "$lzd_stage/lazydocker" ]]; then
-          mkdir -p "$HOME/.local/bin"
-          install -m 755 "$lzd_stage/lazydocker" "$HOME/.local/bin/lazydocker"
-          success "$(msg "lazydocker 安装成功（位于 ~/.local/bin/lazydocker）" "lazydocker installed successfully (in ~/.local/bin/lazydocker)")"
-          remove_skipped lazydocker
+        if verify_asset_sha256 "$lzd_stage/lzd.tar.gz" "https://github.com/jesseduffield/lazydocker/releases/download/${lzd_tag}/checksums.txt" "$lzd_asset" "$lzd_stage"; then
+          if tar -xzf "$lzd_stage/lzd.tar.gz" -C "$lzd_stage" lazydocker 2>/dev/null && [[ -x "$lzd_stage/lazydocker" ]]; then
+            mkdir -p "$HOME/.local/bin"
+            install -m 755 "$lzd_stage/lazydocker" "$HOME/.local/bin/lazydocker"
+            success "$(msg "lazydocker 安装成功（位于 ~/.local/bin/lazydocker）" "lazydocker installed successfully (in ~/.local/bin/lazydocker)")"
+            remove_skipped lazydocker
+          fi
+        else
+          warn "$(msg "lazydocker 校验和比对失败，已放弃安装。" "lazydocker SHA-256 verification failed; aborted.")"
         fi
       fi
     fi
@@ -1568,13 +1632,18 @@ if ((WITH_LAZYGIT)) && ! command -v lazygit >/dev/null 2>&1; then
     lg_tag=${lg_url##*/}
     lg_version=${lg_tag#v}
     if [[ "$lg_tag" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      lg_download_url="https://github.com/jesseduffield/lazygit/releases/download/${lg_tag}/lazygit_${lg_version}_${lg_os}_${lg_arch}.tar.gz"
+      lg_asset="lazygit_${lg_version}_${lg_os}_${lg_arch}.tar.gz"
+      lg_download_url="https://github.com/jesseduffield/lazygit/releases/download/${lg_tag}/${lg_asset}"
       if curl -fsSL --connect-timeout 10 -m 90 "$lg_download_url" -o "$lg_stage/lg.tar.gz" 2>/dev/null; then
-        if tar -xzf "$lg_stage/lg.tar.gz" -C "$lg_stage" lazygit 2>/dev/null && [[ -x "$lg_stage/lazygit" ]]; then
-          mkdir -p "$HOME/.local/bin"
-          install -m 755 "$lg_stage/lazygit" "$HOME/.local/bin/lazygit"
-          success "$(msg "lazygit 安装成功（位于 ~/.local/bin/lazygit）" "lazygit installed successfully (in ~/.local/bin/lazygit)")"
-          remove_skipped lazygit
+        if verify_asset_sha256 "$lg_stage/lg.tar.gz" "https://github.com/jesseduffield/lazygit/releases/download/${lg_tag}/checksums.txt" "$lg_asset" "$lg_stage"; then
+          if tar -xzf "$lg_stage/lg.tar.gz" -C "$lg_stage" lazygit 2>/dev/null && [[ -x "$lg_stage/lazygit" ]]; then
+            mkdir -p "$HOME/.local/bin"
+            install -m 755 "$lg_stage/lazygit" "$HOME/.local/bin/lazygit"
+            success "$(msg "lazygit 安装成功（位于 ~/.local/bin/lazygit）" "lazygit installed successfully (in ~/.local/bin/lazygit)")"
+            remove_skipped lazygit
+          fi
+        else
+          warn "$(msg "lazygit 校验和比对失败，已放弃安装。" "lazygit SHA-256 verification failed; aborted.")"
         fi
       fi
     fi
@@ -1598,16 +1667,9 @@ if ((WITH_TMUX)); then
       export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
     fi
   elif [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
-    # Linux 环境：确保具备 bash、bc（浮点计算，主题监控依赖）、剪贴板后端与 terminfo
-    optional_package bash bash || true
-    optional_package bc bc || true
     optional_package xclip xclip || true
     optional_package wl-copy wl-clipboard || true
-    if [[ "$FAMILY" == apt ]]; then
-      optional_package "" ncurses-term || true
-    elif [[ "$FAMILY" == dnf || "$FAMILY" == zypper || "$FAMILY" == pacman ]]; then
-      optional_package "" ncurses || true
-    fi
+    [[ "$FAMILY" == apt ]] && { optional_package "" ncurses-term || true; }
   fi
 fi
 
@@ -1681,25 +1743,68 @@ case "$P10K_STYLE" in
 esac
 
 if ((WITH_TMUX)); then
-  info "$(msg "正在配置 Tmux 与 TPM 插件管理器..." "Configuring Tmux and TPM plugin manager...")"
-  clone_missing https://github.com/tmux-plugins/tpm.git "$HOME/.tmux/plugins/tpm" tpm
-  if [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]]; then
-    cp "$SCRIPT_DIR/templates/tmux.conf" "$BACKUP/new.tmux.conf"
-    command rm -f "$HOME/.tmux.conf" 2>/dev/null || true
-    install -m 600 "$BACKUP/new.tmux.conf" "$HOME/.tmux.conf"
-    success "$(msg "已部署 ~/.tmux.conf" "Deployed ~/.tmux.conf successfully")"
-  fi
-  if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
-    info "$(msg "正在自动下载并安装 Tmux 插件..." "Installing Tmux plugins automatically...")"
-    bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
-    if [[ -d "$HOME/.tmux/plugins/tmux-tokyo-night" ]]; then
-      (cd "$HOME/.tmux/plugins/tmux-tokyo-night" && git checkout -q v2.7.2 2>/dev/null || true)
+  # 预检 tmux 版本：模板使用 Tmux >= 3.2 的 terminal-features、%hidden 与 display-popup
+  _tmux_ver_ok=1
+  if command -v tmux >/dev/null 2>&1; then
+    _tmux_ver_raw=$(tmux -V 2>/dev/null || true)
+    _tmux_ver_num=$(printf '%s\n' "$_tmux_ver_raw" | grep -oE '[0-9]+\.[0-9]+' | head -n 1 || true)
+    if [[ -n "$_tmux_ver_num" ]]; then
+      _tmux_maj=${_tmux_ver_num%%.*}
+      _tmux_min=${_tmux_ver_num#*.}
+      if (( 10#${_tmux_maj:-0} < 3 || (10#${_tmux_maj:-0} == 3 && 10#${_tmux_min:-0} < 2) )); then
+        _tmux_ver_ok=0
+        warn "$(msg "检测到当前 tmux 版本 ($_tmux_ver_raw) 低于 3.2，跳过部署 ~/.tmux.conf（模板需要 3.2+ 特性支持）" "Detected tmux ($_tmux_ver_raw) < 3.2; skipping ~/.tmux.conf deployment (requires 3.2+)")"
+      fi
     fi
-    success "$(msg "Tmux 插件初始化完成" "Tmux plugins initialized successfully")"
   fi
-  if command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
-    tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
-    info "$(msg "已热重载运行中的 Tmux 服务配置" "Reloaded active Tmux server configuration")"
+  if ((_tmux_ver_ok)); then
+    info "$(msg "正在配置 Tmux 与 TPM 插件管理器..." "Configuring Tmux and TPM plugin manager...")"
+    clone_missing https://github.com/tmux-plugins/tpm.git "$HOME/.tmux/plugins/tpm" tpm
+    if [[ -r "$SCRIPT_DIR/templates/tmux.conf" ]]; then
+      cp "$SCRIPT_DIR/templates/tmux.conf" "$BACKUP/new.tmux.conf"
+      command rm -f "$HOME/.tmux.conf" 2>/dev/null || true
+      install -m 600 "$BACKUP/new.tmux.conf" "$HOME/.tmux.conf"
+      success "$(msg "已部署 ~/.tmux.conf" "Deployed ~/.tmux.conf successfully")"
+    fi
+    if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
+      info "$(msg "正在自动下载并安装 Tmux 插件..." "Installing Tmux plugins automatically...")"
+      bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
+      # 从模板配置中动态提取所有带有 #ref 版本锁定的插件并切换至目标标签/分支，消除多处硬编码
+      if [[ -f "$HOME/.tmux.conf" ]]; then
+        while IFS='#' read -r _p_repo _p_ref; do
+          [[ -n "$_p_repo" && -n "$_p_ref" ]] || continue
+          _p_name=${_p_repo##*/}
+          if [[ -d "$HOME/.tmux/plugins/$_p_name/.git" ]]; then
+            (cd "$HOME/.tmux/plugins/$_p_name" && git fetch --tags -q origin 2>/dev/null || true; git checkout -q "$_p_ref" 2>/dev/null || true)
+          fi
+        done < <(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"]\([^'\"]*#[^'\"]*\)['\"].*/\1/p" "$HOME/.tmux.conf" 2>/dev/null)
+      fi
+      success "$(msg "Tmux 插件初始化完成" "Tmux plugins initialized successfully")"
+    fi
+    if command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
+      tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+      info "$(msg "已热重载运行中的 Tmux 服务配置" "Reloaded active Tmux server configuration")"
+    fi
+  fi
+fi
+
+# 可选部署 WezTerm 与 Alacritty 现代化终端配置（自动备份已有文件）
+if ((WITH_TERMINALS)); then
+  info "$(msg "正在部署 WezTerm 与 Alacritty 终端推荐配置..." "Deploying WezTerm and Alacritty terminal configurations...")"
+  if [[ "$FAMILY" == brew ]] && ! fc-list : family 2>/dev/null | grep -qi "JetBrainsMono Nerd Font"; then
+    HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask font-jetbrains-mono-nerd-font 2>/dev/null || true
+  fi
+  if [[ -r "$SCRIPT_DIR/terminal_configs/wezterm/wezterm.lua" ]]; then
+    mkdir -p "$HOME/.config/wezterm"
+    [[ -f "$HOME/.config/wezterm/wezterm.lua" && ! -L "$HOME/.config/wezterm/wezterm.lua" ]] && cp "$HOME/.config/wezterm/wezterm.lua" "$BACKUP/wezterm.lua.bak"
+    install -m 600 "$SCRIPT_DIR/terminal_configs/wezterm/wezterm.lua" "$HOME/.config/wezterm/wezterm.lua"
+    success "$(msg "已部署 ~/.config/wezterm/wezterm.lua" "Deployed ~/.config/wezterm/wezterm.lua")"
+  fi
+  if [[ -r "$SCRIPT_DIR/terminal_configs/alacritty/alacritty.toml" ]]; then
+    mkdir -p "$HOME/.config/alacritty"
+    [[ -f "$HOME/.config/alacritty/alacritty.toml" && ! -L "$HOME/.config/alacritty/alacritty.toml" ]] && cp "$HOME/.config/alacritty/alacritty.toml" "$BACKUP/alacritty.toml.bak"
+    install -m 600 "$SCRIPT_DIR/terminal_configs/alacritty/alacritty.toml" "$HOME/.config/alacritty/alacritty.toml"
+    success "$(msg "已部署 ~/.config/alacritty/alacritty.toml" "Deployed ~/.config/alacritty/alacritty.toml")"
   fi
 fi
 

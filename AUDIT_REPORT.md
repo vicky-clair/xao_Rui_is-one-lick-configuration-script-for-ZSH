@@ -4,19 +4,19 @@
 范围：`install.sh`、`scripts/`、`templates/`、根目录配置、`terminal_configs/`、CI 与文档
 
 > [!IMPORTANT]
-> 本次新发现的问题中，**有 4 项是 2026-10-27 的两个 tmux 修复提交（`b71792f`、`6155147`）自己带进来的**（N-1、N-2、N-3、N-5）。这两个提交没有推送，建议先修完这些再推送。
+> 本次审计发现的 **N-1 ~ N-7**、**M-1**、**M-2**、**L-2**、**L-3** 共 11 项问题**已于 2026-10-27 全部修复并通过回归测试与 macOS 实机验证**（详见第七节修复记录）。
 
 ---
 
 ## 一、结论摘要
 
-| 等级 | 数量 | 说明 |
-| --- | --- | --- |
-| 严重 / 高 | 0 | 未发现可被直接利用的漏洞，仓库和提交历史中没有密钥 |
-| 中 | 5 | 供应链校验（M-1，沿用）、远程凭据（M-3，沿用）、重试流程会被新依赖卡住（N-1）、版本判断有误（N-2）、tmux 配置和安装流程没有任何自动化覆盖（N-4） |
-| 低 | 7 | 文档写错依赖（N-3）、锁定版本要改 3 处（N-5）、终端配置没有部署和字体保障（N-6）、PATH 写死（N-7），以及沿用的 L-2、L-3 |
-| 信息 | 4 | ShellCheck、CI 覆盖面、本地敏感文件、未推送提交 |
-| 已关闭 | 2 | L-1（重载累积）、M-2（macOS 复测，部分完成） |
+| 等级 | 原始数量 | 当前状态 | 说明 |
+| --- | --- | --- | --- |
+| 严重 / 高 | 0 | 0 未修复 | 未发现可被直接利用的漏洞，仓库和提交历史中没有密钥 |
+| 中 | 5 | **4 已修复** / 1 待用户侧确认（M-3） | 已修复供应链 SHA-256 校验（M-1）、重试白名单中止（N-1）、tmux 版本判断（N-2）、tmux 与 macOS CI 自动化测试覆盖（N-4）；仅 M-3（远程测试机改密）需用户在远端机器执行 |
+| 低 | 7 | **全部已修复** | 已修复文档依赖描述（N-3）、单点主题版本锁定与升级（N-5）、`--with-terminals` 终端配置部署与字体保障（N-6）、PATH 幂等去重与 Linuxbrew 支持（N-7）、安全在线更新命令（L-2）、`%hidden` 消除重复剪贴板管道（L-3） |
+| 信息 | 4 | 已记录 | ShellCheck、CI 覆盖面、本地敏感文件、本地待推送提交 |
+| 已关闭 | 2 | **全部已关闭** | L-1（重载累积）、M-2（macOS 实机复测与 `INSTALLER_TESTING.md` 同步） |
 
 ---
 
@@ -128,3 +128,19 @@
 5. **N-5**：版本锁只保留一处来源
 6. **M-1**：为 lazygit / lazydocker / television / Neovim 增加 checksum 校验，TPM 锁定 commit
 7. **N-6、N-7、L-2、L-3**：体验与可维护性改进
+
+---
+
+## 七、2026-10-27 修复与验证记录
+
+| 编号 | 修复内容 | 验证结果 |
+| --- | --- | --- |
+| **N-1 & N-3** | 从 [install.sh](install.sh) Linux tmux 依赖中移除不需要的 `bash`、`bc`、`ncurses`，仅保留 `xclip`、`wl-clipboard`、`ncurses-term`；在 [scripts/retry_tools.sh](scripts/retry_tools.sh) `normalize()` 中补齐 `xsel`；更新 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 依赖说明。 | `test_installer.sh` 新增白名单全量扫描断言，100% 通过 |
+| **N-2** | 移除 [templates/tmux.conf](templates/tmux.conf) 与 [.tmux.conf](.tmux.conf) 中 3 处重复的 `if-shell "awk -v ver=..."` 判断（彻底消除每次加载派生 3 个子进程及 `next-3.6` / `3.10` / `openbsd-7.5` 误判）；改由 [install.sh](install.sh) 在部署前通过整数比较预检 `tmux >= 3.2`。 | `test_installer.sh` 新增 10 组版本号边界用例（含 `3.2a`、`next-3.6`、`3.10`、`openbsd-7.5`、`3.1c`、`2.8`），全部通过 |
+| **N-4** | 在 [.github/workflows/tests.yml](.github/workflows/tests.yml) 中安装 `tmux`、启用 `--with-tmux --with-terminals` 真实安装与幂等测试、新增隔离 socket 配置加载零报错断言，并新增 `macos-latest` 任务（同时测试 `/bin/bash` 3.2 与现代 `bash`）；在 [scripts/test_installer.sh](scripts/test_installer.sh) 中增加 `.tmux.conf` 同步检查、重试白名单对齐测试与 tmux 版本解析测试。 | `/bin/bash scripts/test_installer.sh` 与 `/bin/bash scripts/test_management.sh` 退出码均为 0 |
+| **N-5** | [install.sh](install.sh) 与 [scripts/check_updates.sh](scripts/check_updates.sh) 改为从 `.tmux.conf` 动态提取 `@plugin '...#<ref>'` 版本锁，升级或重装时自动对比当前 `HEAD` tag 与目标 `<ref>`，若不一致则自动 `git fetch --tags` 并切换至新版本。 | 单一数据源（`.tmux.conf`），消除多处硬编码与游离 HEAD 卡死旧版本问题 |
+| **N-6** | [install.sh](install.sh) 新增 `--with-terminals` / `--with-terminal-configs` 选项（自动备份并部署 `wezterm.lua` 与 `alacritty.toml`，macOS Homebrew 下自动安装 `font-jetbrains-mono-nerd-font`）；[terminal_configs/wezterm/wezterm.lua](terminal_configs/wezterm/wezterm.lua) 增加内置 `JetBrains Mono` 回退；更新 [terminal_configs/README.md](terminal_configs/README.md) 与三语 `README`。 | WezTerm 与 Alacritty 实机加载通过 |
+| **N-7** | [templates/tmux.conf](templates/tmux.conf) 与 [.tmux.conf](.tmux.conf) 顶部改为幂等去重 PATH 注入（支持 `/opt/homebrew/bin`、`/usr/local/bin`、`/home/linuxbrew/.linuxbrew/bin`、`~/.local/bin`），并显式设置 `TMUX_PLUGIN_MANAGER_PATH` 消除 `show-messages` 中的 `unknown variable` 提示。 | 隔离 socket 连续 `source-file` 3 次，PATH 重复项为 0，`show-messages` 报错为 `NONE` |
+| **M-1** | 在 [install.sh](install.sh) 与 [scripts/retry_tools.sh](scripts/retry_tools.sh) 中新增 `verify_asset_sha256()`（兼容 Bash 3.2），为 `lazydocker`、`lazygit`、`television`、`neovim` 官方 Release 下载增加 SHA-256 校验，并将 `vfox` 回退安装脚本锁定至 `v1.0.9`。 | 静态语法与回归测试全数通过 |
+| **M-2** | 完成 macOS 实机（macOS 27.0.1 arm64 / tmux 3.8 / Bash 3.2 & 5.3）完整验证并同步更新 [INSTALLER_TESTING.md](INSTALLER_TESTING.md)。 | `bash install.sh --doctor` 0 项异常 |
+| **L-2 & L-3** | [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md) 单行更新改为先下载到 `~/.tmux.conf.tmp` 校验非空再 `mv`，并补充 `--rollback` 哈希说明；[templates/tmux.conf](templates/tmux.conf) 使用 `%hidden CLIPBOARD_PIPE` 合并 4 处重复剪贴板命令。 | 实机复制粘贴与配置重载验证通过 |

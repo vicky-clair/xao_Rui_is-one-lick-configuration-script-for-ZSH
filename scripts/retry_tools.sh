@@ -29,7 +29,7 @@ normalize() {
     imagemagick|imagemagick-full|ImageMagick|magick) echo imagemagick ;;
     resvg) echo resvg ;;
     font-symbols-only-nerd-font) echo font-symbols-only-nerd-font ;;
-    fzf|eza|zoxide|yazi|fastfetch|lazydocker|lazygit|vfox|tmux|xclip|ncurses-term) echo "$1" ;;
+    fzf|eza|zoxide|yazi|fastfetch|lazydocker|lazygit|vfox|tmux|xclip|xsel|ncurses-term) echo "$1" ;;
     *) printf '不支持的组件：%s\n' "$1" >&2; return 1 ;;
   esac
 }
@@ -153,7 +153,7 @@ available() {
   command -v "$cmd" >/dev/null && return 0
   if [[ "$component" == fd ]] && command -v fdfind >/dev/null 2>&1; then return 0; fi
   if [[ "$component" == bat ]] && command -v batcat >/dev/null 2>&1; then return 0; fi
-  if [[ "$component" == xclip || "$component" == wl-clipboard ]] && (command -v wl-copy >/dev/null 2>&1 || command -v xclip >/dev/null 2>&1 || command -v xsel >/dev/null 2>&1); then return 0; fi
+  if [[ "$component" == xclip || "$component" == xsel || "$component" == wl-clipboard ]] && (command -v wl-copy >/dev/null 2>&1 || command -v xclip >/dev/null 2>&1 || command -v xsel >/dev/null 2>&1); then return 0; fi
   return 1
 }
 # 将统一组件名转换为对应发行版的包名，优先使用系统包管理器。
@@ -223,6 +223,30 @@ package_install() {
       ;;
   esac
 }
+# 校验 GitHub Release 资产 SHA-256（若上游提供 checksums.txt 或 .sha256 文件则强制比对）
+verify_asset_sha256() {
+  local archive="$1" asset_name="$2" checksum_url="$3" sum_file actual expected
+  sum_file="${archive}.checksums"
+  if curl -fsSL --connect-timeout 10 --max-time 30 "$checksum_url" -o "$sum_file" 2>/dev/null && [[ -s "$sum_file" ]]; then
+    expected=$(awk -v f="$asset_name" '$2 == f || $2 == "*"f {print $1; exit} NF == 1 && $1 ~ /^[0-9a-fA-F]{64}$/ {print $1; exit}' "$sum_file")
+    if [[ -n "$expected" ]]; then
+      if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$archive" | awk '{print $1}')
+      elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$archive" | awk '{print $1}')
+      else
+        rm -f "$sum_file"
+        return 0
+      fi
+      rm -f "$sum_file"
+      actual=$(printf '%s' "$actual" | tr 'A-F' 'a-f')
+      expected=$(printf '%s' "$expected" | tr 'A-F' 'a-f')
+      [[ "$actual" == "$expected" ]] || { printf 'SHA-256 校验失败：%s\n' "$asset_name" >&2; return 1; }
+    fi
+  fi
+  rm -f "$sum_file"
+  return 0
+}
 # 包管理器安装失败时下载官方二进制；验证可执行性后才写入用户命令目录。
 lazydocker_release() {
   local url tag version arch os asset stage
@@ -240,6 +264,7 @@ lazydocker_release() {
   mkdir -p "$stage" "$HOME/.local/bin"
   [[ ! -e "$HOME/.local/bin/lazydocker" && ! -L "$HOME/.local/bin/lazydocker" ]] || return 1
   curl -fSL --connect-timeout 10 --max-time 90 "https://github.com/jesseduffield/lazydocker/releases/download/$tag/$asset" -o "$stage/archive.tar.gz" || return 1
+  verify_asset_sha256 "$stage/archive.tar.gz" "$asset" "https://github.com/jesseduffield/lazydocker/releases/download/$tag/checksums.txt" || return 1
   tar -xzf "$stage/archive.tar.gz" -C "$stage" lazydocker || return 1
   [[ -f "$stage/lazydocker" && ! -L "$stage/lazydocker" && -x "$stage/lazydocker" ]] || return 1
   "$stage/lazydocker" --version || return 1
@@ -261,6 +286,7 @@ lazygit_release() {
   mkdir -p "$stage" "$HOME/.local/bin"
   [[ ! -e "$HOME/.local/bin/lazygit" && ! -L "$HOME/.local/bin/lazygit" ]] || return 1
   curl -fSL --connect-timeout 10 --max-time 90 "https://github.com/jesseduffield/lazygit/releases/download/$tag/$asset" -o "$stage/archive.tar.gz" || return 1
+  verify_asset_sha256 "$stage/archive.tar.gz" "$asset" "https://github.com/jesseduffield/lazygit/releases/download/$tag/checksums.txt" || return 1
   tar -xzf "$stage/archive.tar.gz" -C "$stage" lazygit || return 1
   [[ -f "$stage/lazygit" && ! -L "$stage/lazygit" && -x "$stage/lazygit" ]] || return 1
   "$stage/lazygit" --version || return 1
@@ -293,6 +319,7 @@ television_release() {
       return 1
     fi
   fi
+  verify_asset_sha256 "$stage/archive.tar.gz" "$asset" "https://github.com/alexpasmantier/television/releases/download/$tag/${asset}.sha256" || return 1
   tar -xzf "$stage/archive.tar.gz" -C "$stage" tv 2>/dev/null || tar -xzf "$stage/archive.tar.gz" -C "$stage" 2>/dev/null || return 1
   bin=$(find "$stage" -type f -name tv -perm -111 2>/dev/null | head -n 1)
   [[ -n "$bin" && -x "$bin" ]] || return 1

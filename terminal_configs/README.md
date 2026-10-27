@@ -11,7 +11,7 @@ terminal_configs/
 ├── wezterm/
 │   └── wezterm.lua        # WezTerm 完整配置 (含全套字体回退、WebGPU 硬件加速与毛玻璃效果)
 ├── alacritty/
-│   ├── alacritty.yml      # Alacritty v0.12 及以下版本配置 (当前 Pop!_OS 22.04 默认)
+│   ├── alacritty.yml      # Alacritty v0.12 及以下旧版配置 (兼容 Ubuntu/Pop!_OS 22.04 LTS 等)
 │   └── alacritty.toml     # Alacritty v0.13+ 最新 TOML 格式配置
 └── README.md              # 配置指南与效果说明
 ```
@@ -43,21 +43,29 @@ terminal_configs/
 
 ## 部署与生效方法
 
-### 方式 A：WezTerm
+### 方式一：通过安装器一键自动部署（推荐）
+在执行 `install.sh` 时附加 `--with-terminals` 参数，安装器会自动备份现有配置并部署 `wezterm.lua` 与 `alacritty.toml`（macOS Homebrew 下还会自动安装 `font-jetbrains-mono-nerd-font`）：
+```bash
+bash install.sh --profile full --with-tmux --with-terminals --p10k-style rainbow --lang zh
+```
+
+### 方式二：手动复制部署
+
+#### A. WezTerm
 将配置复制或软链接至用户配置目录：
 ```bash
 mkdir -p ~/.config/wezterm
 cp terminal_configs/wezterm/wezterm.lua ~/.config/wezterm/wezterm.lua
 ```
-*注：WezTerm 支持热重载，保存配置后窗口会瞬间自动刷新生效。*
+*注：WezTerm 支持热重载，保存配置后窗口会瞬间自动刷新生效；若尚未安装 `JetBrainsMono Nerd Font`，会自动优雅回退至 WezTerm 内置的 `JetBrains Mono` + `Symbols Nerd Font Mono`。*
 
-### 方式 B：Alacritty
-针对当前 Linux 发行版（根据版本选择）：
+#### B. Alacritty
+根据当前系统安装的 Alacritty 版本选择：
 ```bash
 mkdir -p ~/.config/alacritty
-# 若 Alacritty 为 0.12 版本（如当前 Pop!_OS 22.04 LTS）：
-cp terminal_configs/alacritty/alacritty.yml ~/.config/alacritty/alacritty.yml
-
-# 若未来升级至 0.13+ 版本：
+# Alacritty 0.13+（现代版本推荐）：
 cp terminal_configs/alacritty/alacritty.toml ~/.config/alacritty/alacritty.toml
+
+# 若 Alacritty 为 0.12 及以下旧版本（如 Ubuntu / Pop!_OS 22.04 LTS 默认源）：
+cp terminal_configs/alacritty/alacritty.yml ~/.config/alacritty/alacritty.yml
 ```

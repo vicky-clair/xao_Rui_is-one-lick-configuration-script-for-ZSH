@@ -12,11 +12,12 @@ fail() { printf 'FAIL: %s\n' "$*" >&2; exit 1; }
 pass() { printf 'PASS: %s\n' "$*"; }
 extract_function() { sed -n "/^$1() {/,/^}/p" "$ROOT/install.sh"; }
 # ------------------------------------------------------------------------------
-# 1. 语法检查：验证主安装器与更新检测脚本的 Bash 静态语法
+# 1. 语法检查与模板一致性：验证主安装器、更新检测脚本语法及 .tmux.conf 同步状态
 # ------------------------------------------------------------------------------
 bash -n "$ROOT/install.sh"
 bash -n "$ROOT/scripts/check_updates.sh"
-pass 'Bash syntax'
+cmp -s "$ROOT/.tmux.conf" "$ROOT/templates/tmux.conf" || fail '.tmux.conf and templates/tmux.conf are out of sync'
+pass 'Bash syntax and tmux template sync'
 
 # ------------------------------------------------------------------------------
 # 2. Dry-Run 预演路由隔离测试：
@@ -106,6 +107,48 @@ if optional_package missing_command definitely_missing_pkg 2>/dev/null; then
 fi
 ((${#SKIPPED[@]} > 0)) || fail 'optional_package did not record missing package to SKIPPED'
 pass 'optional_package idempotency, alias detection, and missing package handling'
+
+# ------------------------------------------------------------------------------
+# 6b. optional_package 与 retry_tools.sh normalize() 白名单一致性校验：
+# 确保 install.sh 中所有可能写入 SKIPPED / failed-components 的包名均被 normalize() 支持
+# ------------------------------------------------------------------------------
+eval "$(sed -n '/^normalize() {/,/^}/p' "$ROOT/scripts/retry_tools.sh")"
+for candidate_pkg in \
+  fzf fd fd-find bat batcat eza zoxide yazi fastfetch neovim television tre-command \
+  tre tre-agrep ripgrep jq ffmpeg sevenzip 7zip p7zip-full p7zip poppler poppler-utils \
+  poppler-tools imagemagick ImageMagick resvg wl-clipboard xclip xsel tmux ncurses-term \
+  font-symbols-only-nerd-font lazydocker lazygit vfox; do
+  normalize "$candidate_pkg" >/dev/null || fail "retry_tools.sh normalize() rejected package: $candidate_pkg"
+done
+# 扫描 install.sh 中所有字面量 optional_package 调用的第二参数
+while IFS= read -r literal_pkg; do
+  [[ -n "$literal_pkg" ]] || continue
+  normalize "$literal_pkg" >/dev/null || fail "install.sh optional_package '$literal_pkg' not in retry_tools.sh normalize()"
+done < <(awk '$1 == "optional_package" && $3 !~ /^["$]/ {gsub(/[;|]/, "", $3); print $3}' "$ROOT/install.sh" | sort -u)
+pass 'all optional_package names are recognized by retry_tools.sh normalize()'
+
+# ------------------------------------------------------------------------------
+# 6c. Tmux >= 3.2 版本号解析器边界测试：
+# 覆盖 3.2a、next-3.6、3.10、openbsd-7.5（通过）与 3.1c、2.8（拦截）
+# ------------------------------------------------------------------------------
+check_tmux_ver() {
+  local _tmux_ver_raw="$1" _tmux_ver_num _tmux_maj _tmux_min
+  _tmux_ver_num=$(printf '%s\n' "$_tmux_ver_raw" | grep -oE '[0-9]+\.[0-9]+' | head -n 1 || true)
+  [[ -n "$_tmux_ver_num" ]] || return 1
+  _tmux_maj="${_tmux_ver_num%%.*}"
+  _tmux_min="${_tmux_ver_num#*.}"
+  if (( 10#${_tmux_maj:-0} < 3 || (10#${_tmux_maj:-0} == 3 && 10#${_tmux_min:-0} < 2) )); then
+    return 1
+  fi
+  return 0
+}
+for valid_ver in "tmux 3.2" "tmux 3.2a" "tmux 3.5a" "tmux next-3.6" "tmux 3.10" "tmux openbsd-7.5"; do
+  check_tmux_ver "$valid_ver" || fail "valid tmux version rejected: $valid_ver"
+done
+for invalid_ver in "tmux 3.1c" "tmux 3.0a" "tmux 2.8" "tmux 1.9"; do
+  if check_tmux_ver "$invalid_ver"; then fail "outdated tmux version accepted: $invalid_ver"; fi
+done
+pass 'tmux >= 3.2 version parser handles release, next-*, multi-digit minor, and openbsd strings'
 
 # ------------------------------------------------------------------------------
 # 7. Nerd Font 图标字体检测幂等性测试：

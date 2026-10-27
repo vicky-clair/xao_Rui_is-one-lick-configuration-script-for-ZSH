@@ -126,7 +126,7 @@ tmux 的相关功能从 3.2 引入，参见[官方发布说明](https://github.c
 | **Alacritty** | **Rust** | 极简极速，输入延迟极低，天然契合搭配本项目 tmux 分屏使用 | macOS: [官方 DMG / Cargo 安装](LINUX_ZSH_SETUP_GUIDE.md#alacritty-macos-install)<br>Linux: `sudo apt install alacritty` / `pacman -S alacritty` |
 | **Ghostty** | **Zig** | 原生 macOS Metal 硬件加速与毛玻璃背景，支持图形协议 | macOS: `brew install --cask ghostty`<br>Linux: [详细安装方法](LINUX_ZSH_SETUP_GUIDE.md#3-ghostty-现代高性能终端-安装) |
 
-> 详细的各 Linux 发行版（Debian/Ubuntu/Fedora/Arch/openSUSE）与 macOS 完整安装命令请参阅：[现代终端模拟器安装指南](LINUX_ZSH_SETUP_GUIDE.md#9-推荐现代终端模拟器安装指南macos-与主流-linux-发行版)。
+> 详细的各 Linux 发行版（Debian/Ubuntu/Fedora/Arch/openSUSE）与 macOS 完整安装命令请参阅：[现代终端模拟器安装指南](LINUX_ZSH_SETUP_GUIDE.md#9-推荐现代终端模拟器安装指南macos-与主流-linux-发行版)。项目内置了适配 Tokyo Night 主题与中文字体回退的 WezTerm / Alacritty 配置文件（详见 [`terminal_configs/README.md`](terminal_configs/README.md)），可在安装时附加 `--with-terminals` 一键部署。
 
 ## 快速开始
 
@@ -201,6 +201,7 @@ bash "$bootstrap_dir/install.sh" --lang zh
 | `--with-latest-nvim` | 在 `full` 且非 Homebrew 分支请求下载 Neovim 官方 Release；不在 `basic` 中独立生效 |
 | `--with-vfox` / `--with-lazydocker` / `--with-lazygit` / `--with-tmux` | 启用对应可选组件 |
 | `--without-tmux` / `--no-tmux` | 显式跳过 tmux 及其配置（即使系统已安装 tmux 也不启用） |
+| `--with-terminals` / `--with-terminal-configs` | 自动备份并部署 [`terminal_configs/`](terminal_configs/README.md) 下的 WezTerm 与 Alacritty 终端配置 |
 | `--lang zh` / `--lang en` | 安装、更新界面语言；管理脚本当前主要为中文 |
 | `--check-updates` | 检测更新，联网并写缓存，不升级软件 |
 | `--update` | 检测、确认后更新第三方组件；Linux 系统包仍需手动升级 |

@@ -173,7 +173,7 @@ To get the best visual rendering and latency with Powerlevel10k, Yazi multimedia
 | **Alacritty** | **Rust** | Ultra-minimal, lowest input latency, pairs naturally with tmux | macOS: [Official DMG / Cargo](LINUX_ZSH_SETUP_GUIDE.md#alacritty-macos-install)<br>Linux: `sudo apt install alacritty` / `pacman -S alacritty` |
 | **Ghostty** | **Zig** | Native macOS Metal acceleration, liquid glassmorphism, native Kitty graphics protocol | macOS: `brew install --cask ghostty`<br>Linux: [Installation Guide](LINUX_ZSH_SETUP_GUIDE.md#3-ghostty-现代高性能终端-安装) |
 
-> For comprehensive multi-distribution Linux and macOS setup commands, see [Modern Terminal Emulator Installation Guide](LINUX_ZSH_SETUP_GUIDE.md#9-推荐现代终端模拟器安装指南macos-与主流-linux-发行版).
+> For comprehensive multi-distribution Linux and macOS setup commands, see [Modern Terminal Emulator Installation Guide](LINUX_ZSH_SETUP_GUIDE.md#9-推荐现代终端模拟器安装指南macos-与主流-linux-发行版). Ready-to-use Tokyo Night configurations for WezTerm and Alacritty are included in [`terminal_configs/`](terminal_configs/README.md) and can be deployed via `--with-terminals`.
 
 ## Everyday commands
 
@@ -272,6 +272,7 @@ Choose one primary operation per invocation. See [Configuration management](CONF
 | `--with-latest-nvim` | Request an official Neovim release download for the non-Homebrew `full` profile; does not independently take effect in `basic` |
 | `--with-vfox` / `--with-lazydocker` / `--with-lazygit` / `--with-tmux` | Enable the corresponding optional tool |
 | `--without-tmux` / `--no-tmux` | Explicitly skip tmux and its configuration even if tmux is already installed on the system |
+| `--with-terminals` / `--with-terminal-configs` | Deploy WezTerm (`wezterm.lua`) and Alacritty (`alacritty.toml`) Tokyo Night configurations from [`terminal_configs/`](terminal_configs/README.md) |
 | `--lang zh` / `--lang en` | Installer/update interface language; management scripts are currently primarily Chinese |
 | `--check-updates` | Check online and write the cache without upgrading software |
 | `--update` | Check, confirm, then update third-party components; Linux system packages still require manual upgrades |

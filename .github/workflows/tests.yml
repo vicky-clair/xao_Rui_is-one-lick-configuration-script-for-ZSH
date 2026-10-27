@@ -21,11 +21,11 @@ jobs:
         shell: bash
         run: |
           if command -v apt-get >/dev/null; then
-            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux bsdutils sudo curl file procps
+            apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y bash zsh git tmux coreutils diffutils findutils grep sed ca-certificates util-linux bsdutils sudo curl file procps
           elif command -v dnf >/dev/null; then
-            dnf install -y bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux sudo curl file procps-ng
+            dnf install -y bash zsh git tmux coreutils diffutils findutils grep sed ca-certificates util-linux sudo curl file procps-ng
           else
-            pacman -Syu --noconfirm bash zsh git coreutils diffutils findutils grep sed ca-certificates util-linux sudo curl file procps-ng
+            pacman -Syu --noconfirm bash zsh git tmux coreutils diffutils findutils grep sed ca-certificates util-linux sudo curl file procps-ng
           fi
       - uses: actions/checkout@v4
       - name: Installer regression (mocked downloads and system changes)
@@ -44,9 +44,25 @@ jobs:
           # 模拟生产环境标准部署目录 ~/.zsh-project
           cp -a "$GITHUB_WORKSPACE" /home/testuser/.zsh-project
           chown -R testuser:testuser /home/testuser/.zsh-project
-          # 1. 首次全新安装测试（完整工具链 + 彩虹主题 + 自动化 --yes）
-          su - testuser -c "cd ~/.zsh-project && bash install.sh --profile full --p10k-style rainbow --lang zh --yes"
+          # 1. 首次全新安装测试（完整工具链 + Tmux + 终端配置 + 彩虹主题 + 自动化 --yes）
+          su - testuser -c "cd ~/.zsh-project && bash install.sh --profile full --with-tmux --with-terminals --p10k-style rainbow --lang zh --yes"
           # 2. 第二次运行：严格验证幂等性（已有软件和依赖绝不重复安装，退出码为 0）
-          su - testuser -c "cd ~/.zsh-project && bash install.sh --profile full --p10k-style rainbow --lang zh --yes"
-          # 3. 运行环境体检
+          su - testuser -c "cd ~/.zsh-project && bash install.sh --profile full --with-tmux --with-terminals --p10k-style rainbow --lang zh --yes"
+          # 3. 隔离验证 Tmux 配置加载无语法报错及 PATH 去重幂等
+          su - testuser -c "tmux -L ci_verify -f ~/.tmux.conf new-session -d -s test 'sleep 5' && tmux -L ci_verify source-file ~/.tmux.conf && ! tmux -L ci_verify show-messages | grep -iE 'error|unknown|invalid|usage:' && tmux -L ci_verify kill-server"
+          # 4. 运行环境体检
           su - testuser -c "cd ~/.zsh-project && bash scripts/manage.sh --doctor"
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Installer regression on macOS (Bash 3.2 compatibility)
+        shell: bash
+        run: |
+          /bin/bash scripts/test_installer.sh
+          bash scripts/test_installer.sh
+      - name: Configuration management regression on macOS
+        shell: bash
+        run: |
+          /bin/bash scripts/test_management.sh
+          bash scripts/test_management.sh

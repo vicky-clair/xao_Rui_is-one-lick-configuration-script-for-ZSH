@@ -478,6 +478,23 @@ if ((DO_UPDATE)); then
     mv "$tmp_avail" "$AVAILABLE_FILE"
   fi
 
+  # 对 Linux APT 软件包，校验其是否已不再处于待升级列表；若用户已手动升级，自动从待更新清单中剔除
+  if [[ "$OS_TYPE" == Linux && -f "$AVAILABLE_FILE" ]] && command -v apt >/dev/null 2>&1; then
+    upgradable_now=$(apt list --upgradable 2>/dev/null || true)
+    tmp_avail=$(mktemp "$AVAILABLE_FILE.tmp.XXXXXX")
+    while IFS= read -r a_line || [[ -n "$a_line" ]]; do
+      drop=0
+      if [[ "$a_line" =~ \[应用工具\]\ ([a-zA-Z0-9_-]+)\ \(APT ]]; then
+        pkg_name="${BASH_REMATCH[1]}"
+        if ! echo "$upgradable_now" | grep -qE "^$pkg_name/"; then
+          drop=1
+        fi
+      fi
+      ((drop == 0)) && printf '%s\n' "$a_line" >> "$tmp_avail"
+    done < "$AVAILABLE_FILE"
+    mv "$tmp_avail" "$AVAILABLE_FILE"
+  fi
+
   if [[ -f "$HOME/.zshrc" ]]; then
     zsh -n "$HOME/.zshrc" && success "$(msg "配置语法检查通过。" "Configuration syntax check passed.")"
   fi

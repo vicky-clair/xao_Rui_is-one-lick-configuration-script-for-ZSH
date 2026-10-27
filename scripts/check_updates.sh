@@ -85,6 +85,14 @@ check_git_repo() {
   local name=$1 dir=$2
   [[ -d "$dir/.git" ]] || return 0
 
+  # 若处于 detached HEAD（游离分支状态，如特定发布标签或固定版本），按锁定版本展示
+  if ! git -C "$dir" symbolic-ref -q HEAD >/dev/null 2>&1; then
+    local current_tag
+    current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "pinned")
+    ALL_CHECKED+=("$name: $(msg "已锁定版本 ($current_tag)" "pinned release ($current_tag)")")
+    return 0
+  fi
+
   # 获取默认跟踪分支
   local upstream
   upstream=$(git -C "$dir" rev-parse --abbrev-ref --symbolic-full-name '@{u}' 2>/dev/null || true)

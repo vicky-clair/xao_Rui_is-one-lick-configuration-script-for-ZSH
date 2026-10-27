@@ -203,6 +203,9 @@ Tmux 的大部分内部快捷键需要**先按下前缀键**，松开后再按�
 * **自举完成自动静默热重载**：后台异步克隆 TPM 及其插件完成后，会自动追加触发 `tmux source-file ~/.tmux.conf`，用户零手动干预即可自动生效 Tokyo Night 美化主题与全部插件。
 * **热重载重置防累积**：在配置开头使用 `set -su terminal-overrides` 与 `set -su terminal-features`，每次按 `Prefix + r` 热重载时均先重置为系统默认再注入真彩与剪贴板扩展，彻底杜绝了重复选项无限堆叠的漏洞。
 * **会话常驻防误退 (Persistence)**：显式设置 `destroy-unattached off`、`exit-empty off` 与 `detach-on-destroy off`，客户端断开或窗口关闭不会销毁后台会话。
+* **macOS 状态栏主题与现代 Bash 保障**：`tmux-tokyo-night` 主题脚本使用了 Bash 4.2+ 的 `declare -gA` 特性。macOS 系统内置的 `/bin/bash` 停留在 3.2，安装器会自动通过 Homebrew 部署现代 Bash，并在配置顶部注入全局 PATH，彻底解决 Mac 机器上状态栏主题报错消失的问题。
+* **Linux 极简环境依赖补全**：安装器在启用 Tmux 时自动检测并补充 Linux 环境的 `bash`、`bc`（供状态栏硬件指标浮点计算）、`ncurses-term`（Terminfo 数据库）以及 `xclip`/`wl-clipboard` 剪贴板驱动。
+* **Tmux < 3.2 智能语法向下兼容**：配置内部对 `terminal-features` 与 `display-popup` 加入了动态版本探测，在 Ubuntu 20.04 或 Debian 11 等老旧 Linux LTS 环境下自动优雅降级，绝不出现 `unknown option` 或 `unknown command` 报警。
 
 ### 6. 会话常驻与终端关闭自动重连 (Persistence & Auto-Attach)
 * **默认常驻行为**：直接关闭终端窗口或网络意外中断时，Tmux 后台进程与运行中的任务（编译、下载、服务）均在服务器上完好保留，绝不中断。

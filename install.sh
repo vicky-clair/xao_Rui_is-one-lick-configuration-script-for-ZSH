@@ -372,6 +372,14 @@ if ((DO_UPDATE)); then
       warn "$(msg "$name 存在未提交的本地修改，跳过自动拉取以防止冲突。" "$name has uncommitted local changes; skipping pull to prevent conflicts.")"
       return 0
     fi
+    # 若处于 detached HEAD（游离分支状态，如锁定的 Release 标签 v2.7.2），避免 git pull 报错
+    if ! git -C "$dir" symbolic-ref -q HEAD >/dev/null 2>&1; then
+      local current_tag
+      current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --short HEAD 2>/dev/null || echo "pinned")
+      UPDATED_OK+=("$name ($(msg "已锁定版本" "pinned release"): $current_tag)")
+      info "$(msg "$name 处于锁定发布版本 ($current_tag)，保持原样跳过自动拉取。" "$name is pinned to release ($current_tag); kept intact.")"
+      return 0
+    fi
     info "$(msg "正在拉取 $name 最新代码..." "Pulling latest code for $name...")"
     local pull_out
     if pull_out=$(git -C "$dir" pull --ff-only 2>&1); then
@@ -1587,11 +1595,19 @@ if ((WITH_TMUX)); then
     if (( _bash_major < 4 )); then
       info "$(msg "检测到当前 Bash 版本低于 4.0，正在通过 Homebrew 安装现代 Bash 以支持 Tmux 主题..." "Bash < 4.0 detected; installing modern Bash via Homebrew for Tmux theme...")"
       HOMEBREW_NO_AUTO_UPDATE=1 brew install bash 2>/dev/null || true
+      export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
     fi
   elif [[ "$FAMILY" == apt || "$FAMILY" == dnf || "$FAMILY" == pacman || "$FAMILY" == zypper ]]; then
+    # Linux 环境：确保具备 bash、bc（浮点计算，主题监控依赖）、剪贴板后端与 terminfo
+    optional_package bash bash || true
+    optional_package bc bc || true
     optional_package xclip xclip || true
     optional_package wl-copy wl-clipboard || true
-    [[ "$FAMILY" == apt ]] && { optional_package "" ncurses-term || true; }
+    if [[ "$FAMILY" == apt ]]; then
+      optional_package "" ncurses-term || true
+    elif [[ "$FAMILY" == dnf || "$FAMILY" == zypper || "$FAMILY" == pacman ]]; then
+      optional_package "" ncurses || true
+    fi
   fi
 fi
 
@@ -1681,6 +1697,10 @@ if ((WITH_TMUX)); then
     fi
     success "$(msg "Tmux 插件初始化完成" "Tmux plugins initialized successfully")"
   fi
+  if command -v tmux >/dev/null 2>&1 && tmux info >/dev/null 2>&1; then
+    tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+    info "$(msg "已热重载运行中的 Tmux 服务配置" "Reloaded active Tmux server configuration")"
+  fi
 fi
 
 # 复制更新检测辅助脚本到统一状态或脚本目录
@@ -1708,6 +1728,7 @@ ZSH_PROJECT_VFOX=$WITH_VFOX
 ZSH_PROJECT_LAZYDOCKER=$WITH_LAZYDOCKER
 ZSH_PROJECT_LAZYGIT=$WITH_LAZYGIT
 ZSH_PROJECT_TMUX=$WITH_TMUX
+ZSH_PROJECT_TMUX_AUTO=1
 ZSH_PROJECT_DIR=${q_script_dir}
 ZSH_PROJECT_LANG="$LANG_CHOICE"
 ZSH_PROJECT_AUTO_CHECK_UPDATE=1

@@ -287,12 +287,26 @@ case "$ACTION" in
     for path in .oh-my-zsh/oh-my-zsh.sh powerlevel10k/powerlevel10k.zsh-theme .oh-my-zsh/custom/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh .oh-my-zsh/custom/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh; do
       if [[ -r "$HOME/$path" ]]; then echo "PASS: $path"; else echo "WARN: 缺少 $path"; issues=$((issues+1)); fi
     done
+    if [[ -f "$HOME/.tmux.conf" ]]; then
+      echo "PASS: .tmux.conf"
+      if [[ -d "$HOME/.tmux/plugins/tpm" ]]; then echo "PASS: .tmux/plugins/tpm"; else echo "WARN: 缺少 .tmux/plugins/tpm"; issues=$((issues+1)); fi
+      if [[ -d "$HOME/.tmux/plugins/tmux-tokyo-night" ]]; then echo "PASS: .tmux/plugins/tmux-tokyo-night"; else echo "WARN: 缺少 .tmux/plugins/tmux-tokyo-night"; issues=$((issues+1)); fi
+      if [[ $(uname -s) == Darwin ]]; then
+        _bash_ver=$(bash -c 'echo "${BASH_VERSINFO[0]:-0}"' 2>/dev/null || echo 0)
+        if (( _bash_ver < 4 )); then
+          echo "WARN: macOS 当前 Bash 版本 ($_bash_ver) < 4.0，可能导致 Tmux Tokyo Night 状态栏脚本异常；建议执行 brew install bash"
+          issues=$((issues+1))
+        else
+          echo "PASS: Bash $_bash_ver (>= 4.0, 满足 Tmux 现代化主题需求)"
+        fi
+      fi
+    fi
     for tool in zsh git fzf fd fdfind bat batcat eza zoxide yazi nvim vfox lazydocker lazygit tmux fastfetch tv tre agrep tre-agrep rg jq ffmpeg 7z 7zz pdftoppm magick convert resvg; do
       if location=$(command -v "$tool"); then printf 'FOUND: %s -> %s\n' "$tool" "$location"; else printf 'INFO: 未在当前 PATH 中找到 %s（可选组件不一定需要）\n' "$tool"; fi
     done
     limiter=$(command -v timeout || command -v gtimeout || true)
     if [[ -n "$limiter" ]]; then
-      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit fastfetch tv tre agrep rg jq ffmpeg 7z 7zz pdftoppm magick resvg; do
+      for tool in zsh git fzf fd bat eza zoxide yazi nvim vfox lazydocker lazygit tmux fastfetch tv tre agrep rg jq ffmpeg 7z 7zz pdftoppm magick resvg; do
         command -v "$tool" >/dev/null || continue
         version=""
         # 查询各命令行工具版本：不同工具对版本参数有严格要求
@@ -300,6 +314,9 @@ case "$ACTION" in
         # - 7z/7zz: 不支持 `--version`（会以退出码 7 失败），且 `-v` 是分卷压缩参数；查看版本输出最安全的是帮助参数 `-h`
         # - pdftoppm: Poppler 工具集只接受 `-v`（传入 `--version` 会被当做未知选项）
         case "$tool" in
+          tmux)
+            version=$("$limiter" -k 1s 2s tmux -V </dev/null 2>&1 || true)
+            ;;
           ffmpeg)
             version=$("$limiter" -k 1s 2s ffmpeg -nostdin -version </dev/null 2>&1 || true)
             ;;

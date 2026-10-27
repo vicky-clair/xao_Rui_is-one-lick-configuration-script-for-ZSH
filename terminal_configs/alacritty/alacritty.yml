@@ -1,0 +1,99 @@
+# =============================================================================
+# Alacritty 终端配置 (兼容 v0.12.x 及旧版本 YAML 格式)
+# 主题：Tokyo Night | 字体：JetBrainsMono Nerd Font + 中文自动回退
+# =============================================================================
+
+# 1. 窗口样式设置
+window:
+  # 窗口内边距（像素）：留出适度呼吸空间，告别字符贴边
+  padding:
+    x: 12
+    y: 10
+  dynamic_padding: true
+  # 背景透明度 (0.0 完全透明 ~ 1.0 完全不透明)
+  opacity: 0.95
+  # 窗口标题与装饰
+  decorations: full
+  title: "Alacritty"
+  dynamic_title: true
+
+# 2. 字体配置 (全套 Nerd Font 图标 + 连字与粗斜体支持)
+font:
+  size: 12.0
+  normal:
+    family: "JetBrainsMono Nerd Font"
+    style: Regular
+  bold:
+    family: "JetBrainsMono Nerd Font"
+    style: Bold
+  italic:
+    family: "JetBrainsMono Nerd Font"
+    style: Italic
+  bold_italic:
+    family: "JetBrainsMono Nerd Font"
+    style: Bold Italic
+  offset:
+    x: 0
+    y: 0
+  glyph_offset:
+    x: 0
+    y: 0
+
+# 3. 光标行为
+cursor:
+  style:
+    # 光标形状：Beam (细竖线), Block (方块), Underline (下划线)
+    shape: Beam
+    blinking: On
+  blink_interval: 650
+  unfocused_hollow: true
+
+# 4. 滚动缓冲区
+scrolling:
+  history: 10000
+  multiplier: 3
+
+# 5. 系统蜂鸣音提示 (禁用系统尖锐蜂鸣音)
+bell:
+  animation: EaseOutExpo
+  duration: 0
+
+# 6. Tokyo Night 官方深色主题配色方案
+colors:
+  primary:
+    background: '#1a1b26'
+    foreground: '#c0caf5'
+  cursor:
+    text: '#1a1b26'
+    cursor: '#c0caf5'
+  selection:
+    text: '#c0caf5'
+    background: '#33467c'
+  normal:
+    black: '#15161e'
+    red: '#f7768e'
+    green: '#9ece6a'
+    yellow: '#e0af68'
+    blue: '#7aa2f7'
+    magenta: '#bb9af7'
+    cyan: '#7dcfff'
+    white: '#a9b1d6'
+  bright:
+    black: '#414868'
+    red: '#f7768e'
+    green: '#9ece6a'
+    yellow: '#e0af68'
+    blue: '#7aa2f7'
+    magenta: '#bb9af7'
+    cyan: '#7dcfff'
+    white: '#c0caf5'
+
+# 7. 快捷键映射
+key_bindings:
+  - { key: V,        mods: Control|Shift, action: Paste }
+  - { key: C,        mods: Control|Shift, action: Copy }
+  - { key: Insert,   mods: Shift,         action: PasteSelection }
+  - { key: Key0,     mods: Control,       action: ResetFontSize }
+  - { key: Equals,   mods: Control,       action: IncreaseFontSize }
+  - { key: Plus,     mods: Control,       action: IncreaseFontSize }
+  - { key: Minus,    mods: Control,       action: DecreaseFontSize }

@@ -359,6 +359,7 @@ docker run --rm -it ubuntu:24.04 bash -c "
 | `vfox の初期化に失敗またはタイムアウト` | vfox が初期化されていないかネットワーク環境の遅延 | `vfox --version` を実行するか、`bash install.sh --retry-failed vfox` で再試行してください。 |
 | `macOS Bash version (3.2) < 4.0` 警告 | macOS 標準の `/bin/bash` が 2007 年の古いバージョン 3.2 である | `brew install bash` を実行してください。スクリプト自体は Bash 3.2 と完全な互換性がありますが、Tmux の一部モダンテーマで新しい Bash が推奨されます。 |
 | Tmux 内部でシステムクリップボードが共有されない | リモート SSH セッションで OSC 52 または X11 転送が未設定 | 本設定では OSC 52 透過が標準有効化されています。Windows Terminal、iTerm2、WezTerm 上でマウスドラッグまたは `y` キーを押すだけでローカルクリップボードへ自動コピーされます。 |
+| Tmux 内で GNU `screen` を `Ctrl+a` でデタッチ/終了できない | 外側の Tmux が `Ctrl+a`（`prefix C-a`）を先に捕捉してしまう | Tmux ウィンドウ（`Ctrl+a c`）の直接利用を推奨します。`screen` を併用する場合は `~/.screenrc` に `escape ^Bb`（`Ctrl+b` に変更）を設定するか、`Ctrl+a` を 2 回連打して透過してください（詳細は [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)）。 |
 
 > 詳しい起動エラー、プラグインの競合、復旧手順は [ZSH_TROUBLESHOOTING.md](ZSH_TROUBLESHOOTING.md) をご覧ください。
 

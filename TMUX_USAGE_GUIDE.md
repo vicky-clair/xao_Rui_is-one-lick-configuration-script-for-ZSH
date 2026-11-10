@@ -174,9 +174,11 @@ Tmux 的大部分内部快捷键需要**先按下前缀键**，松开后再按�
 
 ## 10. 高级技巧与避坑指南
 
-### 1. 为什么有时候按了 Ctrl+A 命令行没反应？
-* **原因**：Prefix 映射为了 `Ctrl+a`，tmux 会等待你的下一个按键。
-* **解决**：如果你是想让光标跳到命令行行首，请**快速按两次 `Ctrl+a`**。
+### 1. 为什么有时候按了 Ctrl+A 命令行没反应（或内嵌 Screen 快捷键失效）？
+* **原因**：Prefix 映射为了 `Ctrl+a`，tmux 会等待你的下一个按键。如果在 tmux 中嵌套运行了 GNU `screen`（其默认命令键也是 `Ctrl+a`），所有 `Ctrl+a` 按键也会先被外层 tmux 拦截（例如 `Ctrl+a d` 会直接脱离 tmux 而非 screen，`Ctrl+a \` 会把 `\` 直接透传给终端）。
+* **解决**：
+  * 如果想在命令行让光标跳到行首，或向内嵌 `screen` 透传一次 `Ctrl+a`，请**快速连按两次 `Ctrl+a`**；
+  * 更彻底的共存方案见下方第 12 节 **Q5**，在 `~/.screenrc` 中将 `screen` 转义键改为与 tmux 互补的 `Ctrl+b`（`escape ^Bb`）。
 
 ### 2. 为什么退格键 (Backspace) 偶尔会跳窗格？
 * **原因**：部分终端通过 SSH 连接时将 Backspace 识别为了 `^H`（Ctrl+H），被 `vim-tmux-navigator` 捕获。
@@ -301,4 +303,28 @@ bash install.sh --profile full --with-tmux --p10k-style skip --yes
   1. 在本地电脑下载并安装一款 Nerd Font（强烈推荐 **JetBrainsMono Nerd Font** 或 **FiraCode Nerd Font**）；
   2. 打开本地终端的“设置” -> “外观/字体”，将字体更改为 `JetBrainsMono Nerd Font`；
   3. 若使用 Windows Terminal 或 WezTerm，可在配置中将中文字体设为回退字体（如 `Microsoft YaHei`），即可兼顾精美编程英文字体、炫酷状态栏图标与完美中文显示。
+
+### Q5: 在 Tmux 中使用 GNU Screen 时，为什么按 `Ctrl+a d` 或 `Ctrl+a \` 无法脱离或退出？
+* **原因分析**：
+  1. 本项目的 `~/.tmux.conf` 将 Tmux 前缀键设为了 `Ctrl + a`（同时 `unbind C-b` 解绑了 `Ctrl + b`），而 GNU `screen` 默认的命令转义键同样是 `Ctrl + a`。
+  2. 在 Tmux 内启动 `screen` 时，外层 Tmux 会优先拦截所有 `Ctrl + a`：
+     * 按 **`Ctrl + a` 然后按 `d`**（本意脱离 `screen`）会触发 Tmux 的 `detach-client` 直接脱离 Tmux，回到原生终端，而 `screen` 会话仍以 `(Attached)` 状态留在 Tmux 窗格中；
+     * 按 **`Ctrl + a` 然后按 `\`**（`/etc/screenrc` 默认 `bind \ quit`）时，Tmux 吞掉 `Ctrl + a` 并把字面量 `\` 传给终端（若在 `exit` 后输入会变成 `exit\` 多行续行，导致无法正常退出）；
+     * 按 **`Ctrl + a` 然后按 `k`** 会触发 Tmux 的 `resize-pane -U 5`，不会关闭 `screen` 窗口。
+* **解决办法（推荐方案一或方案二）**：
+  1. **直接复用 Tmux（最推荐）**：系统已默认开启常驻 Tmux 会话，直接使用 **`Ctrl + a` 然后按 `c`** 新建窗口，或 **`Ctrl + a` 然后按 `|` / `-`** 分屏运行后台任务即可，无需在 Tmux 内再嵌套 `screen`。
+  2. **修改 `~/.screenrc` 改用 `Ctrl + b`（与 Tmux 完美共存）**：因为 Tmux 已解绑 `Ctrl + b`（`unbind C-b`），且 `Ctrl + b` 不与 `nano` 的保存（`Ctrl + o`）/退出（`Ctrl + x`）或常用终端信号冲突，只需写入 `~/.screenrc`：
+     ```screenrc
+     # 将 Screen 命令转义键改为 Ctrl+b（与外层 Tmux Ctrl+a 互补共存）
+     escape ^Bb
+     # 启用 256 色终端并跳过启动版权提示、增大回滚缓冲
+     term screen-256color
+     startup_message off
+     defscrollback 10000
+     ```
+     配置后嵌套操作互不干扰：
+     * **控制 Tmux**：继续使用 **`Ctrl + a`**（`Ctrl + a d` 脱离 Tmux、`Ctrl + a c` 新建 Tmux 窗口）；
+     * **控制 Screen**：改用 **`Ctrl + b`**（`Ctrl + b d` 脱离 Screen、`Ctrl + b c` 新建 Screen 窗口、`Ctrl + b n/p` 切换窗口、`Ctrl + b k` 再按 `y` 关闭窗口、`Ctrl + b \` 再按 `y` 退出整个 Screen、`Ctrl + b b` 发送字面量 `Ctrl + b`）；
+     * 若无后台或 `Ctrl+Z` 挂起任务，停掉前台进程后直接输入 **`exit`** 也可正常退出 `screen`。
+  3. **不修改配置时的临时透传**：在未配置 `~/.screenrc` 的环境中，只需**连按两次 `Ctrl + a`** 即可将一个 `Ctrl + a` 透传给内层 `screen`（例如脱离按 **`Ctrl + a` → `Ctrl + a` → `d`**，退出按 **`Ctrl + a` → `Ctrl + a` → `\`** 再按 **`y`**，或从外部执行 `screen -S <会话名> -X quit`）。
 

@@ -407,6 +407,7 @@ docker run --rm -it ubuntu:24.04 bash -c "
 | `vfox 初始化失败或超时，本次已跳过` | vfox 首次安装未初始化或环境缺少网络 | 运行 `vfox --version` 检查，如需重试安装可执行 `bash install.sh --retry-failed vfox`。 |
 | `macOS 当前 Bash 版本 (3.2) < 4.0` 警告 | macOS 自带的 `/bin/bash` 停留在 2007 年的 3.2 版 | 运行 `brew install bash` 安装现代 Bash。本项目安装器与脚本原生兼容 Bash 3.2，但 Tmux 某些主题组件依赖现代特性。 |
 | Tmux 内部无法使用系统剪贴板 | 远程 SSH 会话未启用 OSC 52 或缺少 X11/Wayland 转发 | 本项目 Tmux 配置已默认开启 OSC 52 终端透传。在 Windows Terminal、iTerm2 或 WezTerm 中直接鼠标拖选或按 `y` 即可自动同步至本机剪贴板。 |
+| Tmux 内使用 GNU `screen` 无法用 `Ctrl+a` 脱离/退出 | 外层 Tmux 前缀键设为 `Ctrl+a`，拦截了 `screen` 的默认 `Ctrl+a` | 推荐直接用 Tmux 窗口（`Ctrl+a c`）；如需嵌套 `screen`，在 `~/.screenrc` 中设置 `escape ^Bb`（改用 `Ctrl+b`），或连按两次 `Ctrl+a` 透传（详见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)）。 |
 
 > 更多启动报错、插件冲突、历史记录丢失等详细疑难杂症，请查阅完整专著：[Zsh 排错与故障诊断指南 (ZSH_TROUBLESHOOTING.md)](ZSH_TROUBLESHOOTING.md)。
 

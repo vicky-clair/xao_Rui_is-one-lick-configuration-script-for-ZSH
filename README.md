@@ -415,6 +415,7 @@ docker run --rm -it ubuntu:24.04 bash -c "
 | `vfox initialization failed or timed out` | vfox uninitialized or missing network connection | Run `vfox --version` or retry with `bash install.sh --retry-failed vfox`. |
 | `macOS Bash version (3.2) < 4.0` warning | Default macOS `/bin/bash` is Apple's 2007 legacy Bash 3.2 | Run `brew install bash`. Installer scripts are natively compatible with 3.2, but some third-party tmux themes benefit from modern Bash. |
 | Remote Tmux clipboard synchronization issue | Remote SSH session missing OSC 52 or X11 forwarding | OSC 52 pass-through is enabled by default in our Tmux configuration. Mouse dragging or pressing `y` in Windows Terminal, iTerm2, or WezTerm copies directly to your local system clipboard. |
+| Cannot detach/quit GNU `screen` with `Ctrl+a` inside Tmux | Outer Tmux captures `Ctrl+a` (`prefix C-a`) before it reaches `screen` | Prefer Tmux windows directly (`Ctrl+a c`). If nesting `screen`, set `escape ^Bb` (`Ctrl+b`) in `~/.screenrc` (since Tmux unbinds `C-b`), or press `Ctrl+a` twice to pass it through (see [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)). |
 
 > For comprehensive error diagnostics, plugin conflicts, and recovery procedures, see [ZSH_TROUBLESHOOTING.md](ZSH_TROUBLESHOOTING.md).
 

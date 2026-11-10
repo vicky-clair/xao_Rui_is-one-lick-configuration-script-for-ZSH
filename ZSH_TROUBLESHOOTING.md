@@ -197,6 +197,12 @@ infocmp tmux-256color
    - **xclip 挂起防护**：SSH 场景下若有残留或失效的 `$DISPLAY`，调用 `xclip` 可能长时间挂起。本项目已加入 `timeout 1s` 超时熔断保护。
    - **原生终端选择兜底**：任何时候均可按住 **`Shift` 键**再用鼠标拖选，直接绕过 tmux 调用本地终端原生剪贴板。
 3. **tmux 内按前缀再按 p 能否粘贴**？能粘贴说明 tmux 内部缓冲区正常；从外部粘贴至远程请直接使用终端粘贴键（如 `Ctrl+Shift+V` 或 `Cmd+V`）。
+4. **在 tmux 中嵌套运行 GNU `screen` 时按 `Ctrl+a d` 或 `Ctrl+a \` 无法脱离/退出**：
+   - **原因**：`~/.tmux.conf` 将 tmux 前缀设为 `Ctrl+a`（并解绑了 `Ctrl+b`），与 GNU `screen` 默认转义键 `Ctrl+a` 冲突。外层 tmux 会优先拦截 `Ctrl+a`，导致 `Ctrl+a d` 脱离了外层 tmux（`screen` 仍处于 `Attached` 状态），`Ctrl+a \` 只向终端传入 `\`（如 `exit\` 续行导致无法退出）。
+   - **处理方式**：
+     1. 优先直接使用 tmux 窗口/分屏（`Ctrl+a c`、`Ctrl+a |` / `-`），无需嵌套 `screen`。
+     2. 如需并存使用，在 `~/.screenrc` 中添加 `escape ^Bb`（将 `screen` 前缀改为 tmux 已解绑的 `Ctrl+b`），以及 `term screen-256color`。配置后 `tmux` 仍用 `Ctrl+a`，`screen` 改用 `Ctrl+b d` 脱离、`Ctrl+b \` 再按 `y` 退出（或停掉任务后执行 `exit`）。
+     3. 未修改 `~/.screenrc` 时，可连按两次 `Ctrl+a` 透传给内层 `screen`（如 `Ctrl+a` → `Ctrl+a` → `d` 脱离），或在外部执行 `screen -S <会话名> -X quit`。详见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)（第 12 节 Q5）。
 
 ## 10. Neovim 显示范围异常或出现转义字符
 

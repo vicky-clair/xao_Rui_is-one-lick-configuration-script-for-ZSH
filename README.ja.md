@@ -403,6 +403,7 @@ docker run --rm -it ubuntu:24.04 bash -c "
 | :--- | :--- |
 | [インストールガイド](LINUX_ZSH_SETUP_GUIDE.md) | 初回インストール、手動配置、新しいセッションでの確認 |
 | [Tmux 利用ガイド](TMUX_USAGE_GUIDE.md) | Tmux ショートカットチートシート、リモートクリップボード設定、障害復元 |
+| [ショートカット完全ガイド](SHORTCUTS_GUIDE.md) | Zsh / Tmux / Screen / Neovim / Nano / Yazi / TV のショートカット一覧と競合診断 |
 | [設定管理](CONFIGURATION_MANAGEMENT.md) | 機能の切り替え、無効化・復元、コンポーネントの再試行、バックアップ |
 | [トラブルシューティング](ZSH_TROUBLESHOOTING.md) | 起動エラー、ツールの不足、更新失敗、ターミナル表示の問題 |
 | [開発ドキュメント](DEVELOPMENT.md) | モジュールの役割、読み込み順序、状態ファイル、保守上の規約 |
@@ -424,6 +425,7 @@ docker run --rm -it ubuntu:24.04 bash -c "
 | `AUDIT_REPORT.md` | セキュリティおよびエンジニアリング品質監査レポート |
 | `LINUX_ZSH_SETUP_GUIDE.md` | Linux / macOS 全工程環境インストール・設定ガイド |
 | `TMUX_USAGE_GUIDE.md` | Tmux 活用ガイド、ショートカット、クリップボード連携、実用テクニック |
+| `SHORTCUTS_GUIDE.md` | ターミナル全スタック（Zsh / Tmux / Screen / TUI ツール）ショートカット完全ガイド・競合診断 |
 | `CONFIGURATION_MANAGEMENT.md` | オプション切り替え、スナップショットバックアップ、管理ファイル機構 |
 | `DEVELOPMENT.md` | 開発規約、モジュールアーキテクチャ、読み込みライフサイクル |
 | `INSTALLER_TESTING.md` | 検証テストスイート仕様および実機テスト記録 |

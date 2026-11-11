@@ -458,6 +458,7 @@ The detailed guides below are currently written in Chinese. This README describe
 | :--- | :--- |
 | [Installation guide](LINUX_ZSH_SETUP_GUIDE.md) | First installation, manual deployment, and new-session checks |
 | [Tmux productivity guide](TMUX_USAGE_GUIDE.md) | Tmux shortcuts cheat sheet, remote clipboard setup, and crash recovery |
+| [Terminal shortcuts & conflict guide](SHORTCUTS_GUIDE.md) | Full-stack cheat sheet & conflict audit across Zsh, Tmux, Screen, Neovim, Nano, Yazi, and TV |
 | [Configuration management](CONFIGURATION_MANAGEMENT.md) | Switches, disable/restore, component retries, and backups |
 | [Troubleshooting](ZSH_TROUBLESHOOTING.md) | Startup errors, missing tools, update failures, and terminal display issues |
 | [Development](DEVELOPMENT.md) | Module responsibilities, loading order, state files, and maintenance conventions |
@@ -479,6 +480,7 @@ The detailed guides below are currently written in Chinese. This README describe
 | `AUDIT_REPORT.md` | Security and engineering quality audit report |
 | `LINUX_ZSH_SETUP_GUIDE.md` | Complete Linux and macOS environment installation guide |
 | `TMUX_USAGE_GUIDE.md` | Comprehensive Tmux productivity, shortcuts, and troubleshooting guide |
+| `SHORTCUTS_GUIDE.md` | Complete terminal keybindings guide and conflict resolution across Zsh, Tmux, Screen, and TUI tools |
 | `CONFIGURATION_MANAGEMENT.md` | Options, snapshots, backups, and state mechanism |
 | `DEVELOPMENT.md` | Development standards, architecture diagram, and loading cycle |
 | `INSTALLER_TESTING.md` | Acceptance test suite specification and dual-platform test records |

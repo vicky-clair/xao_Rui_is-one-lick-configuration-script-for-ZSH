@@ -72,6 +72,7 @@ bash install.sh --profile full --p10k-style rainbow --yes --lang zh
 | --- | --- |
 | 首次安装、手动部署与新会话验收 | [安装指南](LINUX_ZSH_SETUP_GUIDE.md) |
 | Tmux 生产力键位速查、剪贴板互通与实战技巧 | [Tmux 使用指南](TMUX_USAGE_GUIDE.md) |
+| Zsh / Tmux / Screen / TUI 全栈快捷键大全与冲突排查 | [快捷键完整指南](SHORTCUTS_GUIDE.md) |
 | 开关、停用恢复、失败组件重试、备份 | [配置管理](CONFIGURATION_MANAGEMENT.md) |
 | 启动报错、工具缺失、更新失败、终端显示异常 | [故障排查](ZSH_TROUBLESHOOTING.md) |
 | 模块职责、加载顺序、状态文件与维护约定 | [开发文档](DEVELOPMENT.md) |
@@ -460,6 +461,7 @@ Bug 反馈与功能建议：[GitHub Issues 页面](https://github.com/vicky-clai
 | `AUDIT_REPORT.md` | 项目安全与质量工程审计报告 |
 | `LINUX_ZSH_SETUP_GUIDE.md` | Linux 与 macOS 全流程环境安装与配置指南 |
 | `TMUX_USAGE_GUIDE.md` | Tmux 现代化生产力键位速查、剪贴板互通与实战技巧指南 |
+| `SHORTCUTS_GUIDE.md` | 终端全栈（Zsh / Tmux / Screen / Neovim / Nano / Yazi / TV）快捷键大全与冲突排查指南 |
 | `CONFIGURATION_MANAGEMENT.md` | 选项开关、快照备份与受管文件状态机制 |
 | `DEVELOPMENT.md` | 开发规范、模块架构图、加载生命周期与边界约定 |
 | `INSTALLER_TESTING.md` | 验收测试套件规范与双平台实机复测记录 |

@@ -329,3 +329,22 @@ bash install.sh --profile full --with-tmux --p10k-style skip --yes
      * 若无后台或 `Ctrl+Z` 挂起任务，停掉前台进程后直接输入 **`exit`** 也可正常退出 `screen`。
   3. **不修改配置时的临时透传**：在未配置 `~/.screenrc` 的环境中，只需**连按两次 `Ctrl + a`** 即可将一个 `Ctrl + a` 透传给内层 `screen`（例如脱离按 **`Ctrl + a` → `Ctrl + a` → `d`**，退出按 **`Ctrl + a` → `Ctrl + a` → `\`** 再按 **`y`**，或从外部执行 `screen -S <会话名> -X quit`）。
 
+### Q6: 用 root 用户切换成个人用户 (`su <user>` / `su - <user>`) 后终端不停刷新、画面疯狂闪烁与 CPU 跑满？
+* **故障现象**：在 Tmux 窗格中通过 `sudo -i` 进入 root 操作完毕后，输入 `su <个人用户名>` 或 `su - <个人用户名>` 试图切回个人用户，结果终端画面以极高频率疯狂刷新、文字不断跳动重绘、按键完全被吞且 CPU 跑满。
+* **根本原因**：
+  1. `sudo` 提权或用户切换环境默认会重置环境变量（`env_reset`），导致 `$TMUX` 变量丢失；
+  2. 个人用户的 `~/.zshrc` 默认开启了 `ZSH_PROJECT_TMUX_AUTO=1`，启动新 Shell 时检测到 `[[ -z "$TMUX" ]]`，误判为“外部原生终端登录”，于是执行 `tmux new-session -A -s main`；
+  3. `-A` 参数将当前子终端挂载到已有会话 `main`；但当前子终端本身就运行在 `main` 会话的一个窗格中！这导致 **Tmux 将 `main` 会话渲染到属于 `main` 会话自身的一个窗格里**，构成了“将摄像机对准监视器屏幕”的**无限递归自挂载与重绘死循环（Feedback Loop）**，终端瞬间陷入疯狂刷新风暴；同时尺寸协商反复触发 `SIGWINCH` 信号和 `zle reset-prompt`。
+* **应急抢救方法（若已陷入死循环）**：
+  * 从另一个终端或 SSH 会话连接服务器，运行 `tmux list-clients` 查看当前所有客户端；
+  * 找到导致死循环的子终端（例如 `/dev/pts/9`），运行：
+    ```bash
+    tmux detach-client -t /dev/pts/9
+    ```
+    死循环会瞬间被掐断，终端立即恢复平稳正常状态。
+* **彻底根治与机制保障（本项目已内置）**：
+  1. **`_zsh_is_in_multiplexer` 深度守卫**：在 `.zshrc` 与安装模板中，自动挂载与 `t`/`ta` 别名执行前引入五重特征预检：不仅检测 `$TMUX`，还匹配 `$TERM` 是否为 `tmux*`/`screen*`、检测 `$SUDO_*` 变量、检测直接父进程名（`/proc/$PPID/comm` 是否为 `su`/`sudo`/`doas`），并对 Linux `/proc` 进程树向上微秒级溯源。一旦处于多路复用或用户切换环境，立即禁止自挂载并友好提示，从源头彻底阻断死循环。
+  2. **提权环境变量继承 (`/etc/sudoers.d/tmux_env`)**：在 `/etc/sudoers.d/tmux_env` 中添加 `Defaults env_keep += "TMUX TMUX_PANE"`，使 `sudo` 提权后依然保留会话标记。
+  3. **标准切换与退出建议**：通过 `sudo -i` 进入 root 后，切回个人用户的标准规范是直接输入 **`exit`** 或按 **`Ctrl+D`** 平稳退回，而不是嵌套执行 `su <个人用户名>`。
+
+

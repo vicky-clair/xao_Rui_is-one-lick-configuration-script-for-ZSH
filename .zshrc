@@ -439,10 +439,51 @@ if [[ ${ZSH_PROJECT_LAZYGIT:-1} == 1 ]] && command -v lazygit &>/dev/null; then
 fi
 
 if command -v tmux &>/dev/null; then
+  # 多路复用环境与用户切换智能探测（防止 Tmux/Screen 嵌套死循环或画面刷新风暴）
+  _zsh_is_in_multiplexer() {
+    # 1. 显式环境变量检查：TMUX、TMUX_PANE (Tmux) 或 STY、WINDOW (GNU Screen)
+    [[ -n "${TMUX:-}" || -n "${TMUX_PANE:-}" || -n "${STY:-}" || -n "${WINDOW:-}" ]] && return 0
+
+    # 2. 终端类型特征匹配：TERM 为 tmux* 或 screen* 时必然处于多路复用会话内（即使跨 sudo/su 丢失 TMUX 变量）
+    [[ "${TERM:-}" == tmux* || "${TERM:-}" == screen* ]] && return 0
+
+    # 3. 提权/切换用户环境特征判定：SUDO 相关变量存在时说明从宿主会话切换进入，绝不可自动拉起外部会话
+    [[ -n "${SUDO_USER:-}" || -n "${SUDO_UID:-}" || -n "${SUDO_COMMAND:-}" ]] && return 0
+
+    # 4. 父进程快速判定：直接父进程为 su / sudo / doas 时，属于跨用户子 Shell，禁止自动挂载
+    if [[ -f "/proc/$PPID/comm" ]]; then
+      local _pcomm=""
+      _pcomm=$(< "/proc/$PPID/comm" 2>/dev/null)
+      [[ "$_pcomm" == "su" || "$_pcomm" == "sudo" || "$_pcomm" == "doas" ]] && return 0
+    fi
+
+    # 5. Linux 进程祖先链深度溯源（纯内核 /proc 访问，微秒级执行，彻底穿透多层 su/sudo/bash 识别外层 Tmux）
+    if [[ -d "/proc" ]]; then
+      local _p=$PPID
+      while [[ -n "$_p" && "$_p" -gt 1 && -f "/proc/$_p/stat" ]]; do
+        local _stat_comm=""
+        _stat_comm=$(cut -d " " -f 2 "/proc/$_p/stat" 2>/dev/null)
+        if [[ "$_stat_comm" == "(tmux)" || "$_stat_comm" == "(tmux:"* || "$_stat_comm" == "(screen)" ]]; then
+          return 0
+        fi
+        local _next_p=""
+        _next_p=$(cut -d " " -f 4 "/proc/$_p/stat" 2>/dev/null)
+        [[ -z "$_next_p" || "$_next_p" -eq "$_p" ]] && break
+        _p=$_next_p
+      done
+    fi
+
+    return 1
+  }
+
   # Tmux 常用别名与智能接入函数：
   # t: 快速进入/创建默认 main 常驻会话；若传入参数则透传给 tmux 原生命令
   t() {
     if [[ $# -eq 0 ]]; then
+      if _zsh_is_in_multiplexer; then
+        _zsh_msg "%F{yellow}当前终端已处于 Tmux/Screen 多路复用环境中，已拦截循环嵌套接入！%f" "%F{yellow}Already inside a terminal multiplexer session; nested attachment prevented!%f"
+        return 0
+      fi
       tmux new-session -A -s main
     else
       tmux "$@"
@@ -451,6 +492,10 @@ if command -v tmux &>/dev/null; then
   # ta: 智能挂载命令。无参数时默认挂载最近一次/main 会话；带参数时挂载指定名称会话
   ta() {
     if [[ $# -eq 0 ]]; then
+      if _zsh_is_in_multiplexer; then
+        _zsh_msg "%F{yellow}当前终端已处于 Tmux/Screen 多路复用环境中，已拦截循环嵌套接入！%f" "%F{yellow}Already inside a terminal multiplexer session; nested attachment prevented!%f"
+        return 0
+      fi
       tmux attach 2>/dev/null || tmux new-session -A -s main
     else
       tmux attach -t "$@"
@@ -619,8 +664,8 @@ fi
 # 3. 平稳退回原生终端：在 Tmux 内输入 exit 或按 Ctrl+a d 脱离后，会自动平稳回到正常原生终端，绝不会闪退关闭窗口；
 # 4. 再次快速进入：在原生终端中输入 t 即可随时重新回到 main 会话。
 if [[ ${ZSH_PROJECT_TMUX:-0} == 1 && ${ZSH_PROJECT_TMUX_AUTO:-1} == 1 ]] && command -v tmux &>/dev/null; then
-  # 预检守卫：避免在已进入 tmux、本次会话已接入过、非交互终端、Vim/Neovim 内部终端、性能分析或测试环境下重复启动
-  if [[ -z "$TMUX" && -z "${ZSH_PROJECT_TMUX_ATTACHED:-}" && -t 0 && -t 1 && -z "${NVIM:-}" && -z "${VIM:-}" && ${ZSH_PROJECT_PROFILING:-0} != 1 && -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
+  # 预检守卫：避免在已进入 tmux/screen、提权/用户切换环境、本次会话已接入过、非交互终端、Vim/Neovim 内部终端、性能分析或测试环境下重复启动
+  if ! _zsh_is_in_multiplexer && [[ -z "${ZSH_PROJECT_TMUX_ATTACHED:-}" && -t 0 && -t 1 && -z "${NVIM:-}" && -z "${VIM:-}" && ${ZSH_PROJECT_PROFILING:-0} != 1 && -z "${ZSH_PROJECT_TEST_MARKER:-${AUDIT_MARKER:-}}" ]]; then
     # 标记当前终端已完成 tmux 接入流程，防止退出 tmux 回到原生终端时或重载 zshrc 时死循环拉起 tmux
     export ZSH_PROJECT_TMUX_ATTACHED=1
     # -A 参数表示：若 main 会话已存在则直接接入恢复现场；若不存在则自动新建

@@ -13,6 +13,7 @@
 | 更新失败或提示一直存在 | 检查范围、网络、包索引、默认超时和缓存 |
 | Neovim 只有小块显示区域 | PTY 尺寸、终端协商、resize 和编辑器配置 |
 | tmux 复制不到本机 | tmux 缓冲区、OSC 52、客户端及中间层设置 |
+| root 切换个人用户终端不停刷新 | TMUX 自挂载递归死循环、环境变量丢失、进程溯源拦截 |
 | 回退被拒绝 | 备份归属、文件后续修改、快照类型与完整性 |
 
 先记录 `git rev-parse --short HEAD`、系统/架构、Bash/Zsh 版本及使用的配置来源。当前测试结果见[测试与验收](INSTALLER_TESTING.md)，不要把历史截图或旧日志当成新版本的完整验收结果。
@@ -203,6 +204,18 @@ infocmp tmux-256color
      1. 优先直接使用 tmux 窗口/分屏（`Ctrl+a c`、`Ctrl+a |` / `-`），无需嵌套 `screen`。
      2. 如需并存使用，在 `~/.screenrc` 中添加 `escape ^Bb`（将 `screen` 前缀改为 tmux 已解绑的 `Ctrl+b`），以及 `term screen-256color`。配置后 `tmux` 仍用 `Ctrl+a`，`screen` 改用 `Ctrl+b d` 脱离、`Ctrl+b \` 再按 `y` 退出（或停掉任务后执行 `exit`）。
      3. 未修改 `~/.screenrc` 时，可连按两次 `Ctrl+a` 透传给内层 `screen`（如 `Ctrl+a` → `Ctrl+a` → `d` 脱离），或在外部执行 `screen -S <会话名> -X quit`。详见 [TMUX_USAGE_GUIDE.md](TMUX_USAGE_GUIDE.md)（第 12 节 Q5）。
+5. **在 Tmux 内用 root 用户切换成个人用户 (`su <user>` / `su - <user>`) 后终端不停刷新、画面疯狂闪烁与 CPU 跑满**：
+   - **根本原因**：
+     1. 提权命令（`sudo -i` / `sudo su`）或切换环境默认会重置环境变量（`env_reset`），导致 `$TMUX` 变量丢失；
+     2. 个人用户的 `~/.zshrc` 开启了 `ZSH_PROJECT_TMUX_AUTO=1`，启动新 Shell 时检测到 `[[ -z "$TMUX" ]]`，误判为“外部原生终端登录”，于是执行 `tmux new-session -A -s main`；
+     3. `-A` 参数将当前子终端挂载到已有会话 `main`；但当前子终端本身就运行在 `main` 会话的一个窗格中！这导致 **Tmux 将 `main` 会话渲染到属于 `main` 会话自身的一个窗格里**，构成了“将摄像机对准监视器屏幕”的**无限递归自挂载与重绘死循环（Feedback Loop）**，终端瞬间以极高频率疯狂刷新，键盘输入被吞，CPU 跑满；同时尺寸协商反复触发 `SIGWINCH` 信号和 `zle reset-prompt`。
+   - **应急抢救方法（若已陷入死循环）**：
+     - 从其他终端或 SSH 登录主机，运行 `tmux list-clients` 查看客户端列表；
+     - 找到该递归死循环的伪终端（如 `/dev/pts/9`），执行 `tmux detach-client -t /dev/pts/9`，死循环瞬间被掐断，终端立即恢复平稳。
+   - **系统级与配置级深度防护（本项目已内置）**：
+     1. **`_zsh_is_in_multiplexer` 深度守卫**：在 `.zshrc` 与安装模板中，自动挂载与 `t`/`ta` 别名执行前引入五重特征预检：不仅检测 `$TMUX`，还匹配 `$TERM` 是否为 `tmux*`/`screen*`、检测 `$SUDO_*` 变量、检测直接父进程名（`/proc/$PPID/comm` 是否为 `su`/`sudo`/`doas`），并对 Linux `/proc` 进程树向上微秒级溯源。一旦处于多路复用或用户切换环境，立即禁止自挂载并友好提示，从源头彻底阻断死循环。
+     2. **提权环境变量继承 (`/etc/sudoers.d/tmux_env`)**：在 `/etc/sudoers.d/tmux_env` 中添加 `Defaults env_keep += "TMUX TMUX_PANE"`，使 `sudo` 提权后依然保留会话标记。
+     3. **标准退出与操作建议**：通过 `sudo -i` 进入 root 后，切回个人用户的标准规范是直接输入 **`exit`** 或按 **`Ctrl+D`** 平稳退回，而不是嵌套执行 `su <个人用户名>`。
 
 ## 10. Neovim 显示范围异常或出现转义字符
 

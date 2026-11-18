@@ -1543,14 +1543,19 @@ if [[ "$PROFILE" == full ]]; then
   elif ! command -v nvim >/dev/null 2>&1; then
     need_nvim_download=1
   else
-    nvim_v_str=$(nvim --version 2>/dev/null | head -n 1)
-    nvim_v_num=$(echo "$nvim_v_str" | grep -oE '[0-9]+\.[0-9]+' | head -n 1 || echo "0.0")
-    nvim_major=$(echo "$nvim_v_num" | cut -d. -f1)
-    nvim_minor=$(echo "$nvim_v_num" | cut -d. -f2)
-    # 若系统现有 Neovim 版本小于 0.10（如 Debian 12 自带的 0.7.2），无法适配现代插件生态，自动从官方升级
-    if (( nvim_major == 0 && nvim_minor < 10 )); then
-      info "$(msg "检测到系统 Neovim 版本过旧 ($nvim_v_str)，现代 Lua 生态（LazyVim/Treesitter等）通常需要 >= 0.10.0。" "Detected outdated Neovim ($nvim_v_str); modern Lua plugins require >= 0.10.0.")"
+    nvim_v_str=$(nvim --version 2>/dev/null | head -n 1 || true)
+    if [[ -z "$nvim_v_str" ]]; then
+      info "$(msg "检测到系统现有 Neovim 无法正常执行，将重新下载官方预编译包..." "Existing Neovim is non-functional; re-downloading official release...")"
       need_nvim_download=1
+    else
+      nvim_v_num=$(echo "$nvim_v_str" | grep -oE '[0-9]+\.[0-9]+' | head -n 1 || echo "0.0")
+      nvim_major=$(echo "$nvim_v_num" | cut -d. -f1)
+      nvim_minor=$(echo "$nvim_v_num" | cut -d. -f2)
+      # 若系统现有 Neovim 版本小于 0.10（如 Debian 12 自带的 0.7.2），无法适配现代插件生态，自动从官方升级
+      if (( nvim_major == 0 && nvim_minor < 10 )); then
+        info "$(msg "检测到系统 Neovim 版本过旧 ($nvim_v_str)，现代 Lua 生态（LazyVim/Treesitter等）通常需要 >= 0.10.0。" "Detected outdated Neovim ($nvim_v_str); modern Lua plugins require >= 0.10.0.")"
+        need_nvim_download=1
+      fi
     fi
   fi
 

@@ -197,13 +197,17 @@ package_install() {
         fi
         if command -v fc-cache >/dev/null 2>&1; then fc-cache -f "$font_dest" 2>/dev/null || true; fi
       elif [[ "$FAMILY" == apt ]]; then
-        sudo apt-get install -y "$package" 2>/dev/null || {
-          if [[ "$component" == 7zip ]]; then sudo apt-get install -y p7zip-full; fi
-        }
+        if [[ "$component" == 7zip ]]; then
+          sudo apt-get install -y "$package" || sudo apt-get install -y p7zip-full
+        else
+          sudo apt-get install -y "$package"
+        fi
       elif [[ "$FAMILY" == dnf ]]; then
-        sudo dnf install -y "$package" 2>/dev/null || {
-          if [[ "$component" == 7zip ]]; then sudo dnf install -y 7zip; fi
-        }
+        if [[ "$component" == 7zip ]]; then
+          sudo dnf install -y "$package" || sudo dnf install -y 7zip
+        else
+          sudo dnf install -y "$package"
+        fi
       elif [[ "$FAMILY" == zypper ]]; then
         sudo zypper install -y "$package"
       fi

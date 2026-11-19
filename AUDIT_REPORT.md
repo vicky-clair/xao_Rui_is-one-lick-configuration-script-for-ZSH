@@ -1,10 +1,10 @@
 # 项目审计报告
 
-审计日期：2026-10-27　｜　审计基线：commit `dc19e31`（与 `origin/main` 保持同步）　｜　上次审计：2026-10-26 / `68cd8ce`
+审计日期：2026-11-19　｜　审计基线：commit `513cce2`（与 `origin/main` 保持同步）　｜　上次审计：2026-10-27 / `dc19e31`
 范围：`install.sh`、`scripts/`、`templates/`、根目录配置、`terminal_configs/`、CI 与文档
 
 > [!IMPORTANT]
-> 本次审计发现的 **N-1 ~ N-13**、**M-1**、**M-2**、**L-2**、**L-3** 共 17 项问题**已于 2026-10-27 全部修复并通过回归测试与多环境验证**（详见第七节修复记录）。
+> 2026-10-27 审计发现的 **N-1 ~ N-13**、**M-1**、**M-2**、**L-2**、**L-3** 共 17 项问题，以及 2026-11-19 全库增量审计与 Debian 13 实机验证新发现的 **A-1 ~ A-7** 共 7 项问题**已全部修复并通过 ShellCheck 0.11.0、隔离回归套件与 Debian 13 实机 9 阶段验证**（详见第七、八节修复记录）。
 
 ---
 
@@ -150,3 +150,26 @@
 | **N-11** | 在仓库根目录正式创建标准 [LICENSE](LICENSE) (MIT License) 文件，补全版权人 `vicky-clair` 与年份信息，修复各语言 `README` 中 `[LICENSE](LICENSE)` 链接 404 问题。 | 协议文件校验与链接可达性核验通过 |
 | **N-12** | 优化 [scripts/manage.sh](scripts/manage.sh) 中的 `--doctor` 健康体检逻辑，同时适配 `$HOME/powerlevel10k/powerlevel10k.zsh-theme` 独立路径与 `$HOME/.oh-my-zsh/custom/themes/powerlevel10k/powerlevel10k.zsh-theme` OMZ 主题路径，消除路径误判。 | 两种路径在测试沙箱与体检中均准确识别 |
 | **N-13** | 完善根目录 [.zshrc](.zshrc) 头部架构与参考配置中文注释，消除用户对根目录配置与安装器模板的混淆；同步更新 [DEVELOPMENT.md](DEVELOPMENT.md) 与 [INSTALLER_TESTING.md](INSTALLER_TESTING.md) 中关于 CI 覆盖面（ShellCheck 与 macOS 阶段）及 `verify_asset_sha256()` 安全校验的最新说明。 | 文档与代码库实现 100% 保持一致 |
+
+---
+
+## 八、2026-11-19 全库增量审计与 Debian 13 实机回归验证
+
+基于 `513cce2`（含 Neovim 版本探测保护、`fc-list` SIGPIPE 修复、macOS `ps` 多路复用守卫、Tmux UTF-8 Powerline 分隔符与 `LC_ALL=C` 清理）对全仓 33 个受控文件执行静态审计（ShellCheck 0.11.0、全仓库 Markdown 链接扫描、行尾/BOM 检查、逐行脚本审查）并在 Debian 13 (`192.168.9.165`) 完成实机 9 阶段验收，发现并修复以下 **7 项问题（A-1 ~ A-7）**：
+
+| 编号 | 风险等级 | 位置 | 问题描述与修复方案 | 验证结果 |
+| --- | --- | --- | --- | --- |
+| **A-1** | 中 | [install.sh](install.sh) | Tmux 锁定版本插件同步逻辑在每次安装时均无条件执行无超时的 `git fetch --tags -q origin`，即使插件已处于目标标签（如 `v2.7.2`）也会反复联网，在 GitHub 网络波动时会导致 `install.sh` 无限挂死且破坏幂等性。修复：先比对当前 tag/branch，一致则 0 联网跳过；不一致时先本地 `checkout`，缺失才以 `GIT_TERMINAL_PROMPT=0` + `timeout/gtimeout 30s` 拉取；同时为 `tpm/bin/install_plugins` 与 `--update` 锁定分支拉取补充超时熔断。 | Debian 13 实机两次连续全量安装分别在 **20s / 19s** 内完成，无卡死 |
+| **A-2** | 中 | [install.sh](install.sh) | `optional_package "" ncurses-term` 传入空命令名且缺少 `terminfo` 判重，导致在已安装 `ncurses-term` 的 Debian/Ubuntu 机器上仍重复触发 `apt` 或在无免密缓存时误报“未在仓库中找到：ncurses-term”并污染 `failed-components`。修复：在 `optional_package()` 中增加 `infocmp tmux-256color` 与 terminfo 路径存在性判重（与 `retry_tools.sh` 对齐）。 | Debian 13 两次实机安装 `跳过的未安装包: none`，`test_installer.sh` 新增回归断言通过 |
+| **A-3** | 中 | [scripts/retry_tools.sh](scripts/retry_tools.sh) | `package_install()` 中 `apt` / `dnf` 分支采用 `cmd 2>/dev/null \|\| { if [[ "$component" == 7zip ]]; then ...; fi; }`，非 `7zip` 组件安装失败时 `if` 块返回退出码 `0` 掩盖失败（导致 `ncurses-term` 失败也误报 PASS）且丢弃错误日志。修复：改用显式 `if/else` 结构，保留真实退出码与 stderr 日志。 | `test_management.sh` 新增 `apt`/`dnf` 失败码保留回归用例通过 |
+| **A-4** | 中 | [templates/zshrc.zsh](templates/zshrc.zsh)、[.zshrc](.zshrc) | `_zsh_is_in_multiplexer()` 的 Linux `/proc/$_p/stat` 解析使用 `cut -d " " -f 2/4`，遇到含空格进程名（如 `(tmux: server)`、`(code helper)`）时第 4 列会错位取到状态字母 `S` 导致祖先链溯源提前中断，且每跳派生两次 `cut` 子进程。修复：改为纯 Zsh 按最后一个 `)` 切片并用 `read -r _ _next_p _` 提取 PPID，零子进程派生、正确处理含空格进程名，并限制最多 64 跳。 | `test_installer.sh` 新增含空格 `/proc/stat` 用例通过；Debian 13 Tmux+`su` 实机成功拦截并输出中文提示 |
+| **A-5** | 低 | [scripts/check_updates.sh](scripts/check_updates.sh)、[install.sh](install.sh) | `set -Eeuo pipefail` 下 `echo "$upgradable" \| grep -q...` 在待升级列表超过 64KB 管道缓冲时可能因 `grep -q` 提前退出触发 SIGPIPE (141) 误判；同时 `install.sh` 清理已手动升级的 APT 提醒仅匹配中文 `[应用工具]` 未匹配英文 `[CLI Tool]`。修复：统一改用 `printf ... \| grep ... >/dev/null` 排空管道，并同时匹配中英文 APT 清单格式。 | ShellCheck 0.11.0 0 错误 0 警告；静态与回归测试全数通过 |
+| **A-6** | 低 | [scripts/manage.sh](scripts/manage.sh) | `--doctor` 检测 `yazi` 版本时，Linux 分支 `setsid yazi -V` 未包裹 `"$limiter" -k 1s 2s`，若 `yazi` 异常挂起会导致体检无超时限制。修复：改为 `setsid "$limiter" -k 1s 2s yazi -V`。 | Debian 13 实机 `--doctor` 0 项异常，秒级读取全部 24 项工具版本（含 `Yazi 25.9.15`） |
+| **A-7** | 低 | [.gitattributes](.gitattributes) | 缺少 `*.yml`、`*.yaml`、`*.toml`、`*.lua` 的 `text eol=lf` 规则，导致 Windows 检出时 CI 工作流与 `terminal_configs/` 下配置出现 CRLF。修复：补齐上述扩展名的 LF 约束规则。 | 全仓库受管文件行尾统一规范为 LF，无 UTF-8 BOM |
+
+### 实机验证汇总（Debian 13 / `192.168.9.165`）
+- **静态分析**：`shellcheck install.sh scripts/*.sh`（ShellCheck 0.11.0）**0 error / 0 warning**；`bash -n`、`zsh -n`、`.tmux.conf` 模板 `diff` 及全仓库 Markdown 内部链接扫描（0 断链）全部通过。
+- **隔离回归**：`bash scripts/test_installer.sh`（14 组用例）与 `bash scripts/test_management.sh`（9 组用例）全部 PASS。
+- **实机全量安装与幂等**：`--profile full --p10k-style skip --lang zh --yes --with-vfox --with-lazydocker --with-lazygit --with-tmux --with-terminals` 连续执行两次，耗时 20s / 19s，`skipped: none`。
+- **Tmux `LC_ALL=C` 清洗与分隔符验证**：在 `LC_ALL=C` 环境下启动隔离 socket (`-L audit_verify_live`)，实测服务端自动清除 `LC_ALL=C` 并注入 UTF-8 `LANG=zh_CN.UTF-8`，4 项 Powerline 分隔符均固定为 UTF-8 实体字符（``、``、``、``），连续 2 次 `source-file` 后 `PATH` 重复项为 `0`。
+- **环境体检与冷启动**：`manage.sh --doctor` 输出 `0 项需要检查`，Zsh 实机冷启动耗时 **144ms**，Tmux 内 `sudo` + `su` 嵌套防护实测触发拦截。

@@ -147,6 +147,14 @@ if manage --retry-failed lazydocker --yes; then fail 'failed package/download re
 grep -qx lazydocker "$XDG_STATE_HOME/zsh-project/failed-components" || fail 'failed retry lost component'
 grep -qx fzf "$XDG_STATE_HOME/zsh-project/failed-components" || fail 'failed retry erased unrelated component'
 cmp "$HOME/.zshrc" "$STAGE/pre-retry" || fail 'failed retry modified configuration'
+# 回归测试：apt/dnf 失败分支在非 7zip 组件下必须保留非零退出码，不得误报成功
+eval "$(sed -n '/^package_install() {/,/^}/p' "$ROOT/scripts/retry_tools.sh")"
+# shellcheck disable=SC2034
+FAMILY=apt
+if package_install ncurses-term >/dev/null 2>&1; then fail 'retry_tools.sh package_install masked apt failure as success'; fi
+# shellcheck disable=SC2034
+FAMILY=dnf
+if package_install ncurses-term >/dev/null 2>&1; then fail 'retry_tools.sh package_install masked dnf failure as success'; fi
 pass 'component retry leaves configuration and unrelated failures intact'
 
 # ------------------------------------------------------------------------------

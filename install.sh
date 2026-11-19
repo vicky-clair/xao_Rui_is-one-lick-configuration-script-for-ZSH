@@ -416,7 +416,15 @@ if ((DO_UPDATE)); then
       current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
       if [[ "$current_tag" != "$pinned_ref" ]]; then
         info "$(msg "正在将 $name 切换至锁定版本 $pinned_ref..." "Switching $name to pinned version $pinned_ref...")"
-        if git -C "$dir" fetch --tags -q origin 2>/dev/null && git -C "$dir" checkout -q "$pinned_ref" 2>/dev/null; then
+        local _git_timeout=""
+        _git_timeout=$(command -v timeout || command -v gtimeout || true)
+        if git -C "$dir" checkout -q "$pinned_ref" 2>/dev/null || (
+          if [[ -n "$_git_timeout" ]]; then
+            GIT_TERMINAL_PROMPT=0 "$_git_timeout" 30 git -C "$dir" fetch --tags -q origin 2>/dev/null
+          else
+            GIT_TERMINAL_PROMPT=0 git -C "$dir" fetch --tags -q origin 2>/dev/null
+          fi && git -C "$dir" checkout -q "$pinned_ref" 2>/dev/null
+        ); then
           UPDATED_OK+=("$name")
           success "$(msg "$name 已同步至锁定版本 $pinned_ref" "$name synced to pinned version $pinned_ref")"
         else
@@ -501,7 +509,7 @@ if ((DO_UPDATE)); then
     brew_outdated=$(HOMEBREW_NO_AUTO_UPDATE=1 brew outdated --formula --quiet 2>/dev/null) || true
     brew_targets=()
     for _b_pkg in fzf fd bat eza zoxide yazi neovim fastfetch lazydocker lazygit vfox zsh git tmux television tre-command tre ripgrep jq poppler sevenzip resvg ffmpeg-full imagemagick-full ffmpeg imagemagick; do
-      if printf '%s\n' "${brew_outdated:-}" | grep -qFx "$_b_pkg"; then
+      if printf '%s\n' "${brew_outdated:-}" | grep -Fx "$_b_pkg" >/dev/null; then
         brew_targets+=("$_b_pkg")
       fi
     done
@@ -548,9 +556,9 @@ if ((DO_UPDATE)); then
     tmp_avail=$(mktemp "$AVAILABLE_FILE.tmp.XXXXXX")
     while IFS= read -r a_line || [[ -n "$a_line" ]]; do
       drop=0
-      if [[ "$a_line" =~ \[应用工具\]\ ([a-zA-Z0-9_-]+)\ \(APT ]]; then
-        pkg_name="${BASH_REMATCH[1]}"
-        if ! echo "$upgradable_now" | grep -qE "^$pkg_name/"; then
+      if [[ "$a_line" =~ ^(\[应用工具\]|\[CLI\ Tool\])\ ([a-zA-Z0-9._+-]+)\ \(APT ]]; then
+        pkg_name="${BASH_REMATCH[2]}"
+        if ! printf '%s\n' "$upgradable_now" | grep -E "^${pkg_name}/" >/dev/null; then
           drop=1
         fi
       fi
@@ -1081,6 +1089,11 @@ optional_package() {
     if command -v wl-copy >/dev/null 2>&1 || command -v xclip >/dev/null 2>&1 || command -v xsel >/dev/null 2>&1; then
       return 0
     fi
+  fi
+  # - ncurses-term 提供 tmux-256color 终端数据库，已有 terminfo 时直接判为满足（保证幂等）
+  if [[ "$pkg" == ncurses-term ]]; then
+    infocmp tmux-256color >/dev/null 2>&1 && return 0
+    [[ -e /usr/share/terminfo/t/tmux-256color || -e /lib/terminfo/t/tmux-256color ]] && return 0
   fi
 
   # 3. 按不同包管理器家族执行安装（仅在检测到缺失时调用）
@@ -1805,14 +1818,31 @@ if ((WITH_TMUX)); then
     fi
     if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
       info "$(msg "正在自动下载并安装 Tmux 插件..." "Installing Tmux plugins automatically...")"
-      "${_tmux_run_env[@]}" bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
+      _tpm_timeout=$(command -v timeout || command -v gtimeout || true)
+      if [[ -n "$_tpm_timeout" ]]; then
+        "${_tmux_run_env[@]}" GIT_TERMINAL_PROMPT=0 "$_tpm_timeout" 60 bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
+      else
+        "${_tmux_run_env[@]}" GIT_TERMINAL_PROMPT=0 bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
+      fi
       # 从模板配置中动态提取所有带有 #ref 版本锁定的插件并切换至目标标签/分支，消除多处硬编码
+      # 严格幂等：若当前已处于目标标签/分支则直接跳过联网拉取，并设置超时熔断防止网络波动导致安装器挂死
       if [[ -f "$HOME/.tmux.conf" ]]; then
         while IFS='#' read -r _p_repo _p_ref; do
           [[ -n "$_p_repo" && -n "$_p_ref" ]] || continue
           _p_name=${_p_repo##*/}
-          if [[ -d "$HOME/.tmux/plugins/$_p_name/.git" ]]; then
-            (cd "$HOME/.tmux/plugins/$_p_name" && git fetch --tags -q origin 2>/dev/null || true; git checkout -q "$_p_ref" 2>/dev/null || true)
+          _p_dir="$HOME/.tmux/plugins/$_p_name"
+          if [[ -d "$_p_dir/.git" ]]; then
+            _cur_ref=$(git -C "$_p_dir" describe --tags --exact-match 2>/dev/null || git -C "$_p_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+            if [[ "$_cur_ref" != "$_p_ref" ]]; then
+              if ! git -C "$_p_dir" checkout -q "$_p_ref" 2>/dev/null; then
+                if [[ -n "$_tpm_timeout" ]]; then
+                  GIT_TERMINAL_PROMPT=0 "$_tpm_timeout" 30 git -C "$_p_dir" fetch --tags -q origin 2>/dev/null || true
+                else
+                  GIT_TERMINAL_PROMPT=0 git -C "$_p_dir" fetch --tags -q origin 2>/dev/null || true
+                fi
+                git -C "$_p_dir" checkout -q "$_p_ref" 2>/dev/null || true
+              fi
+            fi
           fi
         done < <(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"]\([^'\"]*#[^'\"]*\)['\"].*/\1/p" "$HOME/.tmux.conf" 2>/dev/null)
       fi

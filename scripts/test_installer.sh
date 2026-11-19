@@ -92,7 +92,7 @@ pass 'remove_skipped handles empty arrays under nounset'
 # ------------------------------------------------------------------------------
 eval "$(extract_function optional_package)"
 FAMILY=apt
-for fake_cmd in fd bat 7zz convert ripgrep wl-copy; do
+for fake_cmd in fd bat 7zz convert ripgrep wl-copy infocmp; do
   printf '#!/usr/bin/env bash\nexit 0\n' > "$STAGE/bin/$fake_cmd"
   chmod +x "$STAGE/bin/$fake_cmd"
 done
@@ -102,6 +102,7 @@ optional_package 7z 7zip || fail 'optional_package 7z (via 7zz) failed'
 optional_package magick imagemagick || fail 'optional_package magick (via convert) failed'
 optional_package rg ripgrep || fail 'optional_package rg (via ripgrep) failed'
 optional_package xclip xclip || fail 'optional_package xclip (via wl-copy) failed'
+optional_package "" ncurses-term || fail 'optional_package ncurses-term (via infocmp) failed'
 [[ ! -e "$AUDIT_MARKER" ]] || fail 'optional_package invoked package manager despite existing binaries/aliases'
 if optional_package missing_command definitely_missing_pkg 2>/dev/null; then
   fail 'optional_package should return non-zero when package is missing'
@@ -317,6 +318,23 @@ if command -v zsh >/dev/null 2>&1; then
   grep -Eq '[0-9]+ms' "$STAGE/template.log" || fail 'startup timer did not render milliseconds'
   [[ ! -s "$TOOL_MARKER" ]] || fail 'disabled optional tools executed'
   pass 'disabled feature flags bypass installed optional tools'
+
+  # ------------------------------------------------------------------------------
+  # 14. Tmux/Screen 多路复用环境探测 (_zsh_is_in_multiplexer) 回归测试：
+  # 覆盖 TERM=tmux-256color、SUDO_USER 与含空格进程名的 /proc/stat 解析逻辑
+  # ------------------------------------------------------------------------------
+  sed -n '/^  _zsh_is_in_multiplexer() {/,/^  }/p' "$ROOT/templates/zshrc.zsh" > "$STAGE/multiplexer-guard.zsh"
+  zsh -f -c '
+    source "$1" || exit 1
+    ( TERM=tmux-256color TMUX="" TMUX_PANE="" _zsh_is_in_multiplexer ) || exit 1
+    ( TERM=xterm-256color SUDO_USER=root TMUX="" _zsh_is_in_multiplexer ) || exit 1
+    _stat="373639 (tmux: server) S 1 373639 373639 0 -1"
+    _stat_comm="${${_stat#*\(}%\)*}"
+    _stat_rest="${_stat##*\) }"
+    read -r _ _next_p _ <<< "$_stat_rest"
+    [[ "$_stat_comm" == "tmux: server" && "$_next_p" == "1" ]] || exit 1
+  ' test "$STAGE/multiplexer-guard.zsh" || fail '_zsh_is_in_multiplexer guard regression failed'
+  pass '_zsh_is_in_multiplexer handles TERM, SUDO_USER, and spaced /proc/stat comm names'
 else
   printf 'SKIP: Zsh runtime unavailable (run this suite again on Linux)\n'
 fi

@@ -457,19 +457,21 @@ if command -v tmux &>/dev/null; then
       [[ "$_pcomm" == "su" || "$_pcomm" == "sudo" || "$_pcomm" == "doas" ]] && return 0
     fi
 
-    # 5. Linux 进程祖先链深度溯源（纯内核 /proc 访问，微秒级执行，彻底穿透多层 su/sudo/bash 识别外层 Tmux）
+    # 5. Linux 进程祖先链深度溯源（纯内核 /proc 读取，零子进程派生，正确解析含空格进程名如 tmux: server）
     if [[ -d "/proc" ]]; then
-      local _p=$PPID
-      while [[ -n "$_p" && "$_p" -gt 1 && -f "/proc/$_p/stat" ]]; do
-        local _stat_comm=""
-        _stat_comm=$(cut -d " " -f 2 "/proc/$_p/stat" 2>/dev/null)
-        if [[ "$_stat_comm" == "(tmux)" || "$_stat_comm" == "(tmux:"* || "$_stat_comm" == "(screen)" || "$_stat_comm" == "(su)" || "$_stat_comm" == "(sudo)" || "$_stat_comm" == "(doas)" ]]; then
+      local _p=$PPID _hop=0
+      while [[ -n "$_p" && "$_p" -gt 1 && $_hop -lt 64 && -r "/proc/$_p/stat" ]]; do
+        local _stat="" _stat_comm="" _stat_rest="" _next_p=""
+        _stat=$(< "/proc/$_p/stat") 2>/dev/null || break
+        _stat_comm="${${_stat#*\(}%\)*}"
+        if [[ "$_stat_comm" == tmux || "$_stat_comm" == tmux:* || "$_stat_comm" == screen || "$_stat_comm" == su || "$_stat_comm" == sudo || "$_stat_comm" == doas ]]; then
           return 0
         fi
-        local _next_p=""
-        _next_p=$(cut -d " " -f 4 "/proc/$_p/stat" 2>/dev/null)
-        [[ -z "$_next_p" || "$_next_p" -eq "$_p" ]] && break
+        _stat_rest="${_stat##*\) }"
+        read -r _ _next_p _ <<< "$_stat_rest" || break
+        [[ "$_next_p" == <-> && "$_next_p" -ne "$_p" ]] || break
         _p=$_next_p
+        ((_hop++))
       done
     elif command -v ps >/dev/null 2>&1; then
       # macOS / BSD 等无 /proc 系统的进程祖先链回溯兜底（遇到受限沙箱环境则静默退出）

@@ -1796,9 +1796,16 @@ if ((WITH_TMUX)); then
       install -m 600 "$BACKUP/new.tmux.conf" "$HOME/.tmux.conf"
       success "$(msg "已部署 ~/.tmux.conf" "Deployed ~/.tmux.conf successfully")"
     fi
+    # 临时恢复用户原始 Locale（避免脚本顶部的 LC_ALL=C 污染首次自举启动的 tmux 后台服务端，导致状态栏分隔符退化为 \uE0B2）
+    _tmux_run_env=()
+    if [[ -n "${ORIG_LC_ALL:-}" && "${ORIG_LC_ALL:-}" != C && "${ORIG_LC_ALL:-}" != POSIX ]]; then
+      _tmux_run_env=(env "LC_ALL=${ORIG_LC_ALL}")
+    else
+      _tmux_run_env=(env -u LC_ALL)
+    fi
     if [[ -x "$HOME/.tmux/plugins/tpm/bin/install_plugins" ]]; then
       info "$(msg "正在自动下载并安装 Tmux 插件..." "Installing Tmux plugins automatically...")"
-      bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
+      "${_tmux_run_env[@]}" bash "$HOME/.tmux/plugins/tpm/bin/install_plugins" >/dev/null 2>&1 || true
       # 从模板配置中动态提取所有带有 #ref 版本锁定的插件并切换至目标标签/分支，消除多处硬编码
       if [[ -f "$HOME/.tmux.conf" ]]; then
         while IFS='#' read -r _p_repo _p_ref; do
@@ -1813,7 +1820,7 @@ if ((WITH_TMUX)); then
     fi
     # shellcheck disable=SC2032,SC2033
     if command -v tmux >/dev/null 2>&1 && command tmux info >/dev/null 2>&1; then
-      command tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
+      "${_tmux_run_env[@]}" tmux source-file "$HOME/.tmux.conf" >/dev/null 2>&1 || true
       info "$(msg "已热重载运行中的 Tmux 服务配置" "Reloaded active Tmux server configuration")"
     fi
   fi

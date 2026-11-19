@@ -308,6 +308,15 @@ Debian 13 中 `/usr/bin/resize` 由 xterm 包提供，参见[官方文件清单]
   2. 若在个人全局配置中启用了拼写检查，请在全局 `settings.json` 中对 `*.ja.md` 禁用拼写检查。
   3. 确保文件统一采用 UTF-8 编码与 LF (`\n`) 换行符。
 
+### (6) Tmux 底部状态栏显示 `\uE0B2` 等字面量字符或硬件图标显示为方框
+- **现象**：底部右侧状态栏在日期、电量、CPU 等模块之间显示字面量字符串 `\uE0B2`，或者图标显示为方框/问号。
+- **原因**：
+  1. **`\uE0B2` 字面量**：`tmux-tokyo-night` 默认使用 Bash `$'\ue0b2'` 定义 Powerline 分隔符；当 `tmux` 后台服务端全局环境继承了 `LC_ALL=C`（或非 UTF-8 Locale）时，Bash 不会解析 `\uE0B2` 转义而直接输出为 6 个 ASCII 字符。
+  2. **图标方框**：`MesloLGS NF` 等旧版 Nerd Font v2 字体缺少部分 v3 图标（如 CPU `` `U+F4BC`、内存 `` `U+EFC5`），或终端（如 macOS 原生 Terminal / 未配置的 Ghostty）仍在使用系统默认字体。
+- **处理方式**：
+  1. 当前仓库已在 `templates/tmux.conf` 中显式固定 `@theme_left_separator` / `@theme_right_separator` 为真实 UTF-8 字符并自动清理 `LC_ALL=C`；重新部署或按 `Ctrl+a` 后按 `r` 重载 `~/.tmux.conf` 即可恢复。
+  2. 推荐配合 WezTerm（`--with-terminals` 自动部署 `~/.config/wezterm/wezterm.lua`）或 Alacritty，并在终端设置中选用 `JetBrainsMono Nerd Font`。
+
 ## 历史验证摘要
 
 以下保留自旧文档的 2026-09-06 至 09-07 Debian 13 / Zsh 5.9 用户反馈，属于历史记录，本轮未再次连接目标机验证。

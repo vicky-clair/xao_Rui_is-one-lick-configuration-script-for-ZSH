@@ -344,13 +344,13 @@ case "$ACTION" in
             # yazi 采用大写 -V 输出版本；通过 setsid/--foreground 隔离终端控制权并设置超时，避免无 TTY 下触发 SIGTTOU 挂死
             if command -v setsid >/dev/null 2>&1; then
               version=$(setsid yazi -V </dev/null 2>&1 || true)
-            elif "$limiter" --help 2>&1 | grep -q -- --foreground; then
+            elif "$limiter" --help 2>&1 | grep -- --foreground >/dev/null; then
               version=$("$limiter" --foreground -k 1s 2s yazi -V </dev/null 2>&1 || true)
             else
               version=$("$limiter" -k 1s 2s yazi -V </dev/null 2>&1 || true)
             fi
-            # 去除终端图形协议探测序列（如 Gi=31...;AAAA）保留标准版本文本
-            version=$(printf "%s\n" "$version" | sed -e 's/^.*\(Yazi [0-9]\)/\1/' || true)
+            # 去除终端图形协议探测序列（如 Gi=31...;AAAA），并兼容 Yazi 26+ 将版本号放在第二行 Version: 的输出格式
+            version=$(printf "%s\n" "$version" | sed -e 's/^.*\(Yazi\)/\1/' | awk '/Yazi/{line=$0; if (getline nxt > 0 && nxt ~ /Version:/) {sub(/^[[:space:]]*Version:[[:space:]]*/, "", nxt); print "Yazi " nxt; exit} print line; exit}' || true)
             ;;
           *)
             version=$("$limiter" -k 1s 2s "$tool" --version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -version </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -V </dev/null 2>&1 || "$limiter" -k 1s 2s "$tool" -v </dev/null 2>&1 || true)

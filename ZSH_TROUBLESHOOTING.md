@@ -266,7 +266,7 @@ Debian 13 中 `/usr/bin/resize` 由 xterm 包提供，参见[官方文件清单]
      brew install --cask font-jetbrains-mono-nerd-font font-meslo-for-powerlevel10k
      ```
   2. 在终端配置文件中指定字体名称：
-     - **WezTerm** (`~/.wezterm.lua`):
+     - **WezTerm** (`~/.config/wezterm/wezterm.lua` 或 `~/.wezterm.lua`):
        ```lua
        local wezterm = require 'wezterm'
        local config = wezterm.config_builder()

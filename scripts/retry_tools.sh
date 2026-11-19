@@ -92,18 +92,20 @@ elif [[ -r /etc/os-release ]]; then
   fi
 fi
 [[ -n "$FAMILY" ]] || { echo '不支持此发行版的自动重试'; exit 1; }
+# 辅助函数：检测系统或用户目录是否已安装 Nerd Font（避免 pipefail 下 grep -q 引发 SIGPIPE）
 has_nerd_font() {
-  if command -v fc-list >/dev/null 2>&1; then
-    if fc-list : family 2>/dev/null | grep -qiE 'nerd font|nerdfont'; then
-      return 0
-    fi
-  fi
   local font_dir
   for font_dir in "$HOME/.local/share/fonts" "$HOME/.fonts" "/usr/share/fonts" "/usr/local/share/fonts" "$HOME/Library/Fonts" "/Library/Fonts"; do
-    if [[ -d "$font_dir" ]] && find "$font_dir" -maxdepth 3 \( -iname "*nerdfont*" -o -iname "*nerd font*" -o -iname "*symbols*nerd*" \) 2>/dev/null | head -n 1 | grep -q .; then
+    [[ -d "$font_dir" ]] || continue
+    if [[ -n $(find "$font_dir" -maxdepth 3 \( -iname "*nerdfont*" -o -iname "*nerd font*" -o -iname "*symbols*nerd*" \) 2>/dev/null | head -n 1 || true) ]]; then
       return 0
     fi
   done
+  if command -v fc-list >/dev/null 2>&1; then
+    if fc-list : family 2>/dev/null | grep -iE 'nerd font|nerdfont' >/dev/null; then
+      return 0
+    fi
+  fi
   return 1
 }
 

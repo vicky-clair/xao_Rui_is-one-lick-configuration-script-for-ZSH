@@ -89,7 +89,7 @@ check_git_repo() {
   local pinned_ref="" current_tag=""
   if [[ "$name" == tmux/* && -f "$HOME/.tmux.conf" ]]; then
     local pname="${name#tmux/}"
-    pinned_ref=$(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"][^'\"]*\/${pname}#\([^'\"]*\)['\"].*/\1/p" "$HOME/.tmux.conf" 2>/dev/null | head -n 1)
+    pinned_ref=$(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"][^'\"]*\/${pname}#\([^'\"]*\)['\"].*/\1/p" "$HOME/.tmux.conf" 2>/dev/null | head -n 1 || true)
   fi
   if [[ -n "$pinned_ref" ]]; then
     current_tag=$(git -C "$dir" describe --tags --exact-match 2>/dev/null || git -C "$dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)

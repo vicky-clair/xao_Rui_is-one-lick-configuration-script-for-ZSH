@@ -360,7 +360,7 @@ brew install --cask font-jetbrains-mono-nerd-font font-meslo-for-powerlevel10k
 > *亦可通过 Rust 官方工具链直接编译安装*：`cargo install alacritty`。
 
 各终端配置文件位置：
-* **WezTerm**：`~/.wezterm.lua`
+* **WezTerm**：`~/.config/wezterm/wezterm.lua`（`--with-terminals` 默认部署路径；若存在 `~/.wezterm.lua` 则前者优先）
 * **Alacritty**：`~/.config/alacritty/alacritty.toml`
 * **Ghostty**：`~/.config/ghostty/config`
 

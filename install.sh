@@ -409,7 +409,7 @@ if ((DO_UPDATE)); then
       local pname="${name#tmux/}" _tconf="$HOME/.tmux.conf"
       [[ -f "$_tconf" ]] || _tconf="$SCRIPT_DIR/templates/tmux.conf"
       if [[ -f "$_tconf" ]]; then
-        pinned_ref=$(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"][^'\"]*\/${pname}#\([^'\"]*\)['\"].*/\1/p" "$_tconf" 2>/dev/null | head -n 1)
+        pinned_ref=$(sed -n "s/^[[:space:]]*set[[:space:]].*@plugin[[:space:]]*['\"][^'\"]*\/${pname}#\([^'\"]*\)['\"].*/\1/p" "$_tconf" 2>/dev/null | head -n 1 || true)
       fi
     fi
     if [[ -n "$pinned_ref" ]]; then
@@ -444,7 +444,7 @@ if ((DO_UPDATE)); then
     else
       UPDATE_INCOMPLETE=1
       local first_err
-      first_err=$(printf '%s\n' "$pull_out" | command grep -v '^[[:space:]]*$' | head -n 1)
+      first_err=$(printf '%s\n' "$pull_out" | command grep -v '^[[:space:]]*$' | head -n 1 || true)
       UPDATED_FAIL+=("$name | ${first_err:-$(msg "拉取超时或网络连接失败" "Pull timed out or network failed")} | cd \"$dir\" && git pull")
       warn "$(msg "$name 自动更新失败 (${first_err:-网络超时})" "$name update failed (${first_err:-network timeout})")"
     fi
@@ -1027,19 +1027,26 @@ else
   export PATH="$HOME/.local/bin:$PATH"
 fi
 
-# 辅助函数：检测系统或用户目录是否已安装 Nerd Font
+# 辅助函数：检测系统或用户目录是否已安装 Nerd Font（支持按需传入文件名通配与字族正则）
 has_nerd_font() {
-  if command -v fc-list >/dev/null 2>&1; then
-    if fc-list : family 2>/dev/null | grep -qiE 'nerd font|nerdfont'; then
-      return 0
-    fi
-  fi
-  local font_dir
+  local file_glob="${1:-}" fc_pattern="${2:-nerd font|nerdfont}" font_dir
+  # 优先扫描标准字体目录，毫秒级完成且避免无谓调用 fc-list
   for font_dir in "$HOME/.local/share/fonts" "$HOME/.fonts" "/usr/share/fonts" "/usr/local/share/fonts" "$HOME/Library/Fonts" "/Library/Fonts"; do
-    if [[ -d "$font_dir" ]] && find "$font_dir" -maxdepth 3 \( -iname "*nerdfont*" -o -iname "*nerd font*" -o -iname "*symbols*nerd*" \) 2>/dev/null | head -n 1 | grep -q .; then
+    [[ -d "$font_dir" ]] || continue
+    if [[ -n "$file_glob" ]]; then
+      if [[ -n $(find "$font_dir" -maxdepth 3 -iname "*${file_glob}*" 2>/dev/null | head -n 1 || true) ]]; then
+        return 0
+      fi
+    elif [[ -n $(find "$font_dir" -maxdepth 3 \( -iname "*nerdfont*" -o -iname "*nerd font*" -o -iname "*symbols*nerd*" \) 2>/dev/null | head -n 1 || true) ]]; then
       return 0
     fi
   done
+  if command -v fc-list >/dev/null 2>&1; then
+    # 禁止在 pipefail 下使用 grep -q，避免匹配后提前关闭管道导致 fc-list 触发 SIGPIPE (141) 误判
+    if fc-list : family 2>/dev/null | grep -iE "$fc_pattern" >/dev/null; then
+      return 0
+    fi
+  fi
   return 1
 }
 
@@ -1815,7 +1822,7 @@ fi
 # 可选部署 WezTerm 与 Alacritty 现代化终端配置（自动备份已有文件）
 if ((WITH_TERMINALS)); then
   info "$(msg "正在部署 WezTerm 与 Alacritty 终端推荐配置..." "Deploying WezTerm and Alacritty terminal configurations...")"
-  if [[ "$FAMILY" == brew ]] && ! fc-list : family 2>/dev/null | grep -qi "JetBrainsMono Nerd Font"; then
+  if [[ "$FAMILY" == brew ]] && ! has_nerd_font "JetBrainsMono*Nerd" "JetBrainsMono.*Nerd"; then
     HOMEBREW_NO_AUTO_UPDATE=1 brew install --cask font-jetbrains-mono-nerd-font 2>/dev/null || true
   fi
   if [[ -r "$SCRIPT_DIR/terminal_configs/wezterm/wezterm.lua" ]]; then
@@ -1823,6 +1830,9 @@ if ((WITH_TERMINALS)); then
     [[ -f "$HOME/.config/wezterm/wezterm.lua" && ! -L "$HOME/.config/wezterm/wezterm.lua" ]] && cp "$HOME/.config/wezterm/wezterm.lua" "$BACKUP/wezterm.lua.bak"
     install -m 600 "$SCRIPT_DIR/terminal_configs/wezterm/wezterm.lua" "$HOME/.config/wezterm/wezterm.lua"
     success "$(msg "已部署 ~/.config/wezterm/wezterm.lua" "Deployed ~/.config/wezterm/wezterm.lua")"
+    if [[ -e "$HOME/.wezterm.lua" ]]; then
+      warn "$(msg "检测到旧版 ~/.wezterm.lua；WezTerm 会优先加载 ~/.wezterm.lua 而忽略 ~/.config/wezterm/wezterm.lua，如需启用新配置请备份后移除前者。" "Legacy ~/.wezterm.lua detected; WezTerm prioritizes it over ~/.config/wezterm/wezterm.lua. Back up and remove ~/.wezterm.lua to apply the new config.")"
+    fi
   fi
   if [[ -r "$SCRIPT_DIR/terminal_configs/alacritty/alacritty.toml" ]]; then
     mkdir -p "$HOME/.config/alacritty"

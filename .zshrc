@@ -463,13 +463,28 @@ if command -v tmux &>/dev/null; then
       while [[ -n "$_p" && "$_p" -gt 1 && -f "/proc/$_p/stat" ]]; do
         local _stat_comm=""
         _stat_comm=$(cut -d " " -f 2 "/proc/$_p/stat" 2>/dev/null)
-        if [[ "$_stat_comm" == "(tmux)" || "$_stat_comm" == "(tmux:"* || "$_stat_comm" == "(screen)" ]]; then
+        if [[ "$_stat_comm" == "(tmux)" || "$_stat_comm" == "(tmux:"* || "$_stat_comm" == "(screen)" || "$_stat_comm" == "(su)" || "$_stat_comm" == "(sudo)" || "$_stat_comm" == "(doas)" ]]; then
           return 0
         fi
         local _next_p=""
         _next_p=$(cut -d " " -f 4 "/proc/$_p/stat" 2>/dev/null)
         [[ -z "$_next_p" || "$_next_p" -eq "$_p" ]] && break
         _p=$_next_p
+      done
+    elif command -v ps >/dev/null 2>&1; then
+      # macOS / BSD 等无 /proc 系统的进程祖先链回溯兜底（遇到受限沙箱环境则静默退出）
+      local _p=$PPID _hop=0
+      while [[ -n "$_p" && "$_p" -gt 1 && $_hop -lt 32 ]]; do
+        local _ps_line="" _ps_ppid="" _ps_comm=""
+        _ps_line=$(ps -o ppid=,comm= -p "$_p" 2>/dev/null) || break
+        read -r _ps_ppid _ps_comm <<< "$_ps_line" || break
+        _ps_comm="${_ps_comm##*/}"
+        if [[ "$_ps_comm" == "su" || "$_ps_comm" == "sudo" || "$_ps_comm" == "doas" || "$_ps_comm" == tmux* || "$_ps_comm" == screen* ]]; then
+          return 0
+        fi
+        [[ -z "$_ps_ppid" || "$_ps_ppid" -eq "$_p" ]] && break
+        _p=$_ps_ppid
+        ((_hop++))
       done
     fi
 

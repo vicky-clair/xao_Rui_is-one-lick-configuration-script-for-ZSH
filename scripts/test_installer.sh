@@ -162,7 +162,20 @@ has_nerd_font && fail 'has_nerd_font reported positive on clean state'
 mkdir -p "$font_mock_dir"
 touch "$font_mock_dir/SymbolsNerdFont-Regular.ttf"
 has_nerd_font || fail 'has_nerd_font failed to detect installed Nerd Font'
-pass 'has_nerd_font detection'
+if has_nerd_font "JetBrainsMono*Nerd" "JetBrainsMono.*Nerd"; then
+  fail 'has_nerd_font matched JetBrainsMono when only SymbolsNerdFont existed'
+fi
+rm -rf "$font_mock_dir"
+# 回归测试：fc-list 输出超过管道缓冲区 (>64KB) 时，pipefail 下不得因 SIGPIPE (141) 误报未安装
+_orig_fclist=$(declare -f fc-list 2>/dev/null || true)
+fc-list() {
+  printf 'JetBrainsMono Nerd Font\n'
+  awk 'BEGIN{for(i=0;i<5000;i++) print "SystemFallbackFontFamilyNamePaddingLine"}'
+}
+has_nerd_font "JetBrainsMono*Nerd" "JetBrainsMono.*Nerd" || fail 'has_nerd_font failed under pipefail SIGPIPE with large fc-list output'
+unset -f fc-list
+[[ -n "$_orig_fclist" ]] && eval "$_orig_fclist"
+pass 'has_nerd_font detection and pipefail SIGPIPE safety'
 
 # ------------------------------------------------------------------------------
 # 7b. 下载资产 SHA-256 校验和验证器 (verify_asset_sha256) 边界测试：
